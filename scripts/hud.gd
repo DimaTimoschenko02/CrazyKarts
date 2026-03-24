@@ -48,11 +48,11 @@ func _on_player_died(victim_id: int, killer_id: int) -> void:
 	# Remove feed entry after 4 seconds
 	get_tree().create_timer(4.0).timeout.connect(msg.queue_free)
 
-func _find_my_kart() -> RigidBody3D:
+func _find_my_kart() -> CharacterBody3D:
 	var scene := get_tree().current_scene
 	if not scene:
 		return null
 	var karts_node := scene.get_node_or_null("Karts")
 	if not karts_node:
 		return null
-	return karts_node.get_node_or_null(str(multiplayer.get_unique_id())) as RigidBody3D
+	return karts_node.get_node_or_null(str(multiplayer.get_unique_id())) as CharacterBody3D

@@ -1,9 +1,17 @@
 [gd_scene format=3 uid="uid://cupdu5hd0xxsr"]
 
 [ext_resource type="Texture2D" uid="uid://baeqy54gm6aew" path="res://assets/Explosions/1/1_1.png" id="3_a4qrm"]
-[ext_resource type="PackedScene" uid="uid://c0uq73o1vm07i" path="res://assets/carts/FirstCar.glb" id="4_scnjq"]
+[ext_resource type="PackedScene" uid="uid://0buyak1wp7m2" path="res://assets/carts/Car2.glb" id="3_sud1f"]
+
+[sub_resource type="Curve" id="Curve_k4lwf"]
+_data = [Vector2(0.22972974, 1), 0.0, 0.0, 0, 0, Vector2(1, 0.056179762), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_sud1f"]
+curve = SubResource("Curve_k4lwf")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_a4qrm"]
+lifetime_randomness = 0.6
 direction = Vector3(0, 0, -1)
 spread = 10.0
 initial_velocity_min = 1.0
@@ -11,9 +19,12 @@ initial_velocity_max = 2.0
 gravity = Vector3(0, 0.5, 0)
 scale_min = 0.19999999
 scale_max = 1.5
+alpha_curve = SubResource("CurveTexture_sud1f")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_w8d41"]
 transparency = 1
+depth_draw_mode = 1
+shading_mode = 0
 vertex_color_use_as_albedo = true
 albedo_color = Color(0.37413967, 0.3741391, 0.37413925, 0.8352941)
 albedo_texture = ExtResource("3_a4qrm")
@@ -26,33 +37,38 @@ size = Vector2(0.5, 0.5)
 [node name="Base Car(rockets)" type="Node3D" unique_id=358117560]
 
 [node name="Socket_Left" type="Marker3D" parent="." unique_id=282843129]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.44938105, 0.7024865, 1.1983335)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3546462, 0.61905324, 0.63135004)
 
 [node name="Socket_Right" type="Marker3D" parent="." unique_id=1741245770]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44089156, 0.68249404, 1.205587)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3947143, 0.6298427, 0.63860357)
 
 [node name="Socket_Center" type="Marker3D" parent="." unique_id=995822031]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.44456613, 0.94410515)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.005925417, 0.31185567, 1.1002692)
 
-[node name="FirstCar" parent="." unique_id=555782321 instance=ExtResource("4_scnjq")]
-transform = Transform3D(-0.6, 0, -5.2453668e-08, 0, 0.6, 0, 5.2453668e-08, 0, -0.6, 0, 0, 0)
+[node name="MainCar" type="Node3D" parent="." unique_id=587672237]
+transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0, 0, 0)
 
-[node name="RightDrift" type="Node3D" parent="FirstCar/RT" parent_id_path=PackedInt32Array(555782321, 1343012725) index="0" unique_id=986762458]
+[node name="Car2" parent="MainCar" unique_id=1608341542 instance=ExtResource("3_sud1f")]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 0, 0, 0)
+
+[node name="RightDrift" type="Node3D" parent="MainCar/Car2/RT" parent_id_path=PackedInt32Array(1608341542, 1587589758) index="0" unique_id=1458398523]
 transform = Transform3D(-1.6666665, 0, 1.4570462e-07, 0, 1.6666665, 0, -1.4570462e-07, 0, -1.6666665, 0.067570865, -0.54651254, 0.27541202)
 
-[node name="GPUParticles3D" type="GPUParticles3D" parent="FirstCar/RT/RightDrift" unique_id=982224402]
+[node name="GPUParticles3D" type="GPUParticles3D" parent="MainCar/Car2/RT/RightDrift" unique_id=1166281601]
 transform = Transform3D(1, 0, -8.4703295e-22, 0, 1, 0, 8.4703295e-22, 0, 1, 0.18235096, 0.32031396, 0)
+emitting = false
 amount = 35
 process_material = SubResource("ParticleProcessMaterial_a4qrm")
 draw_pass_1 = SubResource("QuadMesh_umnlq")
 
-[node name="LeftDrift" type="Node3D" parent="FirstCar" unique_id=1034232496]
-transform = Transform3D(-1.6666665, 0, 1.4570462e-07, 0, 1.6666665, 0, -1.4570462e-07, 0, -1.6666665, -0.50000006, -0.024519362, 1.2666665)
+[node name="LeftDrift" type="Node3D" parent="MainCar/Car2/LT" parent_id_path=PackedInt32Array(1608341542, 550988877) index="0" unique_id=45871805]
+transform = Transform3D(-1.6666664, 0, 1.4570463e-07, 0, 1.6666664, 0, -1.4570463e-07, 0, -1.6666664, 0.40447533, -0.024519384, 1.2666664)
 
-[node name="GPUParticles3D" type="GPUParticles3D" parent="FirstCar/LeftDrift" unique_id=322618974]
-transform = Transform3D(1, 0, -1.6940659e-21, 0, 1, 0, 1.6940659e-21, 0, 1, 0.11048013, 0.32031396, 0)
+[node name="GPUParticles3D" type="GPUParticles3D" parent="MainCar/Car2/LT/LeftDrift" unique_id=1909145678]
+transform = Transform3D(1, 0, 1.4210855e-14, 0, 1, 0, -1.4210855e-14, 0, 1, 0.11048016, 0.039699405, -1.1920929e-07)
+emitting = false
 amount = 35
 process_material = SubResource("ParticleProcessMaterial_a4qrm")
 draw_pass_1 = SubResource("QuadMesh_umnlq")
 
-[editable path="FirstCar"]
+[editable path="MainCar/Car2"]

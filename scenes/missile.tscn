@@ -30,6 +30,7 @@ transform = Transform3D(-1.3113417e-08, 0, -0.3, 0, 0.3, 0, 0.3, 0, -1.3113417e-
 mesh = ExtResource("2_bkb3y")
 
 [node name="GPUParticles3D" type="GPUParticles3D" parent="blockbench_export" unique_id=29407648]
+emitting = false
 amount = 100
 process_material = SubResource("ParticleProcessMaterial_5epdn")
 draw_pass_1 = SubResource("QuadMesh_brtn2")
