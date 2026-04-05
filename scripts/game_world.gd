@@ -83,27 +83,52 @@ func _build_world_state() -> Dictionary:
 		if pickup.has_method("_set_state"):
 			pickup_states[pickup.get_path()] = pickup.active
 
+	var hp_states := {}
+	for pid in GameManager.players:
+		var kart := karts.get_node_or_null(str(pid))
+		if kart:
+			var health: HealthComponent = kart.get_node_or_null("HealthComponent")
+			if health:
+				hp_states[pid] = health.current_hp
+
 	return {
 		"scores": GameManager.players.duplicate(true),
 		"pickups": pickup_states,
 		"match_state": StateManager.get_match_state(),
+		"hp_states": hp_states,
 	}
 
+
+var _pending_hp_states: Dictionary = {}
 
 @rpc("authority", "call_remote", "reliable")
 func _rpc_world_state(state: Dictionary) -> void:
 	print("[GameWorld] Received world_state")
-	# Apply scores
 	if "scores" in state:
 		GameManager.players = state["scores"]
 		GameManager.scores_updated.emit(GameManager.players)
 
-	# Apply pickup states
 	if "pickups" in state:
 		for path in state["pickups"]:
 			var pickup := get_node_or_null(path)
 			if pickup and pickup.has_method("_set_state"):
 				pickup._set_state(state["pickups"][path])
+
+	if "hp_states" in state:
+		_pending_hp_states = state["hp_states"]
+
+
+func _apply_pending_hp(pid: int) -> void:
+	if pid not in _pending_hp_states:
+		return
+	var kart := karts.get_node_or_null(str(pid))
+	if not kart:
+		return
+	var health: HealthComponent = kart.get_node_or_null("HealthComponent")
+	if health:
+		health.current_hp = clampi(_pending_hp_states[pid], 0, health.max_hp)
+		health.hp_changed.emit(health.current_hp, health.max_hp)
+	_pending_hp_states.erase(pid)
 
 
 # ── Spawning ──────────────────────────────────────────────────────────────────
@@ -131,6 +156,7 @@ func _rpc_spawn_kart(pid: int, player_name: String, spawn_pos: Vector3) -> void:
 	kart.name        = str(pid)
 	kart.position    = spawn_pos
 	karts.add_child(kart, true)
+	call_deferred("_apply_pending_hp", pid)
 
 
 # ── State changes ────────────────────────────────────────────────────────────

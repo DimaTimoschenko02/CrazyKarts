@@ -55,8 +55,9 @@ const ROCKET_SPREAD_DEG := 10.0
 # ── Server-side tracking ─────────────────────────────────────────────────────
 var _last_known_pos: Vector3 = Vector3.ZERO
 
-@onready var camera:          Camera3D = $Camera3D
-@onready var name_label:      Label3D  = $NameLabel
+@onready var camera:          Camera3D        = $Camera3D
+@onready var name_label:      Label3D         = $NameLabel
+@onready var _health:         HealthComponent = $HealthComponent
 @onready var _launcher_left:  Marker3D   = $BaseCar/Socket_Left
 @onready var _launcher_right: Marker3D   = $BaseCar/Socket_Right
 @onready var _launcher_center:Marker3D   = $BaseCar/Socket_Center
@@ -94,6 +95,9 @@ func _ready() -> void:
 	if r_smoke:
 		r_smoke.emitting = false
 
+	_health.setup(player_id)
+	_health.died.connect(_on_health_died)
+
 	StateManager.kart_state_changed.connect(_on_kart_state_changed)
 	StateManager.weapon_state_changed.connect(_on_weapon_state_changed)
 
@@ -102,6 +106,8 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	if _health and _health.died.is_connected(_on_health_died):
+		_health.died.disconnect(_on_health_died)
 	if StateManager.kart_state_changed.is_connected(_on_kart_state_changed):
 		StateManager.kart_state_changed.disconnect(_on_kart_state_changed)
 	if StateManager.weapon_state_changed.is_connected(_on_weapon_state_changed):
@@ -229,7 +235,7 @@ func _physics_process(delta: float) -> void:
 			local_vel.z,
 			local_vel.x,
 			rad_to_deg(global_rotation.y),
-			GameManager.players.get(player_id, {}).get("hp", 0),
+			_health.current_hp if _health else 0,
 			"true" if weapon_state == GameStates.WeaponState.ARMED else "false",
 			"true" if kart_state == GameStates.KartState.DEAD else "false",
 			"true" if is_on_floor() else "false",
@@ -466,12 +472,15 @@ func _clear_launchers() -> void:
 
 # ── Damage (server-side entry point) ─────────────────────────────────────────
 
-func take_damage(damage: int, attacker_id: int) -> void:
+func take_damage(damage: int, attacker_id: int, damage_type: DamageInfo.Type = DamageInfo.Type.PROJECTILE, hit_position: Vector3 = Vector3.ZERO) -> void:
 	if not multiplayer.is_server():
 		return
-	if not StateManager.can_take_damage(player_id):
-		return
-	GameManager.deal_damage(player_id, attacker_id, damage)
+	var info := DamageInfo.create(damage_type, damage, attacker_id, hit_position)
+	_health.apply_damage(info)
+
+
+func _on_health_died(_killer_id: int) -> void:
+	pass  # VFX hook — placeholder for step 7
 
 
 # ── Respawn (visual reset, called via RPC from game_world) ───────────────────
@@ -485,4 +494,4 @@ func respawn(spawn_pos: Vector3) -> void:
 	_last_known_pos = spawn_pos
 	if _snapshot_buffer:
 		_snapshot_buffer.force_teleport()
-	GameManager.reset_hp(player_id)
+	_health.reset()

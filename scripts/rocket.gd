@@ -1,7 +1,7 @@
 extends Area3D
 
 var SPEED            : float = 45.0
-var DAMAGE           : int   = 50
+var DAMAGE           : int   = 40
 var EXPLOSION_RADIUS : float = 3.5
 var LIFETIME         : float = 6.0
 
@@ -52,8 +52,11 @@ func _explode() -> void:
 
 	if multiplayer.is_server():
 		for kart in get_tree().get_nodes_in_group("karts"):
-			if hit_pos.distance_to(kart.global_position) <= EXPLOSION_RADIUS:
-				kart.take_damage(DAMAGE, shooter_id)
+			var dist := hit_pos.distance_to(kart.global_position)
+			if dist <= EXPLOSION_RADIUS:
+				var falloff_damage := floori(DAMAGE * maxf(0.0, 1.0 - (dist / EXPLOSION_RADIUS)))
+				if falloff_damage > 0:
+					kart.take_damage(falloff_damage, shooter_id, DamageInfo.Type.AOE_EXPLOSION, hit_pos)
 
 	_spawn_explosion_vfx(hit_pos)
 	queue_free()

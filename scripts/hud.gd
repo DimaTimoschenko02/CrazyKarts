@@ -12,6 +12,7 @@ func _ready() -> void:
 	StateManager.weapon_state_changed.connect(_on_weapon_state_changed)
 	GameManager.scores_updated.connect(_on_scores_updated)
 	NetworkManager.ping_updated.connect(_on_ping_updated)
+	_try_connect_local_health.call_deferred()
 
 	# Create ping label in a full-rect Control container (anchors need a Control parent)
 	var ping_container := Control.new()
@@ -40,10 +41,12 @@ func _exit_tree() -> void:
 		GameManager.scores_updated.disconnect(_on_scores_updated)
 	if NetworkManager.ping_updated.is_connected(_on_ping_updated):
 		NetworkManager.ping_updated.disconnect(_on_ping_updated)
+	var health := _get_local_health()
+	if health and health.hp_changed.is_connected(_on_hp_changed):
+		health.hp_changed.disconnect(_on_hp_changed)
 
 
 func _on_scores_updated(_scores: Dictionary) -> void:
-	_update_hp_bar()
 	update_scores(_scores)
 
 
@@ -65,10 +68,32 @@ func _on_ping_updated(rtt_ms: int) -> void:
 		ping_label.add_theme_color_override("font_color", Color.RED)
 
 
-func _update_hp_bar() -> void:
-	var my_id := multiplayer.get_unique_id()
-	var data: Dictionary = GameManager.players.get(my_id, {})
-	hp_bar.value = data.get("hp", 100)
+func _get_local_health() -> HealthComponent:
+	var karts_node := get_tree().current_scene.get_node_or_null("Karts") if get_tree().current_scene else null
+	if not karts_node:
+		return null
+	var kart := karts_node.get_node_or_null(str(multiplayer.get_unique_id()))
+	if not kart:
+		return null
+	return kart.get_node_or_null("HealthComponent") as HealthComponent
+
+
+func _try_connect_local_health() -> void:
+	if not is_inside_tree():
+		return
+	var health := _get_local_health()
+	if not health:
+		get_tree().create_timer(0.5).timeout.connect(_try_connect_local_health, CONNECT_ONE_SHOT)
+		return
+	if not health.hp_changed.is_connected(_on_hp_changed):
+		health.hp_changed.connect(_on_hp_changed)
+	hp_bar.max_value = health.max_hp
+	hp_bar.value = health.current_hp
+
+
+func _on_hp_changed(current: int, maximum: int) -> void:
+	hp_bar.max_value = maximum
+	hp_bar.value = current
 
 
 func update_scores(_scores: Dictionary) -> void:
