@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$CLAUDE_TOOL_PARAM_file_path\" | grep -q \"\\.gd$\"; then \"C:/Godot_v4.6.1-stable_win64_console.exe\" --headless --check-only --quit --path \"C:/Users/dimti/do_chego_doshel_progress/smash-karts-clone\" 2>&1 | grep -i \"error\\|warning\" || echo \"GDScript validation: OK\"; fi'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit:*)",
+            "command": "bash -c 'echo \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PostToolUse\\\",\\\"additionalContext\\\":\\\"POST-COMMIT REMINDER: Check if design/gdd/systems-index.md and CLAUDE.md need status updates for systems that were implemented or changed in this commit. Update Progress Tracker table in systems-index.md and MVP Systems table in CLAUDE.md if any system status changed.\\\"}}\"'"
+          }
+        ]
+      }
+    ]
+  }
+}
