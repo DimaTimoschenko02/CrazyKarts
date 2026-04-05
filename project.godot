@@ -12,13 +12,14 @@ config_version=5
 
 config/name="SmashKarts Clone"
 run/main_scene="res://scenes/lobby.tscn"
-config/features=PackedStringArray("4.6", "Forward Plus")
-config/icon="res://icon.svg"
+config/features=PackedStringArray("4.6", "GL Compatibility")
 
 [autoload]
 
+GameStates="*res://scripts/game_states.gd"
 NetworkManager="*res://scripts/network_manager.gd"
 GameManager="*res://scripts/game_manager.gd"
+StateManager="*res://scripts/state_manager.gd"
 PlayerData="*res://scripts/player_data.gd"
 DebugOverlay="*res://scripts/debug_overlay.gd"
 DevParams="*res://scripts/dev_params.gd"
@@ -73,3 +74,9 @@ debug_toggle={
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194334,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
 ]
 }
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+config/icon="res://icon.svg"

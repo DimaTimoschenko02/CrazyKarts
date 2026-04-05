@@ -29,8 +29,13 @@ func host_game() -> Error:
 	return OK
 
 func join_game(address: String) -> Error:
+	print("[NetworkManager] join_game called with address: ", address)
 	peer = WebSocketMultiplayerPeer.new()
-	var url := "ws://" + address + ":" + str(PORT)
+	var url := _build_ws_url(address)
+	print("[NetworkManager] Built WS URL: ", url)
+	if url.is_empty():
+		push_error("Failed to build websocket URL from address: ", address)
+		return ERR_INVALID_PARAMETER
 	var err := peer.create_client(url)
 	if err != OK:
 		push_error("Failed to connect to ", url, ": ", err)
@@ -38,6 +43,20 @@ func join_game(address: String) -> Error:
 	multiplayer.multiplayer_peer = peer
 	print("[Client] Connecting to ", url)
 	return OK
+
+func _build_ws_url(address: String) -> String:
+	var value := address.strip_edges()
+	if value.is_empty():
+		return ""
+	if value.begins_with("ws://") or value.begins_with("wss://"):
+		return value
+	if value.begins_with("http://"):
+		return "ws://" + value.substr(7)
+	if value.begins_with("https://"):
+		return "wss://" + value.substr(8)
+	if value.contains(":"):
+		return "ws://" + value
+	return "ws://" + value + ":" + str(PORT)
 
 func disconnect_from_game() -> void:
 	if peer:

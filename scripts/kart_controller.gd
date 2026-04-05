@@ -1,54 +1,55 @@
 extends CharacterBody3D
 
-# ── Физика ───────────────────────────────────────────────────────────────────
-var MAX_SPEED      : float = 23.0    # м/с
+# ── Physics ──────────────────────────────────────────────────────────────────
+var MAX_SPEED      : float = 23.0
 var REVERSE_MAX_SPEED: float = 13.0
-var ACCELERATION   : float = 12.0   # м/с² — разгон
+var ACCELERATION   : float = 12.0
 var REVERSE_ACCELERATION: float = 10.0
-var BRAKE_DECEL    : float = 40.0   # м/с² — торможение/реверс
-var COAST_DECEL    : float = 8.0    # м/с² — накат (газ отпущен)
-var STEERING_SPEED : float = 2.2    # рад/с при максимальной скорости
-var HIGH_GRIP      : float = 18.0   # боковое сцепление на малой скорости (цепкий)
-var LOW_GRIP       : float = 0.3    # боковое сцепление при заносе (скользкий)
+var BRAKE_DECEL    : float = 40.0
+var COAST_DECEL    : float = 8.0
+var STEERING_SPEED : float = 2.2
+var HIGH_GRIP      : float = 18.0
+var LOW_GRIP       : float = 0.3
 
-# ── Сеть ─────────────────────────────────────────────────────────────────────
-const SYNC_INTERVAL  := 0.05
+# ── Network ──────────────────────────────────────────────────────────────────
+const SYNC_INTERVAL  := 0.033
 
-# ── Состояние игрока ─────────────────────────────────────────────────────────
+# ── Player identity ─────────────────────────────────────────────────────────
 var player_id: int = 0
 var player_name: String = ""
 
-var current_hp: int = 100
-var has_weapon: bool = false
-var is_dead: bool = false
-
-# ── Сеть: интерполяция ───────────────────────────────────────────────────────
+# ── Network interpolation ───────────────────────────────────────────────────
 var _net_pos: Vector3
 var _net_rot: Vector3
 var _sync_timer: float = 0.0
 
-# ── Камера ────────────────────────────────────────────────────────────────────
+# ── Camera ───────────────────────────────────────────────────────────────────
 var _cam_offset := Vector3(0, 4.1, 6.8)
 var _cam_look_forward := 1.15
 var _cam_pos    := Vector3.ZERO
 var _cam_init   := false
 
-# ── Визуал ────────────────────────────────────────────────────────────────────
+# ── VFX ──────────────────────────────────────────────────────────────────────
 var _smoke_timer: float = 0.0
 var _mark_timer:  float = 0.0
 
-# ── Debug кэш (заполняется в _integrate_forces, читается в _physics_process) ──
+# ── Collision (disabled on death) ────────────────────────────────────────────
+var _original_collision_layer: int = 0
+var _original_collision_mask: int = 0
+
+# ── Debug cache ──────────────────────────────────────────────────────────────
 var _dbg_fwd_vel  : float = 0.0
 var _dbg_lat_vel  : float = 0.0
 var _dbg_vert_vel : float = 0.0
 var _dbg_angular  : float = 0.0
 var _dbg_on_floor : bool  = false
 
-# ── Ввод ─────────────────────────────────────────────────────────────────────
+# ── Input ────────────────────────────────────────────────────────────────────
 var _throttle:    float = 0.0
 var _steer_input: float = 0.0
 var _launcher_nodes: Array[Node3D] = []
 const LAUNCHER_SCENE := preload("res://scenes/launcher.tscn")
+const ROCKET_SCENE := preload("res://scenes/rocket.tscn")
 const ROCKET_SPREAD_DEG := 10.0
 
 @onready var camera:          Camera3D = $Camera3D
@@ -61,20 +62,46 @@ const ROCKET_SPREAD_DEG := 10.0
 @onready var l_smoke: GPUParticles3D = $BaseCar/MainCar/Car2/LT/LeftDrift/GPUParticles3D
 @onready var r_smoke: GPUParticles3D = $BaseCar/MainCar/Car2/RT/RightDrift/GPUParticles3D
 
+
 func _ready() -> void:
+	if player_id == 0 and name.is_valid_int():
+		player_id = name.to_int()
+	print("[Kart] _ready: player_id=", player_id, " name=", player_name, " my_id=", multiplayer.get_unique_id())
 	_net_pos = global_position
 	_net_rot = global_rotation
-	camera.current = (player_id == multiplayer.get_unique_id())
+	_original_collision_layer = collision_layer
+	_original_collision_mask = collision_mask
+	var is_local := (player_id == multiplayer.get_unique_id())
+	camera.current = is_local
+	print("[Kart] Camera setup: is_local=", is_local, " camera.current=", camera.current)
 	name_label.text = player_name
+	if OS.has_feature("web"):
+		var dbg_label := Label.new()
+		dbg_label.text = "pid=%d my_id=%d name=%s is_local=%s cam=%s" % [player_id, multiplayer.get_unique_id(), name, is_local, camera.current]
+		dbg_label.position = Vector2(10, 40 + player_id * 25)
+		dbg_label.add_theme_font_size_override("font_size", 18)
+		dbg_label.add_theme_color_override("font_color", Color.YELLOW)
+		get_tree().root.add_child.call_deferred(dbg_label)
 	add_to_group("karts")
 	if l_smoke:
 		l_smoke.emitting = false
 	if r_smoke:
 		r_smoke.emitting = false
-	# Удалённые карты двигаем вручную — без симуляции физики
-	
+
+	# Subscribe to state changes
+	StateManager.kart_state_changed.connect(_on_kart_state_changed)
+	StateManager.weapon_state_changed.connect(_on_weapon_state_changed)
+
 	if OS.is_debug_build() and not OS.has_feature("web"):
 		DevParams.params_changed.connect(_on_dev_params_changed)
+
+
+func _exit_tree() -> void:
+	if StateManager.kart_state_changed.is_connected(_on_kart_state_changed):
+		StateManager.kart_state_changed.disconnect(_on_kart_state_changed)
+	if StateManager.weapon_state_changed.is_connected(_on_weapon_state_changed):
+		StateManager.weapon_state_changed.disconnect(_on_weapon_state_changed)
+
 
 func _on_dev_params_changed(data: Dictionary) -> void:
 	MAX_SPEED      = data.get("MAX_SPEED",      MAX_SPEED)
@@ -93,27 +120,60 @@ func _on_dev_params_changed(data: Dictionary) -> void:
 	if camera:
 		camera.fov = data.get("FOV", camera.fov)
 
-# ── Основной цикл ─────────────────────────────────────────────────────────────
+
+# ── State change handlers ────────────────────────────────────────────────────
+
+func _on_kart_state_changed(peer_id: int, _from: GameStates.KartState, to: GameStates.KartState) -> void:
+	if peer_id != player_id:
+		return
+	match to:
+		GameStates.KartState.DEAD:
+			_on_enter_dead()
+		GameStates.KartState.RESPAWNING, GameStates.KartState.DRIVING:
+			_on_enter_alive()
+
+
+func _on_enter_dead() -> void:
+	visible = false
+	velocity = Vector3.ZERO
+	collision_layer = 0
+	collision_mask = 0
+	_clear_launchers()
+
+
+func _on_enter_alive() -> void:
+	visible = true
+	collision_layer = _original_collision_layer
+	collision_mask = _original_collision_mask
+
+
+func _on_weapon_state_changed(peer_id: int, _from: GameStates.WeaponState, to: GameStates.WeaponState) -> void:
+	if peer_id != player_id:
+		return
+	if to == GameStates.WeaponState.ARMED:
+		_spawn_launchers()
+	elif to == GameStates.WeaponState.EMPTY:
+		_clear_launchers()
+
+
+# ── Main loop ────────────────────────────────────────────────────────────────
 
 func _physics_process(delta: float) -> void:
-	if is_dead:
+	if not StateManager.can_move(player_id):
 		return
 
 	if multiplayer.get_unique_id() == player_id:
-		# 1. Ввод
 		_throttle    = Input.get_axis("move_backward", "move_forward")
 		_steer_input = Input.get_axis("steer_right",   "steer_left")
-		
-		# 2. Гравитация
+
 		if not is_on_floor():
 			velocity.y -= 35.0 * delta
 		else:
 			velocity.y = 0
-		
-		# 3. Направление и расчет скорости
+
 		var forward_dir = -global_transform.basis.z
 		var side_dir = global_transform.basis.x
-		
+
 		var effective_throttle := _throttle
 		if _throttle == 0.0 and _steer_input != 0.0:
 			effective_throttle = 0.55
@@ -123,7 +183,7 @@ func _physics_process(delta: float) -> void:
 		elif effective_throttle < 0.0:
 			target_speed = effective_throttle * REVERSE_MAX_SPEED
 		var current_fwd_speed = velocity.dot(forward_dir)
-		
+
 		if effective_throttle > 0.0:
 			current_fwd_speed = move_toward(current_fwd_speed, target_speed, ACCELERATION * delta)
 		elif effective_throttle < 0.0:
@@ -131,7 +191,6 @@ func _physics_process(delta: float) -> void:
 		else:
 			current_fwd_speed = lerp(current_fwd_speed, 0.0, 1.2 * delta)
 
-		# 4. Повороты
 		var rotation_speed = STEERING_SPEED
 		if _throttle == 0:
 			rotation_speed *= 1.25
@@ -139,22 +198,38 @@ func _physics_process(delta: float) -> void:
 		if current_fwd_speed < -0.5:
 			steer_sign = -1.0
 		rotate_y(_steer_input * steer_sign * rotation_speed * delta)
-		
-		# 5. СБОРКА ВЕКТОРА (Убираем резкое выравнивание)
+
 		var current_side_speed = velocity.dot(side_dir)
-		
 		var drift_resistance := 3.8 if _steer_input != 0.0 else 4.8
 		current_side_speed = lerp(current_side_speed, 0.0, drift_resistance * delta)
-		
+
 		velocity = (forward_dir * current_fwd_speed) + (side_dir * current_side_speed) + Vector3(0, velocity.y, 0)
-		
+
 		move_and_slide()
 		_update_vfx(delta)
-		# --- КОНЕЦ БЛОКА ФИЗИКИ ---
-		
-		if Input.is_action_just_pressed("fire") and has_weapon:
+
+		if Input.is_action_just_pressed("fire") and StateManager.can_fire(player_id):
 			_fire()
-		
+
+		if OS.has_feature("web"):
+			var local_vel := global_transform.basis.inverse() * velocity
+			var kart_state := StateManager.get_kart_state(player_id)
+			var weapon_state := StateManager.get_weapon_state(player_id)
+			var js_code := "window.kartMetrics = {x:%.2f, y:%.2f, z:%.2f, speed:%.2f, fwdSpeed:%.2f, latSpeed:%.2f, rotY:%.2f, hp:%d, weapon:%s, isDead:%s, onFloor:%s, steer:%.2f, throttle:%.2f}" % [
+				global_position.x, global_position.y, global_position.z,
+				velocity.length(),
+				local_vel.z,
+				local_vel.x,
+				rad_to_deg(global_rotation.y),
+				GameManager.players.get(player_id, {}).get("hp", 0),
+				"true" if weapon_state == GameStates.WeaponState.ARMED else "false",
+				"true" if kart_state == GameStates.KartState.DEAD else "false",
+				"true" if is_on_floor() else "false",
+				_steer_input,
+				_throttle
+			]
+			JavaScriptBridge.eval(js_code)
+
 		if OS.is_debug_build():
 			var h : float = 0.0
 			var space := get_world_3d().direct_space_state
@@ -172,8 +247,8 @@ func _physics_process(delta: float) -> void:
 				"height":   h,
 				"angular":  _dbg_angular,
 				"on_floor": _dbg_on_floor,
-				"hp":       current_hp,
-				"weapon":   has_weapon,
+				"hp":       GameManager.players.get(player_id, {}).get("hp", 0),
+				"weapon":   StateManager.get_weapon_state(player_id) == GameStates.WeaponState.ARMED,
 				"peer_id":  player_id,
 				"is_server": multiplayer.is_server(),
 				"pos":      global_position,
@@ -181,9 +256,14 @@ func _physics_process(delta: float) -> void:
 		_sync_timer += delta
 		if _sync_timer >= SYNC_INTERVAL:
 			_sync_timer = 0.0
-			_rpc_sync.rpc(global_position, global_rotation, velocity)
+			var game_world := get_tree().current_scene
+			if multiplayer.is_server() and game_world and "synced_peers" in game_world:
+				for pid in game_world.synced_peers:
+					if pid != player_id:
+						_rpc_sync.rpc_id(pid, global_position, global_rotation, velocity)
+			else:
+				_rpc_sync.rpc(global_position, global_rotation, velocity)
 	else:
-		# Плавная интерполяция позиции удалённого карта
 		global_position = global_position.lerp(_net_pos, 12.0 * delta)
 		global_rotation = Vector3(
 			lerp_angle(global_rotation.x, _net_rot.x, 12.0 * delta),
@@ -191,15 +271,8 @@ func _physics_process(delta: float) -> void:
 			lerp_angle(global_rotation.z, _net_rot.z, 12.0 * delta)
 		)
 
-# ── Arcade физика (_integrate_forces — правильный способ по документации Godot) ──
-#
-# _integrate_forces вызывается движком ВНУТРИ физического шага, после применения
-# гравитации, но до разрешения контактов. Это единственное место, где безопасно
-# переопределять linear_velocity/angular_velocity (docs.godotengine.org → RigidBody3D).
 
-
-
-# ── Камера ────────────────────────────────────────────────────────────────────
+# ── Camera ───────────────────────────────────────────────────────────────────
 
 func _process(delta: float) -> void:
 	if multiplayer.get_unique_id() != player_id or not camera:
@@ -215,20 +288,21 @@ func _process(delta: float) -> void:
 	var look_at_pt := global_position + forward_flat * _cam_look_forward + Vector3.UP * 0.55
 	camera.look_at(look_at_pt, Vector3.UP)
 
-# ── Стрельба ──────────────────────────────────────────────────────────────────
+
+# ── Firing ───────────────────────────────────────────────────────────────────
 
 func _fire() -> void:
-	has_weapon = false
 	var muzzle_transforms := _launch_visual()
 	_show_fire_flash()
 	if multiplayer.is_server():
+		StateManager.server_consume_weapon(player_id)
 		for i in range(muzzle_transforms.size()):
 			var tr := muzzle_transforms[i]
 			var rocket_dir := _apply_rocket_spread(tr.basis.z.normalized(), i, muzzle_transforms.size())
 			_rpc_spawn_rocket.rpc(player_id, tr.origin, rocket_dir)
 	else:
 		_rpc_request_fire.rpc_id(1)
-	_clear_launchers()
+
 
 func _launch_visual() -> Array[Transform3D]:
 	var result: Array[Transform3D] = []
@@ -239,6 +313,7 @@ func _launch_visual() -> Array[Transform3D]:
 		if launcher.has_method("launch"):
 			launcher.launch()
 	return result
+
 
 func _show_fire_flash() -> void:
 	var flash_pos := global_position - global_transform.basis.z * 2.2 + Vector3.UP * 0.4
@@ -264,6 +339,7 @@ func _show_fire_flash() -> void:
 	tw.tween_property(m, "scale", Vector3.ZERO, 0.12)
 	tw.tween_callback(m.queue_free)
 
+
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_request_fire() -> void:
 	if not multiplayer.is_server():
@@ -272,23 +348,27 @@ func _rpc_request_fire() -> void:
 	var kart := get_parent().get_node_or_null(str(shooter_id))
 	if not kart:
 		return
+	if not StateManager.can_fire(shooter_id):
+		return
+	# Read muzzle positions BEFORE consuming weapon (consume clears launchers via signal)
 	var muzzle_transforms: Array[Transform3D] = kart._launch_visual()
 	kart._show_fire_flash()
+	StateManager.server_consume_weapon(shooter_id)
 	for i in range(muzzle_transforms.size()):
 		var tr := muzzle_transforms[i]
 		var rocket_dir: Vector3 = kart._apply_rocket_spread(tr.basis.z.normalized(), i, muzzle_transforms.size())
 		_rpc_spawn_rocket.rpc(shooter_id, tr.origin, rocket_dir)
-	kart._clear_launchers()
+
 
 @rpc("authority", "call_local", "reliable")
 func _rpc_spawn_rocket(shooter_id: int, pos: Vector3, dir: Vector3) -> void:
-	var rocket_scene := load("res://scenes/rocket.tscn") as PackedScene
-	var rocket := rocket_scene.instantiate()
+	var rocket := ROCKET_SCENE.instantiate()
 	get_tree().current_scene.add_child(rocket)
 	rocket.shooter_id = shooter_id
 	rocket.global_position = pos
 	rocket.direction = dir.normalized()
 	rocket.look_at(pos + dir.normalized(), Vector3.UP)
+
 
 func _apply_rocket_spread(base_dir: Vector3, index: int, total: int) -> Vector3:
 	if total < 3:
@@ -301,10 +381,12 @@ func _apply_rocket_spread(base_dir: Vector3, index: int, total: int) -> Vector3:
 	var spread_basis := Basis(Vector3.UP, deg_to_rad(yaw_deg))
 	return (spread_basis * base_dir).normalized()
 
-# ── Дымок при скольжении ──────────────────────────────────────────────────────
+
+# ── Drift VFX ────────────────────────────────────────────────────────────────
+
 func _update_vfx(delta: float) -> void:
 	if not l_smoke or not r_smoke: return
-	
+
 	var local_velocity = global_transform.basis.inverse() * velocity
 	var forward_speed = abs(local_velocity.z)
 	var side_speed = abs(local_velocity.x)
@@ -321,7 +403,8 @@ func _update_vfx(delta: float) -> void:
 	l_drift.visible = true
 	r_drift.visible = true
 
-# ── Сетевая синхронизация ─────────────────────────────────────────────────────
+
+# ── Network sync ─────────────────────────────────────────────────────────────
 
 @rpc("any_peer", "unreliable")
 func _rpc_sync(pos: Vector3, rot: Vector3, _lvel: Vector3) -> void:
@@ -330,13 +413,8 @@ func _rpc_sync(pos: Vector3, rot: Vector3, _lvel: Vector3) -> void:
 	_net_pos = pos
 	_net_rot = rot
 
-# ── Оружие / урон ─────────────────────────────────────────────────────────────
 
-@rpc("authority", "call_local", "reliable")
-func give_weapon() -> void:
-	if not has_weapon:
-		has_weapon = true
-		_spawn_launchers()
+# ── Weapon visuals ───────────────────────────────────────────────────────────
 
 func _spawn_launchers() -> void:
 	_clear_launchers()
@@ -349,35 +427,30 @@ func _spawn_launchers() -> void:
 		launcher.transform = Transform3D.IDENTITY
 		_launcher_nodes.append(launcher)
 
+
 func _clear_launchers() -> void:
 	for launcher in _launcher_nodes:
 		if is_instance_valid(launcher):
 			launcher.queue_free()
 	_launcher_nodes.clear()
 
+
+# ── Damage (server-side entry point) ─────────────────────────────────────────
+
 func take_damage(damage: int, attacker_id: int) -> void:
 	if not multiplayer.is_server():
 		return
+	if not StateManager.can_take_damage(player_id):
+		return
 	GameManager.deal_damage(player_id, attacker_id, damage)
-	_rpc_update_hp.rpc(GameManager.players.get(player_id, {}).get("hp", 0))
 
-@rpc("authority", "call_local", "reliable")
-func _rpc_update_hp(new_hp: int) -> void:
-	current_hp = new_hp
-	if current_hp <= 0 and not is_dead:
-		_die()
 
-func _die() -> void:
-	is_dead = true
-	visible = false
-	velocity  = Vector3.ZERO
+# ── Respawn (visual reset, called via RPC from game_world) ───────────────────
 
 @rpc("authority", "call_local", "reliable")
 func respawn(spawn_pos: Vector3) -> void:
-	is_dead = false
-	visible = true
-	current_hp    = GameManager.MAX_HP
-	global_position  = spawn_pos
-	velocity  = Vector3.ZERO
-	_throttle    = 0.0
+	global_position = spawn_pos
+	velocity = Vector3.ZERO
+	_throttle = 0.0
 	_steer_input = 0.0
+	GameManager.reset_hp(player_id)

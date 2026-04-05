@@ -1,0 +1,34 @@
+# Godot 4+ specific ignores
+.godot/
+
+# Godot-specific ignores
+.import/
+export.cfg
+
+# Imported translations (automatically generated from CSV files)
+*.translation
+
+# Mono-specific ignores
+.mono/
+data_*/
+mono_crash.*.json
+
+# Build outputs
+build/
+dist/
+*.exe
+*.pck
+*.zip
+
+# System/Editor-specific
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Credentials & secrets
+.godot/export_credentials.cfg
+
+# Custom
+.firecrawl/

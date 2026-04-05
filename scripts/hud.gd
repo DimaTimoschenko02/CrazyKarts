@@ -5,14 +5,38 @@ extends CanvasLayer
 @onready var weapon_label: Label         = $WeaponLabel
 @onready var kill_feed:    VBoxContainer = $KillFeed
 
+
 func _ready() -> void:
 	GameManager.player_died.connect(_on_player_died)
+	StateManager.weapon_state_changed.connect(_on_weapon_state_changed)
+	GameManager.scores_updated.connect(_on_scores_updated)
 
-func _process(_delta: float) -> void:
-	var kart := _find_my_kart()
-	if kart:
-		hp_bar.value = kart.current_hp
-		weapon_label.text = "[ ROCKET ]" if kart.has_weapon else "[ no weapon ]"
+
+func _exit_tree() -> void:
+	if StateManager.weapon_state_changed.is_connected(_on_weapon_state_changed):
+		StateManager.weapon_state_changed.disconnect(_on_weapon_state_changed)
+	if GameManager.player_died.is_connected(_on_player_died):
+		GameManager.player_died.disconnect(_on_player_died)
+	if GameManager.scores_updated.is_connected(_on_scores_updated):
+		GameManager.scores_updated.disconnect(_on_scores_updated)
+
+
+func _on_scores_updated(_scores: Dictionary) -> void:
+	_update_hp_bar()
+	update_scores(_scores)
+
+
+func _on_weapon_state_changed(peer_id: int, _from: GameStates.WeaponState, to: GameStates.WeaponState) -> void:
+	if peer_id != multiplayer.get_unique_id():
+		return
+	weapon_label.text = "[ ROCKET ]" if to == GameStates.WeaponState.ARMED else "[ no weapon ]"
+
+
+func _update_hp_bar() -> void:
+	var my_id := multiplayer.get_unique_id()
+	var data: Dictionary = GameManager.players.get(my_id, {})
+	hp_bar.value = data.get("hp", 100)
+
 
 func update_scores(_scores: Dictionary) -> void:
 	for child in score_box.get_children():
@@ -34,6 +58,7 @@ func update_scores(_scores: Dictionary) -> void:
 		lbl.add_theme_font_size_override("font_size", 13)
 		score_box.add_child(lbl)
 
+
 func _on_player_died(victim_id: int, killer_id: int) -> void:
 	var victim_name: String = GameManager.players.get(victim_id, {}).get("name", "?")
 	var killer_name: String = GameManager.players.get(killer_id, {}).get("name", "?")
@@ -45,14 +70,4 @@ func _on_player_died(victim_id: int, killer_id: int) -> void:
 	msg.add_theme_font_size_override("font_size", 14)
 	msg.add_theme_color_override("font_color", Color(1, 0.6, 0.2))
 	kill_feed.add_child(msg)
-	# Remove feed entry after 4 seconds
 	get_tree().create_timer(4.0).timeout.connect(msg.queue_free)
-
-func _find_my_kart() -> CharacterBody3D:
-	var scene := get_tree().current_scene
-	if not scene:
-		return null
-	var karts_node := scene.get_node_or_null("Karts")
-	if not karts_node:
-		return null
-	return karts_node.get_node_or_null(str(multiplayer.get_unique_id())) as CharacterBody3D

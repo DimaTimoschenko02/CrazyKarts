@@ -29,10 +29,6 @@ environment = SubResource("Environment_1")
 
 [node name="Karts" type="Node3D" parent="." unique_id=830106612]
 
-[node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="." unique_id=793776720]
-_spawnable_scenes = PackedStringArray("uid://kart001")
-spawn_path = NodePath("../Karts")
-
 [node name="Pickup_N" parent="." unique_id=2001760647 instance=ExtResource("4_pickup")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -13)
 

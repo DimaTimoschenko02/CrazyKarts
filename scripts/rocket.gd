@@ -9,7 +9,6 @@ var shooter_id: int = 0
 var direction: Vector3 = Vector3.ZERO
 var _age: float = 0.0
 var _exploded: bool = false
-var _trail_timer: float = 0.015
 const EXPLOSION_SCENE := preload("res://scenes/explosion_rockets.tscn")
 
 func _ready() -> void:
@@ -35,37 +34,13 @@ func _physics_process(delta: float) -> void:
 		_explode()
 		return
 	global_position += direction * SPEED * delta
-	_trail_timer += delta
-	if _trail_timer >= 0.015:
-		_trail_timer = 0.0
-		_spawn_trail()
-
-func _spawn_trail() -> void:
-	var p := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = 0.14
-	sm.height = 0.28
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(1.0, 0.45, 0.05, 0.85)
-	mat.emission_enabled = true
-	mat.emission = Color(1.0, 0.25, 0.0)
-	mat.emission_energy_multiplier = 5.0
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	sm.material = mat
-	p.mesh = sm
-	get_tree().current_scene.add_child(p)
-	p.global_position = global_position - direction * 0.35
-	var tw := p.create_tween()
-	tw.set_parallel(true)
-	tw.tween_property(p, "scale", Vector3.ZERO, 0.22)
-	tw.tween_callback(p.queue_free).set_delay(0.22)
 
 func _on_body_entered(body: Node) -> void:
-	if _exploded or _age < 0.1:
+	if _exploded or _age < 0.02:
 		return
 	if body.is_in_group("rockets"):
 		return
-	if body is RigidBody3D and body.player_id == shooter_id:
+	if body is CharacterBody3D and body.player_id == shooter_id:
 		return
 	_explode()
 
