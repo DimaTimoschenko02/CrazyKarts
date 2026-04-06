@@ -1,15 +1,14 @@
 extends CharacterBody3D
 
-# ── Physics ──────────────────────────────────────────────────────────────────
-var MAX_SPEED      : float = 23.0
-var REVERSE_MAX_SPEED: float = 13.0
-var ACCELERATION   : float = 12.0
-var REVERSE_ACCELERATION: float = 10.0
-var BRAKE_DECEL    : float = 40.0
-var COAST_DECEL    : float = 8.0
-var STEERING_SPEED : float = 2.2
-var HIGH_GRIP      : float = 18.0
-var LOW_GRIP       : float = 0.3
+# ── Physics resource ──────────────────────────────────────────────────────────
+@export var physics: KartPhysicsResource = KartPhysicsResource.new()
+
+# ── Drift state ───────────────────────────────────────────────────────────────
+enum DriftPhase { NONE, ENTERING, DRIFTING, EXITING }
+var _drift_phase: DriftPhase = DriftPhase.NONE
+var _drift_direction: int = 0        # -1 or +1, locked on entry
+var _drift_commit_time: float = 0.0  # seconds in ENTERING phase
+var _grip: float = 14.0             # initialised in _ready from physics.high_grip_target
 
 # ── Network ──────────────────────────────────────────────────────────────────
 const SYNC_INTERVAL := 0.033
@@ -43,7 +42,7 @@ var _dbg_vert_vel : float = 0.0
 var _dbg_angular  : float = 0.0
 var _dbg_on_floor : bool  = false
 
-# ── Input ────────────────────────────────────────────────────────────────────
+# ── Input (smoothed) ─────────────────────────────────────────────────────────
 var _throttle:    float = 0.0
 var _steer_input: float = 0.0
 var _launcher_nodes: Array[Node3D] = []
@@ -72,6 +71,11 @@ func _ready() -> void:
 		player_id = name.to_int()
 	print("[Kart] _ready: player_id=", player_id, " name=", player_name, " my_id=", multiplayer.get_unique_id())
 	_last_known_pos = global_position
+	if physics:
+		_grip = physics.high_grip_target
+		floor_snap_length = physics.floor_snap_length
+	floor_stop_on_slope = false
+	floor_max_angle = deg_to_rad(50.0)
 	_original_collision_layer = collision_layer
 	_original_collision_mask = collision_mask
 	var is_local := (player_id == multiplayer.get_unique_id())
@@ -103,6 +107,8 @@ func _ready() -> void:
 
 	if OS.is_debug_build() and not OS.has_feature("web"):
 		DevParams.params_changed.connect(_on_dev_params_changed)
+		if not DevParams.get_data().is_empty():
+			_on_dev_params_changed(DevParams.get_data())
 
 
 func _exit_tree() -> void:
@@ -115,15 +121,40 @@ func _exit_tree() -> void:
 
 
 func _on_dev_params_changed(data: Dictionary) -> void:
-	MAX_SPEED      = data.get("MAX_SPEED",      MAX_SPEED)
-	REVERSE_MAX_SPEED = data.get("REVERSE_MAX_SPEED", REVERSE_MAX_SPEED)
-	ACCELERATION   = data.get("ACCELERATION",   ACCELERATION)
-	REVERSE_ACCELERATION = data.get("REVERSE_ACCELERATION", REVERSE_ACCELERATION)
-	COAST_DECEL    = data.get("COAST_DECEL",    COAST_DECEL)
-	BRAKE_DECEL    = data.get("BRAKE_DECEL",    BRAKE_DECEL)
-	HIGH_GRIP      = data.get("HIGH_GRIP",      HIGH_GRIP)
-	LOW_GRIP       = data.get("LOW_GRIP",       LOW_GRIP)
-	STEERING_SPEED = data.get("STEERING_SPEED", STEERING_SPEED)
+	if not physics:
+		return
+	# Speed
+	physics.max_speed             = data.get("MAX_SPEED",              physics.max_speed)
+	physics.reverse_max_speed     = data.get("REVERSE_MAX_SPEED",      physics.reverse_max_speed)
+	physics.accel_sharpness       = data.get("ACCEL_SHARPNESS",        physics.accel_sharpness)
+	physics.coast_decel           = data.get("COAST_DECEL",            physics.coast_decel)
+	physics.brake_decel           = data.get("BRAKE_DECEL",            physics.brake_decel)
+	# Input smoothing
+	physics.steer_slew_rate_in    = data.get("STEER_SLEW_IN",          physics.steer_slew_rate_in)
+	physics.steer_slew_rate_out   = data.get("STEER_SLEW_OUT",         physics.steer_slew_rate_out)
+	physics.throttle_slew_rate    = data.get("THROTTLE_SLEW",          physics.throttle_slew_rate)
+	# Steering
+	physics.steering_speed        = data.get("STEERING_SPEED",         physics.steering_speed)
+	physics.steer_low_speed_mult  = data.get("STEER_LOW_MULT",         physics.steer_low_speed_mult)
+	physics.steer_high_speed_mult = data.get("STEER_HIGH_MULT",        physics.steer_high_speed_mult)
+	physics.steer_speed_threshold = data.get("STEER_SPEED_THRESHOLD",  physics.steer_speed_threshold)
+	# Drift
+	physics.high_grip_target      = data.get("HIGH_GRIP",              physics.high_grip_target)
+	physics.low_grip_target       = data.get("LOW_GRIP",               physics.low_grip_target)
+	physics.drift_steer_threshold = data.get("DRIFT_STEER_THRESHOLD",  physics.drift_steer_threshold)
+	physics.drift_kick_force      = data.get("DRIFT_KICK_FORCE",       physics.drift_kick_force)
+	physics.min_drift_speed       = data.get("MIN_DRIFT_SPEED",        physics.min_drift_speed)
+	physics.grip_loss_rate        = data.get("GRIP_LOSS_RATE",         physics.grip_loss_rate)
+	physics.grip_recovery_rate    = data.get("GRIP_RECOVERY_RATE",     physics.grip_recovery_rate)
+	physics.drift_counter_steer_mult = data.get("DRIFT_COUNTER_STEER", physics.drift_counter_steer_mult)
+	physics.drift_same_steer_mult    = data.get("DRIFT_SAME_STEER",    physics.drift_same_steer_mult)
+	# Terrain
+	physics.gravity               = data.get("GRAVITY",               physics.gravity)
+	physics.floor_align_speed     = data.get("FLOOR_ALIGN_SPEED",     physics.floor_align_speed)
+	physics.slope_speed_influence = data.get("SLOPE_INFLUENCE",        physics.slope_speed_influence)
+	# Reset grip if not drifting
+	if _drift_phase == DriftPhase.NONE or _drift_phase == DriftPhase.EXITING:
+		_grip = physics.high_grip_target
 	_cam_offset = Vector3(0.0,
 		data.get("CAMERA_HEIGHT",    _cam_offset.y),
 		absf(data.get("CAMERA_DISTANCE", absf(_cam_offset.z))))
@@ -150,12 +181,16 @@ func _on_enter_dead() -> void:
 	collision_layer = 0
 	collision_mask = 0
 	_clear_launchers()
+	_drift_phase = DriftPhase.NONE
+	_drift_direction = 0
 
 
 func _on_enter_alive() -> void:
 	visible = true
 	collision_layer = _original_collision_layer
 	collision_mask = _original_collision_mask
+	if physics:
+		_grip = physics.high_grip_target
 
 
 func _on_weapon_state_changed(peer_id: int, _from: GameStates.WeaponState, to: GameStates.WeaponState) -> void:
@@ -177,49 +212,144 @@ func _physics_process(delta: float) -> void:
 	if not StateManager.can_move(player_id):
 		return
 
-	_throttle    = Input.get_axis("move_backward", "move_forward")
-	_steer_input = Input.get_axis("steer_right",   "steer_left")
+	# ── 1. Input smoothing ────────────────────────────────────────────────────
+	var raw_throttle := Input.get_axis("move_backward", "move_forward")
+	var raw_steer    := Input.get_axis("steer_right",   "steer_left")
 
+	var steer_slew: float
+	if absf(raw_steer) > absf(_steer_input):
+		steer_slew = physics.steer_slew_rate_in
+	else:
+		steer_slew = physics.steer_slew_rate_out
+	_steer_input = move_toward(_steer_input, raw_steer, steer_slew * delta)
+	_throttle    = move_toward(_throttle, raw_throttle, physics.throttle_slew_rate * delta)
+
+	# ── 2. Gravity ────────────────────────────────────────────────────────────
 	if not is_on_floor():
-		velocity.y -= 35.0 * delta
-	else:
-		velocity.y = 0
+		velocity.y -= physics.gravity * delta
 
-	var forward_dir = -global_transform.basis.z
-	var side_dir = global_transform.basis.x
+	# ── 3. Decompose velocity ─────────────────────────────────────────────────
+	var fwd_dir  := -global_transform.basis.z
+	var side_dir :=  global_transform.basis.x
+	var fwd_speed  := velocity.dot(fwd_dir)
+	var side_speed := velocity.dot(side_dir)
 
-	var effective_throttle := _throttle
-	if _throttle == 0.0 and _steer_input != 0.0:
-		effective_throttle = 0.55
+	# ── 4. Acceleration (asymptotic) ──────────────────────────────────────────
 	var target_speed := 0.0
-	if effective_throttle > 0.0:
-		target_speed = effective_throttle * MAX_SPEED
-	elif effective_throttle < 0.0:
-		target_speed = effective_throttle * REVERSE_MAX_SPEED
-	var current_fwd_speed = velocity.dot(forward_dir)
+	if _throttle > 0.0:
+		target_speed = _throttle * physics.max_speed
+	elif _throttle < 0.0:
+		target_speed = _throttle * physics.reverse_max_speed
 
-	if effective_throttle > 0.0:
-		current_fwd_speed = move_toward(current_fwd_speed, target_speed, ACCELERATION * delta)
-	elif effective_throttle < 0.0:
-		current_fwd_speed = move_toward(current_fwd_speed, target_speed, REVERSE_ACCELERATION * delta)
+	if absf(_throttle) > 0.01:
+		fwd_speed = lerp(fwd_speed, target_speed, physics.accel_sharpness * delta * 60.0)
+	elif Input.is_action_pressed("move_backward") and fwd_speed > 0.0:
+		fwd_speed = move_toward(fwd_speed, 0.0, physics.brake_decel * delta)
 	else:
-		current_fwd_speed = lerp(current_fwd_speed, 0.0, 1.2 * delta)
+		fwd_speed = move_toward(fwd_speed, 0.0, physics.coast_decel * delta)
 
-	var rotation_speed = STEERING_SPEED
-	if _throttle == 0:
-		rotation_speed *= 1.25
-	var steer_sign := 1.0
-	if current_fwd_speed < -0.5:
-		steer_sign = -1.0
-	rotate_y(_steer_input * steer_sign * rotation_speed * delta)
+	# ── 5. Steering ───────────────────────────────────────────────────────────
+	var speed_ratio: float = clamp(absf(fwd_speed) / physics.max_speed, 0.0, 1.0)
+	var steer_mult: float = lerp(physics.steer_low_speed_mult, physics.steer_high_speed_mult, speed_ratio)
+	var steer_sign := 1.0 if fwd_speed >= -0.5 else -1.0
+	var speed_scale: float = clamp(absf(fwd_speed) / maxf(physics.steer_speed_threshold, 0.01), 0.0, 1.0)
 
-	var current_side_speed = velocity.dot(side_dir)
-	var drift_resistance := 3.8 if _steer_input != 0.0 else 4.8
-	current_side_speed = lerp(current_side_speed, 0.0, drift_resistance * delta)
+	# Drift affects steering: counter-steer is boosted, same-direction is reduced
+	var drift_steer_mult := 1.0
+	if _drift_phase == DriftPhase.DRIFTING:
+		var is_counter := signf(_steer_input) != 0.0 and signf(_steer_input) != float(_drift_direction)
+		if is_counter:
+			drift_steer_mult = physics.drift_counter_steer_mult
+		else:
+			drift_steer_mult = physics.drift_same_steer_mult
 
-	velocity = (forward_dir * current_fwd_speed) + (side_dir * current_side_speed) + Vector3(0, velocity.y, 0)
+	rotate_y(_steer_input * steer_sign * physics.steering_speed * steer_mult * drift_steer_mult * speed_scale * delta)
 
+	# Recompute dirs after rotation
+	fwd_dir  = -global_transform.basis.z
+	side_dir =  global_transform.basis.x
+
+	# ── 6. Drift state machine ────────────────────────────────────────────────
+	var speed_ok: bool = absf(fwd_speed) > physics.min_drift_speed
+	var steer_ok: bool = absf(_steer_input) > physics.drift_steer_threshold
+
+	match _drift_phase:
+		DriftPhase.NONE:
+			if speed_ok and steer_ok:
+				_drift_phase = DriftPhase.ENTERING
+				_drift_direction = int(signf(_steer_input))
+				_drift_commit_time = 0.0
+				# Drift kick — rear swings opposite to steer direction
+				velocity += side_dir * (float(_drift_direction) * physics.drift_kick_force)
+				side_speed = velocity.dot(side_dir)
+
+		DriftPhase.ENTERING:
+			_drift_commit_time += delta
+			if _drift_commit_time >= 0.1 or _grip <= physics.low_grip_target * 2.0:
+				_drift_phase = DriftPhase.DRIFTING
+
+		DriftPhase.DRIFTING:
+			var steer_released := absf(_steer_input) < 0.15
+			var counter_steered := signf(_steer_input) != 0.0 and int(signf(_steer_input)) != _drift_direction
+			if steer_released or counter_steered or not speed_ok:
+				_drift_phase = DriftPhase.EXITING
+
+		DriftPhase.EXITING:
+			if _grip >= physics.high_grip_target * 0.9:
+				_drift_phase = DriftPhase.NONE
+				_drift_direction = 0
+
+	# ── 7. Grip transition ────────────────────────────────────────────────────
+	var is_drifting := _drift_phase == DriftPhase.ENTERING or _drift_phase == DriftPhase.DRIFTING
+	if is_drifting:
+		_grip = move_toward(_grip, physics.low_grip_target, physics.grip_loss_rate * delta)
+	else:
+		_grip = move_toward(_grip, physics.high_grip_target, physics.grip_recovery_rate * delta)
+
+	# ── 8. Lateral damping (exponential grip) ─────────────────────────────────
+	side_speed *= exp(-_grip * delta)
+
+	# ── 9. Rebuild velocity ───────────────────────────────────────────────────
+	velocity = fwd_dir * fwd_speed + side_dir * side_speed + Vector3(0.0, velocity.y, 0.0)
+
+	# ── 10. Move ──────────────────────────────────────────────────────────────
 	move_and_slide()
+
+	# ── 11. Slope speed influence (post-slide, uses is_on_floor) ──────────────
+	if is_on_floor():
+		var slope_factor := -global_transform.basis.z.dot(Vector3.UP)
+		var cur_fwd  := -global_transform.basis.z
+		var cur_side :=  global_transform.basis.x
+		var cur_fwd_speed  := velocity.dot(cur_fwd)
+		var cur_side_speed := velocity.dot(cur_side)
+		cur_fwd_speed += slope_factor * physics.slope_speed_influence * delta
+		velocity = cur_fwd * cur_fwd_speed + cur_side * cur_side_speed + Vector3(0.0, velocity.y, 0.0)
+
+	# ── 12. Floor alignment ───────────────────────────────────────────────────
+	if is_on_floor() and physics.floor_align_speed > 0.0:
+		var floor_n := get_floor_normal()
+		var projected_fwd := fwd_dir - floor_n * fwd_dir.dot(floor_n)
+		if projected_fwd.length_squared() > 0.0001:
+			var target_basis := Basis.looking_at(projected_fwd, floor_n)
+			global_transform.basis = global_transform.basis.slerp(target_basis, physics.floor_align_speed * delta).orthonormalized()
+
+	# ── Kart-to-kart collision (server-only) ──────────────────────────────────
+	if multiplayer.is_server():
+		for i in get_slide_collision_count():
+			var col := get_slide_collision(i)
+			var other := col.get_collider()
+			if other is CharacterBody3D and other.has_method("get_kart_mass"):
+				var other_kart := other as CharacterBody3D
+				var my_energy := physics.mass * absf(fwd_speed)
+				var other_energy: float = other_kart.call("get_kart_mass") * other_kart.velocity.length()
+				var energy_diff := my_energy - other_energy
+				var push_dir := col.get_normal()  # points toward self (away from other)
+				var force: float = clamp(absf(energy_diff) * 0.5, physics.bump_min_force, physics.bump_max_force)
+				if energy_diff > 0.0:
+					other.velocity += push_dir * force   # push other away from self
+				else:
+					velocity += -push_dir * force        # push self away from other
+
 	_update_vfx(delta)
 
 	if Input.is_action_just_pressed("fire") and StateManager.can_fire(player_id):
@@ -281,6 +411,12 @@ func _physics_process(delta: float) -> void:
 						_rpc_sync.rpc_id(pid, global_position, global_rotation, velocity, ts)
 			else:
 				_rpc_sync.rpc(global_position, global_rotation, velocity, ts)
+
+
+# ── Public helpers ───────────────────────────────────────────────────────────
+
+func get_kart_mass() -> float:
+	return physics.mass if physics else 1.0
 
 
 # ── Camera + Remote interpolation ────────────────────────────────────────────
@@ -407,24 +543,16 @@ func _apply_rocket_spread(base_dir: Vector3, index: int, total: int) -> Vector3:
 
 # ── Drift VFX ────────────────────────────────────────────────────────────────
 
-func _update_vfx(delta: float) -> void:
-	if not l_smoke or not r_smoke: return
-
-	var local_velocity = global_transform.basis.inverse() * velocity
-	var forward_speed = abs(local_velocity.z)
-	var side_speed = abs(local_velocity.x)
-	var hard_steer: bool = abs(_steer_input) > 0.55
-	var moving_drift: bool = forward_speed > 4.0 and side_speed > 2.2
-	var spin_turn: bool = abs(_throttle) < 0.15 and abs(_steer_input) > 0.8 and forward_speed > 1.2
-	var is_drifting := is_on_floor() and hard_steer and (moving_drift or spin_turn)
-
+func _update_vfx(_delta: float) -> void:
+	if not l_smoke or not r_smoke:
+		return
+	var is_drifting := is_on_floor() and (_drift_phase == DriftPhase.DRIFTING or _drift_phase == DriftPhase.ENTERING)
 	if l_smoke.emitting != is_drifting:
 		l_smoke.emitting = is_drifting
 	if r_smoke.emitting != is_drifting:
 		r_smoke.emitting = is_drifting
-
-	l_drift.visible = true
-	r_drift.visible = true
+	l_drift.visible = is_drifting
+	r_drift.visible = is_drifting
 
 
 # ── Network sync ─────────────────────────────────────────────────────────────
@@ -491,6 +619,10 @@ func respawn(spawn_pos: Vector3) -> void:
 	velocity = Vector3.ZERO
 	_throttle = 0.0
 	_steer_input = 0.0
+	_drift_phase = DriftPhase.NONE
+	_drift_direction = 0
+	if physics:
+		_grip = physics.high_grip_target
 	_last_known_pos = spawn_pos
 	if _snapshot_buffer:
 		_snapshot_buffer.force_teleport()
