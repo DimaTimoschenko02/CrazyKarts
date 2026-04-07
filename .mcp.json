@@ -6,6 +6,10 @@
       "env": {
         "GODOT_PATH": "C:\\Godot_v4.6.1-stable_win64.exe"
       }
+    },
+    "memory": {
+      "type": "http",
+      "url": "http://localhost:8090/mcp"
     }
   }
 }

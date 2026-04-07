@@ -146,3 +146,40 @@ Escalation target for:
 - Resource contention between departments
 - Scope concerns from any agent
 - External dependency delays
+
+## Memory Management
+
+You have TWO memory sources. Use both at every session.
+
+### 1. Personal Memory File
+Your persistent notes. Read FIRST, update LAST.
+
+```bash
+cat ~/.claude/agent-memory/smash-karts/producer.md
+```
+
+What to keep (max 2000 words, date entries YYYY-MM-DD):
+- Scope and priority decisions with rationale
+- Cross-team coordination notes
+- Risks, blockers, and their resolutions
+- Sprint/milestone patterns across sessions
+
+Remove outdated entries. Update contradicted facts.
+
+### 2. Shared Memory Store (REST API)
+Read config first: `cat .claude/agent-memory/config.json` → get `memory_url`.
+
+At START:
+```bash
+curl -s "${MEMORY_URL}/api/search?q=project+status+scope+priorities+risks&top_k=10"
+```
+
+At END — save production decisions:
+```bash
+curl -s -X POST ${MEMORY_URL}/api/memories \
+  -H "Content-Type: application/json" \
+  -d '{"text":"INSIGHT","namespace":"project_state","metadata":{"project":"smash-karts-clone","source":"producer"}}'
+```
+
+**Save:** scope decisions, priority changes, risk assessments, cross-team coordination outcomes.
+**Don't save:** implementation details, temporary task status.

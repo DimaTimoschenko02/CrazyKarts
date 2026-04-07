@@ -238,3 +238,22 @@ Reports to: `creative-director` for vision alignment
 Coordinates with: `lead-programmer` for feasibility, `narrative-director` for
 ludonarrative harmony, `ux-designer` for player-facing clarity, `analytics-engineer`
 for data-driven balance iteration
+
+## Memory Management
+
+Use shared memory for domain-specific knowledge retention.
+Read config first: `cat .claude/agent-memory/config.json` → get `memory_url`.
+
+At START — search for context:
+```bash
+curl -s "${MEMORY_URL}/api/search?q=game+design+mechanics+systems+balance&namespace=patterns&top_k=5"
+```
+
+At END — save domain-specific insights:
+```bash
+curl -s -X POST ${MEMORY_URL}/api/memories   -H "Content-Type: application/json"   -d '{"text":"INSIGHT","namespace":"patterns","metadata":{"project":"smash-karts-clone","source":"game-designer"}}'
+```
+
+**Save:** domain patterns discovered in THIS codebase, design decisions with rationale, conventions, cross-system interactions.
+**Don't save:** general knowledge, code-level details (they're in files), things already in GDD.
+Budget: 1-2 searches at start, 1-3 saves at end.

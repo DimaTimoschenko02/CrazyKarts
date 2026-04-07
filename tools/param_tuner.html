@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Kart Physics Tuner</title>
+<style>
+  :root { --bg: #1a1a2e; --card: #16213e; --accent: #0f3460; --hi: #e94560; --text: #eee; --dim: #888; --green: #4ecca3; --blue: #7fb3d3; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 16px; }
+  h1 { text-align: center; margin-bottom: 6px; font-size: 1.4em; }
+  .status { text-align: center; margin-bottom: 12px; color: var(--dim); font-size: 0.85em; min-height: 1.2em; }
+  .status.saved { color: var(--green); }
+  .status.error { color: var(--hi); }
+  .toolbar { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+  .autosave-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.85em; color: var(--dim); }
+  .autosave-toggle input { accent-color: var(--hi); }
+  button { padding: 7px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 600; transition: all 0.15s; }
+  .btn-save { background: var(--hi); color: white; }
+  .btn-save:hover { background: #ff6b81; }
+  .btn-reset { background: var(--accent); color: var(--text); }
+  .btn-reset:hover { background: #1a4a80; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .group { background: var(--card); border-radius: 10px; padding: 14px 16px; }
+  .group h2 { color: var(--hi); font-size: 0.95em; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+  .param { margin-bottom: 12px; }
+  .param:last-child { margin-bottom: 0; }
+  .param-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+  .param-name { font-weight: 700; font-size: 0.82em; color: var(--green); font-family: monospace; min-width: 0; white-space: nowrap; }
+  .param-slider { flex: 1; accent-color: var(--hi); height: 5px; min-width: 60px; }
+  .param-num { width: 68px; background: var(--accent); border: 1px solid #444; color: var(--text); padding: 3px 6px; border-radius: 5px; font-size: 0.85em; text-align: center; }
+  .param-num:focus { outline: 1px solid var(--hi); border-color: var(--hi); }
+  .param-unit { color: var(--dim); font-size: 0.75em; min-width: 30px; }
+  .param-info { display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap; }
+  .param-short { color: var(--dim); font-size: 0.78em; line-height: 1.3; }
+  .param-formula { color: var(--blue); font-size: 0.75em; font-family: monospace; }
+  .param-expand { color: #666; font-size: 0.7em; cursor: pointer; user-select: none; padding: 0 4px; border-radius: 3px; }
+  .param-expand:hover { color: var(--blue); background: rgba(255,255,255,0.05); }
+  .param-detail { color: #999; font-size: 0.73em; line-height: 1.5; margin-top: 4px; padding: 6px 8px; background: rgba(0,0,0,0.2); border-radius: 5px; border-left: 2px solid #333; display: none; }
+  .param-detail.open { display: block; }
+  .changed .param-name { color: #ffcc00; }
+</style>
+</head>
+<body>
+
+<h1>Kart Physics Tuner</h1>
+<div class="status" id="status">Loading...</div>
+<div class="toolbar">
+  <button class="btn-save" onclick="save()">Save Now</button>
+  <button class="btn-reset" onclick="loadParams()">Reload</button>
+  <div class="autosave-toggle">
+    <input type="checkbox" id="autosave" checked>
+    <label for="autosave">Auto-save (0.5s hot-reload)</label>
+  </div>
+</div>
+<div class="grid" id="groups"></div>
+
+<script>
+const PARAMS = {
+  "Скорость": [
+    { key: "MAX_SPEED", min: 5, max: 50, step: 0.5, unit: "m/s",
+      short: "Максималка вперёд. Больше = быстрее, но сложнее контроль",
+      detail: "Машина разгоняется до этого значения асимптотически (никогда не достигает точно, но подходит очень близко). Влияет на всё: рулёжку на скорости, когда можно дрифтить, скорость ракеты относительно тебя." },
+    { key: "REVERSE_MAX_SPEED", min: 2, max: 25, step: 0.5, unit: "m/s",
+      short: "Максималка назад. Обычно ~50% от MAX_SPEED",
+      detail: "Скорость заднего хода. Слишком высокая — машина будет странно ехать назад. Слишком низкая — нельзя откатиться от стены." },
+    { key: "ACCEL_SHARPNESS", min: 0.01, max: 0.6, step: 0.01, unit: "",
+      short: "Резкость разгона. Больше = мгновенный старт, меньше = тяжёлый разгон",
+      detail: "Формула: speed = lerp(speed, target, sharpness * dt * 60). Это НЕ линейное ускорение — скорость сначала растёт быстро, потом замедляется (как будто упираешься в потолок). Это создаёт ощущение веса. При 0.1 машина 'тяжёлая', при 0.5 — 'картонная'." },
+    { key: "COAST_DECEL", min: 1, max: 25, step: 0.5, unit: "m/s²",
+      short: "Торможение без кнопок (трение). Больше = быстрее останавливается",
+      detail: "Когда отпустил газ, машина замедляется линейно на это значение каждую секунду. Время до полной остановки = текущая_скорость / COAST_DECEL. Маленькое значение = машина долго катится по инерции (как на льду)." },
+    { key: "BRAKE_DECEL", min: 10, max: 80, step: 1, unit: "m/s²",
+      short: "Сила торможения кнопкой S. Больше = резче стоп",
+      detail: "Линейное торможение при нажатии S (когда едешь вперёд). Время до остановки = скорость / BRAKE_DECEL. При 10: с макс скорости 19.5 → стоп за 1.95с. При 40: за 0.49с. Слишком резкое торможение — машина 'втыкается', слишком мягкое — не успеешь остановиться." },
+  ],
+  "Сглаживание ввода": [
+    { key: "STEER_SLEW_IN", min: 2, max: 20, step: 0.5, unit: "/s",
+      short: "Как быстро руль доходит до упора. Больше = отзывчивее, меньше = плавнее",
+      detail: "Клавиатура даёт 0 или 1 мгновенно. Этот параметр делает переход плавным: значение руля растёт на SLEW_IN единиц в секунду. При 3: полный поворот за 1/3 = 0.33с. Это также влияет на дрифт — чтобы войти в дрифт нужно достичь порога (DRIFT_STEER_THRESHOLD), и при медленном нарастании быстрый тап не вызовет дрифт." },
+    { key: "STEER_SLEW_OUT", min: 1, max: 15, step: 0.5, unit: "/s",
+      short: "Как быстро руль возвращается в центр. Меньше = дольше доворачивает",
+      detail: "Когда отпускаешь A/D, руль плавно возвращается к нулю. При 2: возврат за 0.5с. Медленный возврат = машина 'доруливает' после отпускания кнопки, что создаёт ощущение инерции руля. Быстрый = руль мгновенно в центре, резкие повороты." },
+    { key: "THROTTLE_SLEW", min: 1, max: 20, step: 0.5, unit: "/s",
+      short: "Как быстро газ доходит до максимума. Меньше = мягче педаль",
+      detail: "Работает как STEER_SLEW, но для газа/тормоза. При 5: полный газ за 0.2с. Влияет на ощущение 'педали' — маленькое значение = как будто плавно давишь на педаль, большое = тумблер вкл/выкл. Также сглаживает переход газ→тормоз." },
+  ],
+  "Рулёжка": [
+    { key: "STEERING_SPEED", min: 0.5, max: 5, step: 0.1, unit: "rad/s",
+      short: "Базовая скорость поворота. Умножается на множители ниже",
+      detail: "Итоговая скорость поворота = STEERING_SPEED × множитель_скорости × множитель_дрифта × (скорость/порог). Это базовое значение. При 3.6 и множителях 0.8/1.05: на малой скорости 2.88 рад/с, на максималке 3.78 рад/с." },
+    { key: "STEER_LOW_MULT", min: 0.5, max: 3, step: 0.1, unit: "x",
+      short: "Множитель поворота на малой скорости. Больше = резче повороты стоя",
+      detail: "Применяется когда машина едет медленно (у нуля). Интерполируется плавно от этого значения (на скорости 0) до STEER_HIGH_MULT (на MAX_SPEED). Было 1.4, ты поставил 0.8 — теперь на малой скорости поворот даже медленнее чем на высокой, что даёт более стабильное управление." },
+    { key: "STEER_HIGH_MULT", min: 0.1, max: 1.5, step: 0.05, unit: "x",
+      short: "Множитель поворота на макс скорости. Меньше = шире дуги на скорости",
+      detail: "Обычно меньше LOW_MULT чтобы на скорости машина ехала широкими дугами (не крутилась на месте). Ты поставил 1.05 (больше LOW_MULT 0.8) — это инвертирует обычную логику: на скорости руль острее чем на месте. Нестандартно, но может давать интересный feel." },
+    { key: "STEER_SPEED_THRESHOLD", min: 0, max: 10, step: 0.5, unit: "m/s",
+      short: "Ниже этой скорости руль ослабевает. 0 = руль всегда полный",
+      detail: "При скорости от 0 до порога поворот масштабируется от 0% до 100%. Это не даёт машине крутиться на месте стоя. При 3 м/с: на скорости 1.5 руль работает на 50%. На 3+ — на полную." },
+    { key: "WHEELBASE", min: 0.5, max: 3.0, step: 0.05, unit: "m",
+      short: "Расстояние между осями (bicycle model). Больше = стабильнее, шире дуги",
+      detail: "Bicycle model: yaw_rate = speed/wheelbase × tan(steer_angle). Длинная колёсная база = стабильный на скорости, широкие повороты. Короткая = маневренный, дёрганый. 1.19 = реальная геометрия модели." },
+    { key: "MAX_STEER_ANGLE", min: 15, max: 60, step: 1, unit: "°",
+      short: "Макс угол поворота передних колёс. Влияет на физику и визуал",
+      detail: "Определяет максимальный поворот в bicycle model. 25° = мягкие дуги, 40° = стандарт, 55° = очень резкие повороты. Также визуально поворачивает колёса." },
+    { key: "RWD_OVERSTEER", min: 0, max: 0.3, step: 0.01, unit: "",
+      short: "Задний привод — сила бокового толчка при повороте",
+      detail: "Имитация заднего привода: задние колёса толкают зад в сторону при повороте. 0 = выкл, 0.04 = лёгкий natural oversteer, 0.15 = агрессивный drift tendency." },
+    { key: "WHEEL_RADIUS", min: 0.05, max: 0.5, step: 0.01, unit: "m",
+      short: "Радиус колеса для анимации вращения",
+      detail: "Влияет только на визуальную скорость вращения колёс. Меньше = крутятся быстрее. Реальный размер из модели ~0.18м." },
+  ],
+  "Дрифт (непрерывный)": [
+    { key: "HIGH_GRIP", min: 5, max: 30, step: 0.5, unit: "",
+      short: "Сцепление при intent=0 (руль в мёртвой зоне). Больше = жёстче держит курс",
+      detail: "Grip при отсутствии дрифт-intent'а. Формула: side_speed *= exp(-grip × dt). При 16: за 0.1с гасится 80% бокового скольжения. При 10: только 63%. Теперь grip плавно интерполируется между HIGH и LOW в зависимости от силы руля." },
+    { key: "LOW_GRIP", min: 0.1, max: 5, step: 0.1, unit: "",
+      short: "Сцепление при intent=1 (полный руль). Меньше = сильнее и дольше занос",
+      detail: "Grip при максимальном дрифт-intent'е. При 0.8: half-life = 0.87с. Дрифт теперь НЕ бинарный — grip плавно падает пропорционально силе руля. Лёгкий поворот = почти полный grip, жёсткий поворот = LOW_GRIP." },
+    { key: "DRIFT_STEER_THRESHOLD", min: 0.1, max: 0.8, step: 0.05, unit: "",
+      short: "Мёртвая зона руля. Ниже — intent=0 (полный grip), выше — intent растёт",
+      detail: "Ниже этого значения руль не вызывает дрифт вообще — обычные повороты. Выше — intent линейно растёт от 0 до 1.0. С STEER_SLEW_IN=2: порог 0.3 достигается за 0.15с." },
+    { key: "GRIP_LOSS_RATE", min: 2, max: 30, step: 0.5, unit: "/s",
+      short: "Как быстро grip падает когда intent растёт. Больше = резче вход в занос",
+      detail: "Grip линейно движется к цели (lerp(HIGH,LOW,intent)) со скоростью этого значения. При 14: полный переход 16→0.8 за 1.09с. Высокое значение = быстрая реакция на руль." },
+    { key: "GRIP_RECOVERY_RATE", min: 1, max: 15, step: 0.5, unit: "/s",
+      short: "Как быстро grip восстанавливается. Больше = быстрее стабилизация",
+      detail: "Когда отпускаешь руль, grip восстанавливается. При 4: от LOW до HIGH за 3.8с. Это 'хвост' заноса — машина ещё скользит после отпускания руля." },
+    { key: "DRIFT_LATERAL_FORCE", min: 0, max: 1.0, step: 0.05, unit: "",
+      short: "Боковая сила при дрифте. Определяет радиус дрифт-круга",
+      detail: "Каждый кадр: side_speed += steer × speed × intent × force × dt. Теперь всегда активна (пропорционально intent). При 0.3 и speed=16, intent=1: +4.8 м/с² бокового ускорения." },
+    { key: "DRIFT_COUNTER_STEER", min: 0.5, max: 2.5, step: 0.1, unit: "x",
+      short: "Бонус руля при контрруле (руль против заноса). 1.0 = нет бонуса",
+      detail: "Теперь определяется по реальному направлению заноса (signf(side_speed)), а не по заблокированному направлению. При 1.4: руль на 40% эффективнее при контрруле." },
+    { key: "DRIFT_SAME_STEER", min: 0.2, max: 1.5, step: 0.1, unit: "x",
+      short: "Множитель руля в сторону заноса. <1.0 = тяжелее, >1.0 = легче",
+      detail: "Когда рулишь в направлении заноса. При 0.7: на 30% медленнее. При 1.1: на 10% быстрее. Влияет на то, насколько легко углублять занос." },
+    { key: "VFX_SMOKE_THRESHOLD", min: 0.5, max: 10, step: 0.5, unit: "m/s",
+      short: "Боковая скорость для дыма из колёс. Меньше = дым при лёгких заносах",
+      detail: "Дым включается когда abs(side_speed) > порог. При 3: лёгкие повороты без дыма, средний занос = дым. При 1: дым почти всегда при повороте на скорости." },
+  ],
+  "Рельеф": [
+    { key: "GRAVITY", min: 10, max: 60, step: 1, unit: "m/s²",
+      short: "Гравитация. Земля = 9.8. Больше = быстрее падаешь, тяжелее прыжки",
+      detail: "35 = 3.57× земной гравитации. Падение с 3м: 0.41с (на Земле 0.78с). Высокая гравитация делает аркадный feel — прыжки короткие, приземления быстрые, машина 'тяжёлая'." },
+    { key: "FLOOR_ALIGN_SPEED", min: 0, max: 20, step: 0.5, unit: "/s",
+      short: "Наклон карта по поверхности. 0 = выкл. Больше = быстрее следует рельефу",
+      detail: "Машина наклоняется чтобы совпадать с поверхностью (на горках кузов наклоняется). Скорость slerp-интерполяции. При 0: машина всегда горизонтальна. При 8: плавно следует. При 15+: дёргается на стыках." },
+    { key: "SLOPE_INFLUENCE", min: 0, max: 20, step: 0.5, unit: "m/s²",
+      short: "Влияние склонов на скорость. Больше = горки сильнее ускоряют/тормозят",
+      detail: "При езде вниз машина получает бонус к скорости, вверх — штраф. Формула: бонус = sin(угол_склона) × SLOPE_INFLUENCE. Для склона 30°: ±4 м/с². При 0: горки не влияют на скорость." },
+  ],
+  "Бой": [
+    { key: "ROCKET_SPEED", min: 10, max: 60, step: 1, unit: "m/s",
+      short: "Скорость ракеты. Должна быть быстрее карта чтобы нельзя было убежать",
+      detail: "При MAX_SPEED=19.5 и ROCKET_SPEED=28: ракета на 44% быстрее. Можно увернуться поворотом, но не удрать по прямой." },
+    { key: "ROCKET_LIFETIME", min: 1, max: 15, step: 0.5, unit: "s",
+      short: "Сколько живёт ракета. Макс дальность = скорость × время",
+      detail: "Определяет макс дальность стрельбы. При 28 м/с × 6с = 168м. Длинное время = снайперская стрельба, короткое = ближний бой." },
+    { key: "EXPLOSION_RADIUS", min: 1, max: 10, step: 0.5, unit: "m",
+      short: "Радиус взрыва. Урон уменьшается с расстоянием от центра",
+      detail: "В центре взрыва — полный урон. На краю — минимальный (AOE falloff). Большой радиус = проще попасть, но средний урон ниже." },
+    { key: "DAMAGE", min: 10, max: 200, step: 5, unit: "hp",
+      short: "Урон ракеты в центре взрыва. HP = 100, значит попаданий до смерти:",
+      detail: "Базовый HP = 100. При DAMAGE=50: 2 прямых попадания = смерть. При 34: 3 попадания. Помни что AOE falloff снижает урон не в центре." },
+  ],
+  "Камера": [
+    { key: "CAMERA_DISTANCE", min: 3, max: 20, step: 0.5, unit: "m",
+      short: "Расстояние камеры от карта. Больше = дальше, видишь больше",
+      detail: "Камера следует за картом на этом расстоянии (с плавным lerp). Близко = immersive но плохой обзор. Далеко = тактический обзор но теряешь связь с машиной." },
+    { key: "CAMERA_HEIGHT", min: 1, max: 10, step: 0.25, unit: "m",
+      short: "Высота камеры. Больше = больше видишь сверху",
+      detail: "Вместе с DISTANCE определяет угол обзора. Высокая камера = видишь больше арены, низкая = больше чувствуешь скорость." },
+    { key: "CAMERA_LOOK_AHEAD", min: 0, max: 5, step: 0.05, unit: "m",
+      short: "Смещение точки взгляда вперёд. Больше = видишь дальше по курсу",
+      detail: "Камера смотрит не на карт, а чуть вперёд от него. Помогает видеть куда едешь. 0 = смотрит точно на карт, 2+ = смотрит далеко вперёд." },
+    { key: "FOV", min: 50, max: 110, step: 1, unit: "°",
+      short: "Базовый угол обзора. На скорости добавляется FOV_SPEED_BOOST",
+      detail: "Базовый FOV стоя. На максимальной скорости FOV увеличивается на FOV_SPEED_BOOST. Это создаёт ощущение скорости." },
+    { key: "FOV_SPEED_BOOST", min: 0, max: 30, step: 1, unit: "°",
+      short: "Доп FOV на макс скорости. 0 = выкл. Больше = сильнее эффект скорости",
+      detail: "На макс скорости FOV = базовый + boost. При FOV=80, boost=12: на максимале 92°. Плавно нарастает и спадает." },
+    { key: "CAMERA_LATERAL_MAX", min: 0, max: 4, step: 0.1, unit: "m",
+      short: "Боковое смещение камеры в поворотах. 0 = выкл",
+      detail: "Камера сдвигается наружу поворота чтобы ты видел куда едешь. Особенно заметно в дрифте — видишь трассу впереди. 1.5м = субтильно, 3м = кинематографично." },
+    { key: "CAMERA_LATERAL_SPEED", min: 1, max: 10, step: 0.5, unit: "/s",
+      short: "Скорость бокового смещения камеры",
+      detail: "Как быстро камера сдвигается в бок при повороте. 2 = плавно, 6 = быстро реагирует на руль." },
+  ],
+};
+
+const FORMULAS = {
+  "MAX_SPEED": p => `${(p.MAX_SPEED * 3.6).toFixed(0)} km/h`,
+  "REVERSE_MAX_SPEED": p => `${(p.REVERSE_MAX_SPEED * 3.6).toFixed(0)} km/h`,
+  "ACCEL_SHARPNESS": p => {
+    const t90 = Math.log(0.1) / Math.log(1 - p.ACCEL_SHARPNESS);
+    return `0→90%: ${(t90/60).toFixed(2)}s`;
+  },
+  "COAST_DECEL": p => `Стоп с макс: ${(p.MAX_SPEED / p.COAST_DECEL).toFixed(1)}s`,
+  "BRAKE_DECEL": p => `Стоп с макс: ${(p.MAX_SPEED / p.BRAKE_DECEL).toFixed(2)}s`,
+  "STEER_SLEW_IN": p => `Полный: ${(1/p.STEER_SLEW_IN).toFixed(2)}s \u2502 До дрифта: ${(p.DRIFT_STEER_THRESHOLD/p.STEER_SLEW_IN).toFixed(2)}s`,
+  "STEER_SLEW_OUT": p => `Центр за ${(1/p.STEER_SLEW_OUT).toFixed(2)}s`,
+  "THROTTLE_SLEW": p => `Полный газ за ${(1/p.THROTTLE_SLEW).toFixed(2)}s`,
+  "STEERING_SPEED": p => `Тихо: ${(p.STEERING_SPEED * p.STEER_LOW_MULT).toFixed(1)} \u2502 Макс: ${(p.STEERING_SPEED * p.STEER_HIGH_MULT).toFixed(1)} rad/s`,
+  "STEER_LOW_MULT": p => `= ${(p.STEERING_SPEED * p.STEER_LOW_MULT).toFixed(1)} rad/s`,
+  "STEER_HIGH_MULT": p => `= ${(p.STEERING_SPEED * p.STEER_HIGH_MULT).toFixed(1)} rad/s`,
+  "WHEELBASE": p => `Радиус на макс: ${(p.WHEELBASE / Math.tan(p.MAX_STEER_ANGLE * Math.PI/180)).toFixed(1)}м`,
+  "MAX_STEER_ANGLE": p => `Радиус на макс: ${(p.WHEELBASE / Math.tan(p.MAX_STEER_ANGLE * Math.PI/180)).toFixed(1)}м`,
+  "WHEEL_RADIUS": p => `${(p.MAX_SPEED / p.WHEEL_RADIUS / (2*Math.PI)).toFixed(0)} об/с на макс`,
+  "HIGH_GRIP": p => `За 0.1с гасит ${((1-Math.exp(-p.HIGH_GRIP*0.1))*100).toFixed(0)}% заноса`,
+  "LOW_GRIP": p => `Half-life: ${(Math.LN2/p.LOW_GRIP).toFixed(2)}s \u2502 1с: -${((1-Math.exp(-p.LOW_GRIP))*100).toFixed(0)}%`,
+  "DRIFT_STEER_THRESHOLD": p => `Мёртвая зона: ${(p.DRIFT_STEER_THRESHOLD/p.STEER_SLEW_IN*1000).toFixed(0)}ms удержания`,
+  "GRIP_LOSS_RATE": p => `HIGH→LOW: ${((p.HIGH_GRIP-p.LOW_GRIP)/p.GRIP_LOSS_RATE).toFixed(2)}s`,
+  "GRIP_RECOVERY_RATE": p => `LOW→HIGH: ${((p.HIGH_GRIP-p.LOW_GRIP)/p.GRIP_RECOVERY_RATE).toFixed(2)}s`,
+  "DRIFT_LATERAL_FORCE": p => `При макс: ${(p.MAX_SPEED * p.DRIFT_LATERAL_FORCE).toFixed(1)} m/s² бокового`,
+  "VFX_SMOKE_THRESHOLD": p => `Порог: ${p.VFX_SMOKE_THRESHOLD.toFixed(1)} m/s`,
+  "GRAVITY": p => `${(p.GRAVITY/9.8).toFixed(1)}× Земля \u2502 3м: ${(Math.sqrt(6/p.GRAVITY)).toFixed(2)}s`,
+  "SLOPE_INFLUENCE": p => `30°: \u00B1${(0.5*p.SLOPE_INFLUENCE).toFixed(1)} m/s²`,
+  "ROCKET_SPEED": p => `${(p.ROCKET_SPEED/p.MAX_SPEED).toFixed(1)}× карта \u2502 ${(p.ROCKET_SPEED*3.6).toFixed(0)} km/h`,
+  "ROCKET_LIFETIME": p => `Дальность: ${(p.ROCKET_SPEED * p.ROCKET_LIFETIME).toFixed(0)}м`,
+  "DAMAGE": p => `${Math.ceil(100/p.DAMAGE)} попаданий = смерть`,
+  "CAMERA_HEIGHT": p => `Угол: ${(Math.atan(p.CAMERA_HEIGHT/p.CAMERA_DISTANCE)*180/Math.PI).toFixed(0)}°`,
+  "FOV_SPEED_BOOST": p => `На макс: ${(p.FOV + p.FOV_SPEED_BOOST).toFixed(0)}°`,
+};
+
+let currentData = {};
+let originalData = {};
+let saveTimeout = null;
+
+async function loadParams() {
+  try {
+    const r = await fetch("/params");
+    currentData = await r.json();
+    originalData = JSON.parse(JSON.stringify(currentData));
+    render();
+    setStatus("Loaded", "");
+  } catch(e) {
+    setStatus("Error loading: " + e.message, "error");
+  }
+}
+
+function setStatus(text, cls) {
+  const el = document.getElementById("status");
+  el.textContent = text;
+  el.className = "status " + (cls || "");
+}
+
+function render() {
+  const container = document.getElementById("groups");
+  container.innerHTML = "";
+
+  for (const [groupName, params] of Object.entries(PARAMS)) {
+    const group = document.createElement("div");
+    group.className = "group";
+    group.innerHTML = `<h2>${groupName}</h2>`;
+
+    for (const p of params) {
+      const val = currentData[p.key] ?? 0;
+      const changed = val !== originalData[p.key];
+      const div = document.createElement("div");
+      div.className = "param" + (changed ? " changed" : "");
+      div.id = "param-" + p.key;
+
+      const formula = FORMULAS[p.key] ? FORMULAS[p.key](currentData) : "";
+      const hasDetail = p.detail && p.detail.length > 0;
+
+      div.innerHTML = `
+        <div class="param-row">
+          <span class="param-name">${p.key}</span>
+          <input type="range" class="param-slider" id="slider-${p.key}" min="${p.min}" max="${p.max}" step="${p.step}" value="${val}">
+          <input type="number" class="param-num" id="num-${p.key}" min="${p.min}" max="${p.max}" step="${p.step}" value="${val}">
+          <span class="param-unit">${p.unit}</span>
+        </div>
+        <div class="param-info">
+          <span class="param-short">${p.short}</span>
+          ${formula ? `<span class="param-formula">${formula}</span>` : ""}
+          ${hasDetail ? `<span class="param-expand" onclick="this.parentElement.nextElementSibling.classList.toggle('open')">\u25BC</span>` : ""}
+        </div>
+        ${hasDetail ? `<div class="param-detail">${p.detail}</div>` : ""}
+      `;
+      group.appendChild(div);
+
+      setTimeout(() => {
+        const slider = document.getElementById("slider-" + p.key);
+        const num = document.getElementById("num-" + p.key);
+        if (!slider || !num) return;
+
+        const update = (v) => {
+          const val = parseFloat(v);
+          currentData[p.key] = val;
+          slider.value = val;
+          num.value = val;
+          const wrap = document.getElementById("param-" + p.key);
+          if (val !== originalData[p.key]) wrap.classList.add("changed");
+          else wrap.classList.remove("changed");
+          updateFormulas();
+          autoSave();
+        };
+        slider.addEventListener("input", e => update(e.target.value));
+        num.addEventListener("input", e => update(e.target.value));
+      }, 0);
+    }
+    container.appendChild(group);
+  }
+}
+
+function updateFormulas() {
+  for (const [groupName, params] of Object.entries(PARAMS)) {
+    for (const p of params) {
+      const fn = FORMULAS[p.key];
+      if (!fn) continue;
+      const el = document.getElementById("param-" + p.key);
+      if (!el) continue;
+      const formulaSpan = el.querySelector(".param-formula");
+      try {
+        const text = fn(currentData);
+        if (formulaSpan) formulaSpan.textContent = text;
+      } catch(e) {}
+    }
+  }
+}
+
+function autoSave() {
+  if (!document.getElementById("autosave").checked) return;
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(save, 300);
+}
+
+async function save() {
+  clearTimeout(saveTimeout);
+  try {
+    const full = {};
+    for (const [k, v] of Object.entries(currentData)) {
+      full[k] = v;
+    }
+    for (const [k, v] of Object.entries(originalData)) {
+      if (k.startsWith("_") && !(k in full)) full[k] = v;
+    }
+
+    const r = await fetch("/params", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(full, null, 2),
+    });
+    if (r.ok) {
+      setStatus("Saved! Hot-reload ~0.5s", "saved");
+      setTimeout(() => setStatus("", ""), 2000);
+    } else {
+      setStatus("Save error: " + r.status, "error");
+    }
+  } catch(e) {
+    setStatus("Save error: " + e.message, "error");
+  }
+}
+
+loadParams();
+</script>
+</body>
+</html>

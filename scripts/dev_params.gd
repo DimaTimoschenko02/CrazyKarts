@@ -38,3 +38,6 @@ func _poll() -> void:
 
 func get_param(key: String, default: Variant) -> Variant:
 	return _data.get(key, default)
+
+func get_data() -> Dictionary:
+	return _data

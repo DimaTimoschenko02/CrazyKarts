@@ -187,3 +187,22 @@ Coordinates with:
 - `ux-designer` for UI layouts that accommodate variable text lengths
 - `tools-programmer` for localization tooling and string extraction automation
 - `qa-lead` for locale-specific test planning and coverage
+
+## Memory Management
+
+Lightweight memory — only for technical discoveries.
+Read config first: `cat .claude/agent-memory/config.json` → get `memory_url`.
+
+At START — check for known issues:
+```bash
+curl -s "${MEMORY_URL}/api/search?q=i18n+localization+string+management+locale&namespace=bugs&top_k=3"
+```
+
+At END — save only if you found something genuinely NEW:
+```bash
+curl -s -X POST ${MEMORY_URL}/api/memories   -H "Content-Type: application/json"   -d '{"text":"DISCOVERY","namespace":"bugs","metadata":{"project":"smash-karts-clone","source":"localization-lead"}}'
+```
+
+**Save:** bugs found and root cause, non-obvious gotchas, workarounds not evident from code.
+**Don't save:** standard practices, anything obvious from reading code, general framework knowledge.
+Budget: 1 search at start. Save only if genuinely new discovery. Most sessions = zero saves.

@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where godot:*)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Read(//c/Users/dimti/**)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(\"C:\\\\Godot_v4.6.1-stable_win64_console.exe\" --headless --check-only --path \"C:\\\\do_chego_doshel_progress\\\\smash-karts-clone\" 2>&1; echo \"EXIT:$?\")",
+      "Bash(\"C:\\\\Godot_v4.6.1-stable_win64_console.exe\" --headless --check-only --path \"C:\\\\do_chego_doshel_progress\\\\smash-karts-clone\" 2>&1)",
+      "Bash(\"C:\\\\Godot_v4.6.1-stable_win64_console.exe\" --headless --check-only --quit --path \"C:\\\\do_chego_doshel_progress\\\\smash-karts-clone\" 2>&1)",
+      "Bash(ffmpeg:*)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "WebSearch",
+      "WebFetch(domain:docs.godotengine.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(mkdir -p \"C:/do_chego_doshel_progress/smash-karts-clone/addons/ScatterTool\")",
+      "Bash(cp -r \"C:/do_chego_doshel_progress/Smash carts/addons/ScatterTool/.\" \"C:/do_chego_doshel_progress/smash-karts-clone/addons/ScatterTool/\")",
+      "Bash(cp:*)",
+      "Bash(mkdir -p \"C:/do_chego_doshel_progress/smash-karts-clone/Maps\")",
+      "Bash(cp \"C:/do_chego_doshel_progress/Smash carts/Maps/map_1.tscn\" \"C:/do_chego_doshel_progress/smash-karts-clone/Maps/\")",
+      "Skill(update-config)",
+      "Bash(npm list:*)",
+      "Bash(npx godot-mcp:*)",
+      "Bash(npx -y godot-mcp@latest)",
+      "mcp__godot__run_project",
+      "mcp__godot__get_debug_output",
+      "mcp__godot__stop_project",
+      "mcp__godot__get_project_info"
+    ]
+  }
+}

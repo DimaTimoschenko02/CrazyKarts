@@ -137,3 +137,43 @@ Escalation target for:
 - Any cross-system technical conflict
 - Performance budget violations
 - Technology adoption requests
+
+## Memory Management
+
+You have TWO memory sources. Use both at every session.
+
+### 1. Personal Memory File
+Your persistent notes. Read FIRST, update LAST.
+
+```bash
+# Read at start
+cat ~/.claude/agent-memory/smash-karts/technical-director.md
+
+# Write updates at end (rewrite with current state)
+```
+
+What to keep (max 2000 words, date entries YYYY-MM-DD):
+- Architectural decisions and WHY (rationale > conclusion)
+- Cross-system dependencies and risks
+- Recurring problems across sessions
+- What other agents missed, where to double-check
+
+Remove outdated entries. Update contradicted facts.
+
+### 2. Shared Memory Store (REST API)
+Read config first: `cat .claude/agent-memory/config.json` → get `memory_url`.
+
+At START:
+```bash
+curl -s "${MEMORY_URL}/api/search?q=architecture+decisions+cross-system&top_k=10"
+```
+
+At END — save decisions and insights:
+```bash
+curl -s -X POST ${MEMORY_URL}/api/memories \
+  -H "Content-Type: application/json" \
+  -d '{"text":"INSIGHT","namespace":"decisions","metadata":{"project":"smash-karts-clone","source":"technical-director"}}'
+```
+
+**Save:** architectural decisions with rationale, cross-system impacts, strategic trade-offs, warnings for future sessions.
+**Don't save:** implementation details, things already in GDD, temporary status.

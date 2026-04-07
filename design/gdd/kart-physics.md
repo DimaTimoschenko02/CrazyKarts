@@ -58,8 +58,9 @@ extends Resource
 @export var high_grip_target: float = 18.0   # grip when not drifting
 @export var grip_loss_rate: float = 12.0     # /sec — how fast grip drops on drift entry
 @export var grip_recovery_rate: float = 3.0  # /sec — how fast grip returns after release
-@export var drift_kick_force: float = 8.0    # lateral impulse on drift entry
+@export var drift_kick_force: float = 4.0    # lateral impulse on drift entry
 @export var min_drift_speed: float = 6.0     # m/s minimum to enter drift
+@export var drift_steer_threshold: float = 0.7  # steer_input threshold (0.0-1.0)
 
 @export_group("Collision")
 @export var mass: float = 1.0                # relative mass (Heavy=2.0, Light=0.6)
@@ -106,11 +107,11 @@ fwd_speed = move_toward(fwd_speed, 0.0, coast_decel * delta)
 between LOW_GRIP and HIGH_GRIP. This creates the "heavy and committal" feel —
 you cannot cancel drift instantly.
 
-**State variable**: `var _grip: float = high_grip_target`
+**State variables**: `var _grip: float = high_grip_target` and `var _was_drifting: bool = false`
 
 **Each physics frame**:
 ```
-var is_drifting := Input.is_action_pressed("drift") and abs(fwd_speed) > min_drift_speed
+var is_drifting := abs(steer_input) > drift_steer_threshold and abs(fwd_speed) > min_drift_speed
 
 if is_drifting:
     _grip = move_toward(_grip, low_grip_target, grip_loss_rate * delta)
@@ -124,9 +125,10 @@ side_speed = move_toward(side_speed, 0.0, _grip * delta)
 
 **Drift entry kick** (rear swings out):
 ```
-if Input.is_action_just_pressed("drift") and abs(fwd_speed) > min_drift_speed:
+if is_drifting and not _was_drifting:
     var kick := basis.x * (-steer_input * drift_kick_force)
     velocity += kick
+_was_drifting = is_drifting
 ```
 
 **Grip recovery timeline** (GRIP_RECOVERY_RATE = 3.0/sec):
@@ -281,6 +283,7 @@ push_force = clamp(abs(energy_diff) * 0.5, bump_min_force, bump_max_force)
 | Remote kart collision | Not simulated locally — server handles, clients interpolate |
 | Reverse + drift | Drift disabled in reverse (min_drift_speed not reached in reverse) |
 | Frame rate drop (HTML5) | delta-based formulas scale correctly. 30fps = same behavior |
+| Micro-steer oscillation near threshold | _was_drifting prevents kick spam — kick fires only on false→true transition |
 
 ## Dependencies
 
@@ -322,7 +325,8 @@ push_force = clamp(abs(energy_diff) * 0.5, bump_min_force, bump_max_force)
 | `high_grip_target` | 18.0 | 10-25 | Normal grip | Always sliding | No slide ever |
 | `grip_loss_rate` | 12.0 | 5-20 /s | Drift entry speed | Slow to enter drift | Instant snap |
 | `grip_recovery_rate` | 3.0 | 1-8 /s | Drift exit speed | Slide forever | Snap straight |
-| `drift_kick_force` | 8.0 | 3-15 | Rear swing on entry | Subtle slide | Spins out |
+| `drift_kick_force` | 4.0 | 3-15 | Rear swing on entry | Subtle slide | Spins out |
+| `drift_steer_threshold` | 0.7 | 0.4-0.95 | How aggressive steer triggers drift | Drift triggers too easily | Almost never auto-drifts |
 | `mass` | 1.0 | 0.4-3.0 | Collision weight | Gets pushed easily | Immovable |
 | `slope_speed_influence` | 8.0 | 3-15 m/s² | Hill impact | Hills meaningless | Hills dominate |
 
@@ -364,7 +368,8 @@ Minimal UI — the car physics FEEL is the primary feedback channel, not numbers
 - [ ] Kart accelerates to max_speed asymptotically (reaches 90% within 1s)
 - [ ] Kart stops completely when braking from max speed within 1s
 - [ ] Steering rate decreases at higher speeds
-- [ ] Drift entry: lateral kick applied, _grip drops toward low_grip_target
+- [ ] Drift entry: when fwd_speed > min_drift_speed AND abs(steer_input) > drift_steer_threshold — _grip drops, lateral kick applied once on entry
+- [ ] No "drift" action required in InputMap
 - [ ] Drift exit: _grip recovers gradually (not instant)
 - [ ] Kart-to-kart collision: heavier/faster kart pushes lighter/slower
 - [ ] Collision push force clamped between min and max
@@ -396,12 +401,7 @@ Minimal UI — the car physics FEEL is the primary feedback channel, not numbers
 1. **Drift visual direction**: Should drift smoke come from rear tires only,
    or all tires? SmashKarts: rear only.
 
-2. **Drift auto-trigger**: Systems-designer noted SmashKarts uses auto-drift
-   on sustained turn at speed. Currently we use explicit Shift key. Keep explicit?
-   More player agency but extra button.
+2. **Drift auto-trigger**: **Resolved**: Auto-drift on sustained steer at speed. No drift button.
 
 3. **Air control**: Currently no steering in air (0.15s lockout). Should there
    be slight air steering for ramp gameplay? Depends on map design.
-
-4. **Handbrake vs drift**: Are these the same input? Handbrake = instant full
-   brake + slide. Drift = maintain speed + slide. Currently treating as one input.

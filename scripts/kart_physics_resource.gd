@@ -18,17 +18,23 @@ extends Resource
 @export var steer_low_speed_mult: float = 1.4
 @export var steer_high_speed_mult: float = 0.7
 @export var steer_speed_threshold: float = 3.0  # min speed for full steering (0 = off)
+@export var wheelbase: float = 1.19              # meters between front/rear axles (bicycle model)
+@export var max_steer_angle: float = 40.0        # degrees, front wheel turn limit
+@export var rwd_oversteer_factor: float = 0.04   # rear-wheel drive lateral nudge strength
 
-@export_group("Drift")
-@export var low_grip_target: float = 1.2
-@export var high_grip_target: float = 14.0
-@export var grip_loss_rate: float = 10.0
-@export var grip_recovery_rate: float = 5.0
-@export var drift_kick_force: float = 5.0
-@export var min_drift_speed: float = 8.0
-@export var drift_steer_threshold: float = 0.75
-@export var drift_counter_steer_mult: float = 1.4  # steering boost when counter-steering in drift
-@export var drift_same_steer_mult: float = 0.7     # steering reduction when steering into drift
+@export_group("Visuals")
+@export var wheel_radius: float = 0.18           # for roll animation speed
+
+@export_group("Drift (Continuous)")
+@export var low_grip_target: float = 0.8            # grip at full drift intent (max slide)
+@export var high_grip_target: float = 16.0           # grip at zero intent (full traction)
+@export var grip_loss_rate: float = 14.0             # how fast grip drops when intent rises
+@export var grip_recovery_rate: float = 4.0          # how fast grip recovers when intent drops
+@export var drift_steer_threshold: float = 0.45      # steer dead zone — below this, intent = 0
+@export var drift_lateral_force: float = 0.30        # continuous lateral push (× intent × fwd_speed)
+@export var drift_counter_steer_mult: float = 1.4    # steering boost when counter-steering in slide
+@export var drift_same_steer_mult: float = 0.7       # steering reduction when steering into slide
+@export var vfx_smoke_speed_threshold: float = 3.0   # lateral speed (m/s) to trigger drift smoke
 
 @export_group("Collision")
 @export var mass: float = 1.0

@@ -112,3 +112,22 @@ Each level document must contain:
 
 ### Reports to: `game-designer`
 ### Coordinates with: `narrative-director`, `art-director`, `audio-director`
+
+## Memory Management
+
+Lightweight memory — only for technical discoveries.
+Read config first: `cat .claude/agent-memory/config.json` → get `memory_url`.
+
+At START — check for known issues:
+```bash
+curl -s "${MEMORY_URL}/api/search?q=level+layout+encounter+pacing+spatial+design&namespace=bugs&top_k=3"
+```
+
+At END — save only if you found something genuinely NEW:
+```bash
+curl -s -X POST ${MEMORY_URL}/api/memories   -H "Content-Type: application/json"   -d '{"text":"DISCOVERY","namespace":"bugs","metadata":{"project":"smash-karts-clone","source":"level-designer"}}'
+```
+
+**Save:** bugs found and root cause, non-obvious gotchas, workarounds not evident from code.
+**Don't save:** standard practices, anything obvious from reading code, general framework knowledge.
+Budget: 1 search at start. Save only if genuinely new discovery. Most sessions = zero saves.

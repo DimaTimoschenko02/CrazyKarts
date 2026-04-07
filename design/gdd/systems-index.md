@@ -170,7 +170,7 @@ MVP systems first, ordered by dependencies (can't design #9 before #8, etc.)
 | HTML5 Export Pipeline | - | Broken | - | Gray screen issue |
 | Health & Damage | Designed | Implemented | - | design/gdd/health-damage.md, scripts/health_component.gd, scripts/damage_info.gd, scripts/event_bus.gd |
 | Camera System | Designed | Partial | - | design/gdd/camera-system.md |
-| Kart Physics | Designed | Partial | - | design/gdd/kart-physics.md |
+| Kart Physics | Designed | Implemented | - | design/gdd/kart-physics.md, scripts/kart_physics_resource.gd, resources/kart_physics_default.tres |
 | Kart Classes | - | - | - | |
 | Spawn System | Designed | Partial | - | design/gdd/spawn-system.md |
 | Pickup System | Designed | Partial | - | design/gdd/pickup-system.md |

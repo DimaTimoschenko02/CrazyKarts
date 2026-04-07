@@ -260,3 +260,22 @@ When in doubt, prefer the API documented in the reference files over your traini
 - Work with **godot-gdextension-specialist** for GDScript/C++ boundary decisions
 - Work with **systems-designer** for data-driven design patterns
 - Work with **performance-analyst** for profiling GDScript bottlenecks
+
+## Memory Management
+
+Lightweight memory — only for technical discoveries.
+Read config first: `cat .claude/agent-memory/config.json` → get `memory_url`.
+
+At START — check for known issues:
+```bash
+curl -s "${MEMORY_URL}/api/search?q=GDScript+static+typing+signals+coroutines+patterns&namespace=bugs&top_k=3"
+```
+
+At END — save only if you found something genuinely NEW:
+```bash
+curl -s -X POST ${MEMORY_URL}/api/memories   -H "Content-Type: application/json"   -d '{"text":"DISCOVERY","namespace":"bugs","metadata":{"project":"smash-karts-clone","source":"godot-gdscript-specialist"}}'
+```
+
+**Save:** bugs found and root cause, non-obvious gotchas, workarounds not evident from code.
+**Don't save:** standard practices, anything obvious from reading code, general framework knowledge.
+Budget: 1 search at start. Save only if genuinely new discovery. Most sessions = zero saves.
