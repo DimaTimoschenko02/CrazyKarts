@@ -31,9 +31,13 @@ extends Resource
 @export var grip_loss_rate: float = 14.0             # how fast grip drops when intent rises
 @export var grip_recovery_rate: float = 4.0          # how fast grip recovers when intent drops
 @export var drift_steer_threshold: float = 0.45      # steer dead zone — below this, intent = 0
-@export var drift_lateral_force: float = 0.30        # continuous lateral push (× intent × fwd_speed)
+@export var drift_steer_boost: float = 1.5           # steering angle multiplier at full drift (sharper arc)
+@export var drift_lateral_force: float = 0.07        # rear-kick nudge (small, not dominant)
 @export var drift_counter_steer_mult: float = 1.4    # steering boost when counter-steering in slide
 @export var drift_same_steer_mult: float = 0.7       # steering reduction when steering into slide
+@export var drift_speed_penalty: float = 0.55         # target speed multiplier at full drift (0.55 = 55% of max)
+@export var drift_min_speed: float = 4.0              # below this speed, drift intent suppressed to 0
+@export var drift_full_speed: float = 10.0             # above this speed, full drift intent allowed
 @export var vfx_smoke_speed_threshold: float = 3.0   # lateral speed (m/s) to trigger drift smoke
 
 @export_group("Collision")

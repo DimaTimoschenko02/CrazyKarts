@@ -474,6 +474,38 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.1049027, 0, -9.160672)
 shape = SubResource("ConvexPolygonShape3D_18xna")
 debug_fill = false
 
+[node name="SpawnPoint1" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 3.5, 0)
+groups = ["kart_spawn"]
+
+[node name="SpawnPoint2" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 3.5, 0)
+groups = ["kart_spawn"]
+
+[node name="SpawnPoint3" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 7)
+groups = ["kart_spawn"]
+
+[node name="SpawnPoint4" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, -7)
+groups = ["kart_spawn"]
+
+[node name="SpawnPoint5" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 3.5, 5)
+groups = ["kart_spawn"]
+
+[node name="SpawnPoint6" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 3.5, -5)
+groups = ["kart_spawn"]
+
+[node name="SpawnPoint7" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 3.5, -5)
+groups = ["kart_spawn"]
+
+[node name="SpawnPoint8" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 3.5, 5)
+groups = ["kart_spawn"]
+
 [editable path="fence-doorway2"]
 [editable path="fence-fortified2"]
 [editable path="fence-fortified3"]

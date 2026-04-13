@@ -167,14 +167,14 @@ MVP systems first, ordered by dependencies (can't design #9 before #8, etc.)
 |--------|-----|-------------|--------|-------|
 | State Machine | Designed | Implemented | - | design/gdd/state-machine.md, scripts/game_states.gd, scripts/state_manager.gd |
 | Network Layer | Designed | Implemented | - | design/gdd/network-layer.md, scripts/snapshot_buffer.gd, scripts/network_manager.gd |
-| HTML5 Export Pipeline | - | Broken | - | Gray screen issue |
+| HTML5 Export Pipeline | - | Working | ✅ | |
 | Health & Damage | Designed | Implemented | - | design/gdd/health-damage.md, scripts/health_component.gd, scripts/damage_info.gd, scripts/event_bus.gd |
-| Camera System | Designed | Partial | - | design/gdd/camera-system.md |
+| Camera System | Designed | Implemented | Not tested | design/gdd/camera-system.md, scripts/camera_rig.gd |
 | Kart Physics | Designed | Implemented | - | design/gdd/kart-physics.md, scripts/kart_physics_resource.gd, resources/kart_physics_default.tres |
 | Kart Classes | - | - | - | |
-| Spawn System | Designed | Partial | - | design/gdd/spawn-system.md |
+| Spawn System | Designed | Implemented | Not tested | design/gdd/spawn-system.md, scripts/spawn_manager.gd |
 | Pickup System | Designed | Partial | - | design/gdd/pickup-system.md |
-| Projectile System | Designed | Partial | - | design/gdd/projectile-system.md |
+| Projectile System | Designed | Implemented | Not tested | design/gdd/projectile-system.md, scripts/base_projectile.gd, scripts/rocket_projectile.gd |
 | Weapon System | Designed | Partial | - | design/gdd/weapon-system.md |
 | Powerup System | - | - | - | |
 | Match System | Designed | - | - | design/gdd/match-system.md |

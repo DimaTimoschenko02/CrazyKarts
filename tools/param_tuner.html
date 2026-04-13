@@ -41,6 +41,11 @@
   .param-detail { color: #999; font-size: 0.73em; line-height: 1.5; margin-top: 4px; padding: 6px 8px; background: rgba(0,0,0,0.2); border-radius: 5px; border-left: 2px solid #333; display: none; }
   .param-detail.open { display: block; }
   .changed .param-name { color: #ffcc00; }
+  .dep-affected .param-name { color: #ff9f43 !important; transition: color 0.3s; }
+  .dep-badge { display: inline-block; background: rgba(127,179,211,0.15); color: var(--blue); font-size: 0.68em; padding: 1px 5px; border-radius: 3px; margin-left: 4px; cursor: help; }
+  .dep-section { margin-top: 4px; }
+  .dep-section .dep-tag { display: inline-block; background: rgba(78,204,163,0.1); color: var(--green); font-size: 0.7em; padding: 1px 5px; border-radius: 3px; margin: 1px 2px; cursor: pointer; }
+  .dep-section .dep-tag:hover { background: rgba(78,204,163,0.25); }
 </style>
 </head>
 <body>
@@ -67,12 +72,15 @@ const PARAMS = {
       short: "Максималка назад. Обычно ~50% от MAX_SPEED",
       detail: "Скорость заднего хода. Слишком высокая — машина будет странно ехать назад. Слишком низкая — нельзя откатиться от стены." },
     { key: "ACCEL_SHARPNESS", min: 0.01, max: 0.6, step: 0.01, unit: "",
+      deps: ["MAX_SPEED"],
       short: "Резкость разгона. Больше = мгновенный старт, меньше = тяжёлый разгон",
       detail: "Формула: speed = lerp(speed, target, sharpness * dt * 60). Это НЕ линейное ускорение — скорость сначала растёт быстро, потом замедляется (как будто упираешься в потолок). Это создаёт ощущение веса. При 0.1 машина 'тяжёлая', при 0.5 — 'картонная'." },
     { key: "COAST_DECEL", min: 1, max: 25, step: 0.5, unit: "m/s²",
+      deps: ["MAX_SPEED"],
       short: "Торможение без кнопок (трение). Больше = быстрее останавливается",
       detail: "Когда отпустил газ, машина замедляется линейно на это значение каждую секунду. Время до полной остановки = текущая_скорость / COAST_DECEL. Маленькое значение = машина долго катится по инерции (как на льду)." },
     { key: "BRAKE_DECEL", min: 10, max: 80, step: 1, unit: "m/s²",
+      deps: ["MAX_SPEED"],
       short: "Сила торможения кнопкой S. Больше = резче стоп",
       detail: "Линейное торможение при нажатии S (когда едешь вперёд). Время до остановки = скорость / BRAKE_DECEL. При 10: с макс скорости 19.5 → стоп за 1.95с. При 40: за 0.49с. Слишком резкое торможение — машина 'втыкается', слишком мягкое — не успеешь остановиться." },
   ],
@@ -92,18 +100,22 @@ const PARAMS = {
       short: "Базовая скорость поворота. Умножается на множители ниже",
       detail: "Итоговая скорость поворота = STEERING_SPEED × множитель_скорости × множитель_дрифта × (скорость/порог). Это базовое значение. При 3.6 и множителях 0.8/1.05: на малой скорости 2.88 рад/с, на максималке 3.78 рад/с." },
     { key: "STEER_LOW_MULT", min: 0.5, max: 3, step: 0.1, unit: "x",
+      deps: ["STEERING_SPEED"],
       short: "Множитель поворота на малой скорости. Больше = резче повороты стоя",
       detail: "Применяется когда машина едет медленно (у нуля). Интерполируется плавно от этого значения (на скорости 0) до STEER_HIGH_MULT (на MAX_SPEED). Было 1.4, ты поставил 0.8 — теперь на малой скорости поворот даже медленнее чем на высокой, что даёт более стабильное управление." },
     { key: "STEER_HIGH_MULT", min: 0.1, max: 1.5, step: 0.05, unit: "x",
+      deps: ["STEERING_SPEED"],
       short: "Множитель поворота на макс скорости. Меньше = шире дуги на скорости",
       detail: "Обычно меньше LOW_MULT чтобы на скорости машина ехала широкими дугами (не крутилась на месте). Ты поставил 1.05 (больше LOW_MULT 0.8) — это инвертирует обычную логику: на скорости руль острее чем на месте. Нестандартно, но может давать интересный feel." },
     { key: "STEER_SPEED_THRESHOLD", min: 0, max: 10, step: 0.5, unit: "m/s",
       short: "Ниже этой скорости руль ослабевает. 0 = руль всегда полный",
       detail: "При скорости от 0 до порога поворот масштабируется от 0% до 100%. Это не даёт машине крутиться на месте стоя. При 3 м/с: на скорости 1.5 руль работает на 50%. На 3+ — на полную." },
     { key: "WHEELBASE", min: 0.5, max: 3.0, step: 0.05, unit: "m",
+      deps: ["MAX_STEER_ANGLE"],
       short: "Расстояние между осями (bicycle model). Больше = стабильнее, шире дуги",
       detail: "Bicycle model: yaw_rate = speed/wheelbase × tan(steer_angle). Длинная колёсная база = стабильный на скорости, широкие повороты. Короткая = маневренный, дёрганый. 1.19 = реальная геометрия модели." },
     { key: "MAX_STEER_ANGLE", min: 15, max: 60, step: 1, unit: "°",
+      deps: ["WHEELBASE"],
       short: "Макс угол поворота передних колёс. Влияет на физику и визуал",
       detail: "Определяет максимальный поворот в bicycle model. 25° = мягкие дуги, 40° = стандарт, 55° = очень резкие повороты. Также визуально поворачивает колёса." },
     { key: "RWD_OVERSTEER", min: 0, max: 0.3, step: 0.01, unit: "",
@@ -115,32 +127,54 @@ const PARAMS = {
   ],
   "Дрифт (непрерывный)": [
     { key: "HIGH_GRIP", min: 5, max: 30, step: 0.5, unit: "",
-      short: "Сцепление при intent=0 (руль в мёртвой зоне). Больше = жёстче держит курс",
-      detail: "Grip при отсутствии дрифт-intent'а. Формула: side_speed *= exp(-grip × dt). При 16: за 0.1с гасится 80% бокового скольжения. При 10: только 63%. Теперь grip плавно интерполируется между HIGH и LOW в зависимости от силы руля." },
+      short: "Сцепление при обычной езде. Больше = колёса крепче держат дорогу",
+      deps: ["GRIP_LOSS_RATE", "GRIP_RECOVERY_RATE"],
+      detail: "📖 Сцепление (grip) — это насколько шины \"прилипают\" к дороге. Высокое = машина едет ровно, куда руль направлен. Низкое = зад скользит.\n\nЭто значение сцепления когда ты НЕ дрифтишь (руль в мёртвой зоне или отпущен). Чем выше — тем \"рельсовее\" машина на прямой.\n\nФормула: каждый кадр боковое скольжение умножается на exp(-grip × dt). При 16: за 0.1с гасится 80% заноса. При 10: только 63%.\n\n⚡ Зависит от: GRIP_LOSS_RATE (скорость перехода к LOW), GRIP_RECOVERY_RATE (скорость возврата сюда)." },
     { key: "LOW_GRIP", min: 0.1, max: 5, step: 0.1, unit: "",
-      short: "Сцепление при intent=1 (полный руль). Меньше = сильнее и дольше занос",
-      detail: "Grip при максимальном дрифт-intent'е. При 0.8: half-life = 0.87с. Дрифт теперь НЕ бинарный — grip плавно падает пропорционально силе руля. Лёгкий поворот = почти полный grip, жёсткий поворот = LOW_GRIP." },
+      short: "Сцепление при полном дрифте. Меньше = длиннее и мощнее занос",
+      deps: ["GRIP_LOSS_RATE", "GRIP_RECOVERY_RATE"],
+      detail: "📖 Это сцепление когда руль выжат на максимум (intent=1). Машина переходит от HIGH_GRIP сюда плавно, пропорционально силе руля.\n\nПример: при 0.8 за 1 секунду гасится только 55% заноса (half-life = 0.87с). Машина ощутимо \"плывёт\" боком.\n\n🎮 Как это чувствуется:\n• 0.3 = вечный занос, машина скользит очень долго\n• 0.8 = стандартный дрифт\n• 2.0 = короткий контролируемый дрифт\n• 3.0+ = почти нет заноса даже при полном руле\n\n⚡ Зависит от: GRIP_LOSS_RATE, GRIP_RECOVERY_RATE." },
     { key: "DRIFT_STEER_THRESHOLD", min: 0.1, max: 0.8, step: 0.05, unit: "",
-      short: "Мёртвая зона руля. Ниже — intent=0 (полный grip), выше — intent растёт",
-      detail: "Ниже этого значения руль не вызывает дрифт вообще — обычные повороты. Выше — intent линейно растёт от 0 до 1.0. С STEER_SLEW_IN=2: порог 0.3 достигается за 0.15с." },
+      short: "Мёртвая зона руля — ниже этого обычные повороты, выше начинается дрифт",
+      deps: ["STEER_SLEW_IN"],
+      detail: "📖 Intent (желание дрифта) — число от 0 до 1, показывает насколько сильно ты хочешь дрифтить. Зависит ТОЛЬКО от силы руля.\n\nМёртвая зона: если руль ниже порога — intent=0, машина едет с полным сцеплением (HIGH_GRIP). Когда руль превышает порог — intent плавно растёт до 1.0.\n\n🎮 Примеры:\n• Порог 0.3 + STEER_SLEW_IN 2: чтобы начать дрифт нужно держать A/D минимум 0.15с\n• Порог 0.5: нужно 0.25с — лёгкие коррекции курса не вызывают дрифт\n• Порог 0.1: дрифт начинается почти мгновенно при любом руле\n\n⚡ Связан с: STEER_SLEW_IN (определяет время до достижения порога)." },
     { key: "GRIP_LOSS_RATE", min: 2, max: 30, step: 0.5, unit: "/s",
-      short: "Как быстро grip падает когда intent растёт. Больше = резче вход в занос",
-      detail: "Grip линейно движется к цели (lerp(HIGH,LOW,intent)) со скоростью этого значения. При 14: полный переход 16→0.8 за 1.09с. Высокое значение = быстрая реакция на руль." },
-    { key: "GRIP_RECOVERY_RATE", min: 1, max: 15, step: 0.5, unit: "/s",
-      short: "Как быстро grip восстанавливается. Больше = быстрее стабилизация",
-      detail: "Когда отпускаешь руль, grip восстанавливается. При 4: от LOW до HIGH за 3.8с. Это 'хвост' заноса — машина ещё скользит после отпускания руля." },
-    { key: "DRIFT_LATERAL_FORCE", min: 0, max: 1.0, step: 0.05, unit: "",
-      short: "Боковая сила при дрифте. Определяет радиус дрифт-круга",
-      detail: "Каждый кадр: side_speed += steer × speed × intent × force × dt. Теперь всегда активна (пропорционально intent). При 0.3 и speed=16, intent=1: +4.8 м/с² бокового ускорения." },
+      short: "Как быстро начинается занос при повороте руля",
+      deps: ["HIGH_GRIP", "LOW_GRIP"],
+      detail: "📖 Когда ты крутишь руль и intent растёт, сцепление падает от HIGH к LOW. Этот параметр — скорость этого падения.\n\n🎮 Примеры (при HIGH=16, LOW=0.8):\n• 8: вход в дрифт за 1.9с — плавно, есть время передумать\n• 14: за 1.09с — стандарт\n• 20: за 0.76с — резкий вход, аркадный feel\n• 30: за 0.5с — мгновенный дрифт\n\n⚡ Работает в паре с: HIGH_GRIP, LOW_GRIP (чем больше разница — тем заметнее)." },
+    { key: "GRIP_RECOVERY_RATE", min: 1, max: 20, step: 0.5, unit: "/s",
+      short: "Как быстро машина стабилизируется после дрифта. МАЛО = 'плывёт' долго!",
+      deps: ["HIGH_GRIP", "LOW_GRIP"],
+      detail: "📖 Когда отпускаешь руль, сцепление восстанавливается от LOW к HIGH. Это \"хвост\" заноса — машина ещё скользит после отпускания.\n\n⚠️ ВАЖНО: Слишком низкое значение = машина ДОЛГО \"плывёт\" после каждого поворота!\n\n🎮 Примеры (при HIGH=16, LOW=0.8):\n• 3: восстановление 5с — машина плывёт как на льду!\n• 8: за 1.9с — заметный хвост\n• 10: за 1.5с — стандарт\n• 15: за 1с — быстрая стабилизация\n• 20: за 0.76с — почти мгновенно\n\n⚡ Работает в паре с: HIGH_GRIP, LOW_GRIP." },
+    { key: "DRIFT_STEER_BOOST", min: 1.0, max: 3.0, step: 0.1, unit: "x",
+      short: "Множитель поворота при дрифте. SmashKarts-стиль: дрифт = резче дуга",
+      deps: ["MAX_STEER_ANGLE", "WHEELBASE"],
+      detail: "📖 ГЛАВНЫЙ параметр дрифта! При intent > 0 угол поворота умножается на этот множитель.\n\nDrift = более резкая дуга (как в SmashKarts), а НЕ боковое скольжение.\n\n🎮 Примеры:\n• 1.0: нет эффекта — дрифт только от grip'а\n• 1.3: на 30% острее повороты при полном intent\n• 1.5: стандарт — заметно резче дуга, зад визуально уходит\n• 2.0: очень агрессивные дуги\n• 2.5+: экстрим — может быть нестабильно\n\n⚡ Работает вместе с: MAX_STEER_ANGLE, WHEELBASE (больше angle × boost = резче arc)." },
+    { key: "DRIFT_LATERAL_FORCE", min: 0, max: 0.3, step: 0.01, unit: "",
+      short: "Rear-kick: лёгкий боковой толчок при дрифте. Не основная сила дрифта!",
+      deps: ["DRIFT_STEER_BOOST"],
+      detail: "📖 Раньше это был ГЛАВНЫЙ параметр дрифта (0.6 = сильный боковой слайд). Теперь основной дрифт через DRIFT_STEER_BOOST.\n\nЭтот параметр добавляет лёгкий rear-kick — ощущение что зад подбрасывает.\n\n🎮 Примеры:\n• 0: только дуга, без kick'а\n• 0.05-0.1: субтильный kick — чувствуется, но не доминирует\n• 0.15+: заметный боковой push — может вернуть старое 'скольжение'\n\n⚠️ НЕ поднимай выше 0.15 — вернётся боковой слайд вместо дуги." },
     { key: "DRIFT_COUNTER_STEER", min: 0.5, max: 2.5, step: 0.1, unit: "x",
-      short: "Бонус руля при контрруле (руль против заноса). 1.0 = нет бонуса",
-      detail: "Теперь определяется по реальному направлению заноса (signf(side_speed)), а не по заблокированному направлению. При 1.4: руль на 40% эффективнее при контрруле." },
+      short: "Бонус руля при контрруле (руль ПРОТИВ заноса). 1.0 = без бонуса",
+      detail: "📖 Контрруль — когда машину заносит влево, а ты рулишь вправо. Этот множитель делает контрруль эффективнее.\n\n🎮 Примеры:\n• 1.0: контрруль работает как обычный поворот\n• 1.4: на 40% эффективнее — умелый игрок может \"поймать\" занос\n• 2.0: на 100% — контрруль очень мощный, дрифт легко контролировать\n\n💡 Это награда за скилл — тот кто умеет контррулить получает больше контроля." },
     { key: "DRIFT_SAME_STEER", min: 0.2, max: 1.5, step: 0.1, unit: "x",
-      short: "Множитель руля в сторону заноса. <1.0 = тяжелее, >1.0 = легче",
-      detail: "Когда рулишь в направлении заноса. При 0.7: на 30% медленнее. При 1.1: на 10% быстрее. Влияет на то, насколько легко углублять занос." },
+      short: "Множитель руля В СТОРОНУ заноса. <1.0 = тяжелее углублять",
+      detail: "📖 Когда машину заносит влево и ты рулишь ещё левее (углубляешь занос).\n\n🎮 Примеры:\n• 0.5: на 50% тяжелее — занос трудно углублять, стабильнее\n• 0.7: стандарт — лёгкое сопротивление\n• 1.0: без изменений\n• 1.3: на 30% легче — занос разрастается агрессивно" },
+    { key: "DRIFT_SPEED_PENALTY", min: 0.1, max: 1.0, step: 0.05, unit: "x",
+      short: "Торможение при дрифте. 0.2 = скорость падает до 20% (как SmashKarts)",
+      deps: ["MAX_SPEED"],
+      detail: "📖 При дрифте машина тормозит! Это множитель максимальной скорости при полном дрифте.\n\n🎮 Примеры (при MAX_SPEED=14):\n• 0.2: дрифт тормозит до 2.8 м/с — как SmashKarts, резкое торможение\n• 0.4: до 5.6 м/с — умеренный\n• 0.55: до 7.7 м/с — лёгкое торможение\n• 0.8: до 11.2 м/с — почти не тормозит\n• 1.0: не тормозит вообще\n\n💡 Это ключевой параметр! В SmashKarts дрифт сильно тормозит — зато после выхода из дрифта разгоняешься заново." },
+    { key: "DRIFT_MIN_SPEED", min: 0, max: 10, step: 0.5, unit: "m/s",
+      short: "Ниже этой скорости дрифт выключен — обычные повороты",
+      deps: ["DRIFT_FULL_SPEED"],
+      detail: "📖 Speed gate — на маленькой скорости машина не может дрифтить.\n\n🎮 Зачем: без этого машина крутится волчком на малой скорости.\n• 0: дрифт всегда возможен (может быть странно на малых скоростях)\n• 4: нужно хотя бы 4 м/с (~14 км/ч) чтобы начать дрифт\n• 8: дрифт только на высоких скоростях\n\n⚡ Связан с: DRIFT_FULL_SPEED (плавный переход между ними)." },
+    { key: "DRIFT_FULL_SPEED", min: 3, max: 20, step: 0.5, unit: "m/s",
+      short: "Выше этой скорости дрифт работает на 100%",
+      deps: ["DRIFT_MIN_SPEED", "MAX_SPEED"],
+      detail: "📖 Между DRIFT_MIN_SPEED и этим значением дрифт нарастает плавно (smoothstep).\n\n🎮 Примеры:\n• MIN=4, FULL=10: при 7 м/с дрифт на ~50%\n• MIN=4, FULL=6: быстрый переход, дрифт включается почти сразу\n• MIN=4, FULL=14: постепенный, дрифт полный только на макс скорости\n\n⚡ Связан с: DRIFT_MIN_SPEED, MAX_SPEED." },
     { key: "VFX_SMOKE_THRESHOLD", min: 0.5, max: 10, step: 0.5, unit: "m/s",
-      short: "Боковая скорость для дыма из колёс. Меньше = дым при лёгких заносах",
-      detail: "Дым включается когда abs(side_speed) > порог. При 3: лёгкие повороты без дыма, средний занос = дым. При 1: дым почти всегда при повороте на скорости." },
+      short: "При какой боковой скорости появляется дым из колёс",
+      detail: "📖 Визуальный эффект — дым включается когда боковое скольжение превышает порог.\n\n🎮 Примеры:\n• 1: дым при любом повороте на скорости\n• 3: дым только при ощутимом заносе\n• 6: дым только при сильном дрифте\n\n💡 Не влияет на физику, только на визуал." },
   ],
   "Рельеф": [
     { key: "GRAVITY", min: 10, max: 60, step: 1, unit: "m/s²",
@@ -158,6 +192,7 @@ const PARAMS = {
       short: "Скорость ракеты. Должна быть быстрее карта чтобы нельзя было убежать",
       detail: "При MAX_SPEED=19.5 и ROCKET_SPEED=28: ракета на 44% быстрее. Можно увернуться поворотом, но не удрать по прямой." },
     { key: "ROCKET_LIFETIME", min: 1, max: 15, step: 0.5, unit: "s",
+      deps: ["ROCKET_SPEED"],
       short: "Сколько живёт ракета. Макс дальность = скорость × время",
       detail: "Определяет макс дальность стрельбы. При 28 м/с × 6с = 168м. Длинное время = снайперская стрельба, короткое = ближний бой." },
     { key: "EXPLOSION_RADIUS", min: 1, max: 10, step: 0.5, unit: "m",
@@ -181,6 +216,7 @@ const PARAMS = {
       short: "Базовый угол обзора. На скорости добавляется FOV_SPEED_BOOST",
       detail: "Базовый FOV стоя. На максимальной скорости FOV увеличивается на FOV_SPEED_BOOST. Это создаёт ощущение скорости." },
     { key: "FOV_SPEED_BOOST", min: 0, max: 30, step: 1, unit: "°",
+      deps: ["FOV"],
       short: "Доп FOV на макс скорости. 0 = выкл. Больше = сильнее эффект скорости",
       detail: "На макс скорости FOV = базовый + boost. При FOV=80, boost=12: на максимале 92°. Плавно нарастает и спадает." },
     { key: "CAMERA_LATERAL_MAX", min: 0, max: 4, step: 0.1, unit: "m",
@@ -215,7 +251,11 @@ const FORMULAS = {
   "DRIFT_STEER_THRESHOLD": p => `Мёртвая зона: ${(p.DRIFT_STEER_THRESHOLD/p.STEER_SLEW_IN*1000).toFixed(0)}ms удержания`,
   "GRIP_LOSS_RATE": p => `HIGH→LOW: ${((p.HIGH_GRIP-p.LOW_GRIP)/p.GRIP_LOSS_RATE).toFixed(2)}s`,
   "GRIP_RECOVERY_RATE": p => `LOW→HIGH: ${((p.HIGH_GRIP-p.LOW_GRIP)/p.GRIP_RECOVERY_RATE).toFixed(2)}s`,
+  "DRIFT_STEER_BOOST": p => `Угол при дрифте: ${(p.MAX_STEER_ANGLE * p.DRIFT_STEER_BOOST).toFixed(0)}° │ Радиус: ${(p.WHEELBASE / Math.tan((p.MAX_STEER_ANGLE * p.DRIFT_STEER_BOOST) * Math.PI/180)).toFixed(1)}м`,
   "DRIFT_LATERAL_FORCE": p => `При макс: ${(p.MAX_SPEED * p.DRIFT_LATERAL_FORCE).toFixed(1)} m/s² бокового`,
+  "DRIFT_SPEED_PENALTY": p => `Дрифт макс: ${(p.MAX_SPEED * p.DRIFT_SPEED_PENALTY).toFixed(1)} m/s (${(p.MAX_SPEED * p.DRIFT_SPEED_PENALTY * 3.6).toFixed(0)} km/h)`,
+  "DRIFT_MIN_SPEED": p => `${(p.DRIFT_MIN_SPEED * 3.6).toFixed(0)} km/h`,
+  "DRIFT_FULL_SPEED": p => `${(p.DRIFT_FULL_SPEED * 3.6).toFixed(0)} km/h │ gate@50%: ${((p.DRIFT_MIN_SPEED + p.DRIFT_FULL_SPEED) / 2).toFixed(1)} m/s`,
   "VFX_SMOKE_THRESHOLD": p => `Порог: ${p.VFX_SMOKE_THRESHOLD.toFixed(1)} m/s`,
   "GRAVITY": p => `${(p.GRAVITY/9.8).toFixed(1)}× Земля \u2502 3м: ${(Math.sqrt(6/p.GRAVITY)).toFixed(2)}s`,
   "SLOPE_INFLUENCE": p => `30°: \u00B1${(0.5*p.SLOPE_INFLUENCE).toFixed(1)} m/s²`,
@@ -267,9 +307,21 @@ function render() {
       const formula = FORMULAS[p.key] ? FORMULAS[p.key](currentData) : "";
       const hasDetail = p.detail && p.detail.length > 0;
 
+      const depsHtml = (p.deps && p.deps.length) ?
+        `<div class="dep-section">↔ ${p.deps.map(d => `<span class="dep-tag" onclick="scrollToParam('${d}')" title="Зависимый параметр">${d}</span>`).join(" ")}</div>` : "";
+      // Build reverse deps display
+      const affectedBy = [];
+      for (const [gn, gp] of Object.entries(PARAMS)) {
+        for (const op of gp) {
+          if (op.deps && op.deps.includes(p.key)) affectedBy.push(op.key);
+        }
+      }
+      const affectedHtml = affectedBy.length ?
+        `<span class="dep-badge" title="Влияет на: ${affectedBy.join(', ')}">↑ ${affectedBy.length}</span>` : "";
+
       div.innerHTML = `
         <div class="param-row">
-          <span class="param-name">${p.key}</span>
+          <span class="param-name">${p.key}</span>${affectedHtml}
           <input type="range" class="param-slider" id="slider-${p.key}" min="${p.min}" max="${p.max}" step="${p.step}" value="${val}">
           <input type="number" class="param-num" id="num-${p.key}" min="${p.min}" max="${p.max}" step="${p.step}" value="${val}">
           <span class="param-unit">${p.unit}</span>
@@ -279,7 +331,8 @@ function render() {
           ${formula ? `<span class="param-formula">${formula}</span>` : ""}
           ${hasDetail ? `<span class="param-expand" onclick="this.parentElement.nextElementSibling.classList.toggle('open')">\u25BC</span>` : ""}
         </div>
-        ${hasDetail ? `<div class="param-detail">${p.detail}</div>` : ""}
+        ${hasDetail ? `<div class="param-detail">${p.detail.replace(/\\n/g, '<br>')}</div>` : ""}
+        ${depsHtml}
       `;
       group.appendChild(div);
 
@@ -290,6 +343,7 @@ function render() {
 
         const update = (v) => {
           const val = parseFloat(v);
+          if (isNaN(val)) return; // guard: empty field or invalid input
           currentData[p.key] = val;
           slider.value = val;
           num.value = val;
@@ -297,6 +351,7 @@ function render() {
           if (val !== originalData[p.key]) wrap.classList.add("changed");
           else wrap.classList.remove("changed");
           updateFormulas();
+          highlightDeps(p.key);
           autoSave();
         };
         slider.addEventListener("input", e => update(e.target.value));
@@ -353,6 +408,44 @@ async function save() {
     }
   } catch(e) {
     setStatus("Save error: " + e.message, "error");
+  }
+}
+
+function scrollToParam(key) {
+  const el = document.getElementById("param-" + key);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.add("dep-affected");
+  setTimeout(() => el.classList.remove("dep-affected"), 2000);
+}
+
+// Highlight dependent params when a value changes
+function highlightDeps(key) {
+  // Find params that list this key in their deps
+  for (const [gn, gp] of Object.entries(PARAMS)) {
+    for (const p of gp) {
+      if (p.deps && p.deps.includes(key)) {
+        const el = document.getElementById("param-" + p.key);
+        if (el) {
+          el.classList.add("dep-affected");
+          setTimeout(() => el.classList.remove("dep-affected"), 1500);
+        }
+      }
+    }
+  }
+  // Also highlight params that this key depends on
+  for (const [gn, gp] of Object.entries(PARAMS)) {
+    for (const p of gp) {
+      if (p.key === key && p.deps) {
+        for (const d of p.deps) {
+          const el = document.getElementById("param-" + d);
+          if (el) {
+            el.classList.add("dep-affected");
+            setTimeout(() => el.classList.remove("dep-affected"), 1500);
+          }
+        }
+      }
+    }
   }
 }
 

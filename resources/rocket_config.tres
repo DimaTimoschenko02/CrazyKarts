@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ProjectileResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/projectile_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+speed = 40.0
+lifetime = 6.0
+gravity_scale = 0.0
+base_damage = 40
+aoe_radius = 3.5
+self_damage = false
+weapon_name = "rocket"

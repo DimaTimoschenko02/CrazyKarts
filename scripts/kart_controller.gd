@@ -8,7 +8,7 @@ var _grip: float = 16.0              # initialised in _ready from physics.high_g
 var _drift_intent: float = 0.0       # 0.0 = no drift, 1.0 = full drift (continuous)
 var _visual_drift_angle: float = 0.0
 var _cached_side_speed: float = 0.0  # stored for VFX threshold check
-var _base_car_rot_y: float = 0.0     # BaseCar has 180° rotation in scene — preserve it
+var _base_car_rot_y: float = 0.0     # BaseCar initial rotation.y (0 after 180° fix)
 var _wheel_roll_angle: float = 0.0   # accumulated roll for wheel spin animation
 var _steer_visual_angle: float = 0.0 # smoothed visual steer angle (radians)
 
@@ -22,17 +22,6 @@ var player_name: String = ""
 # ── Snapshot buffer (remote karts only) ──────────────────────────────────────
 var _snapshot_buffer = null  # SnapshotBufferClass instance for remote karts
 var _sync_timer: float = 0.0
-
-# ── Camera ───────────────────────────────────────────────────────────────────
-var _cam_offset := Vector3(0, 4.1, 6.8)
-var _cam_look_forward := 1.15
-var _cam_pos    := Vector3.ZERO
-var _cam_init   := false
-var _cam_lateral: float = 0.0        # current lateral offset (lerped)
-var _cam_lateral_max: float = 1.5    # max lateral shift in turns (m)
-var _cam_lateral_speed: float = 4.0  # lerp speed for lateral offset
-var _cam_fov_base: float = 80.0      # base FOV (from dev_params)
-var _cam_fov_boost: float = 12.0     # extra FOV at max speed
 
 # ── VFX ──────────────────────────────────────────────────────────────────────
 var _smoke_timer: float = 0.0
@@ -55,13 +44,13 @@ var _steer_input: float = 0.0
 var _launcher_nodes: Array[Node3D] = []
 const LAUNCHER_SCENE := preload("res://scenes/launcher.tscn")
 const ROCKET_SCENE := preload("res://scenes/rocket.tscn")
+const ROCKET_CONFIG := preload("res://resources/rocket_config.tres")
 const SnapshotBufferClass := preload("res://scripts/snapshot_buffer.gd")
 const ROCKET_SPREAD_DEG := 10.0
 
 # ── Server-side tracking ─────────────────────────────────────────────────────
 var _last_known_pos: Vector3 = Vector3.ZERO
 
-@onready var camera:          Camera3D        = $Camera3D
 @onready var name_label:      Label3D         = $NameLabel
 @onready var _health:         HealthComponent = $HealthComponent
 @onready var _launcher_left:  Marker3D   = $BaseCar/Socket_Left
@@ -71,12 +60,13 @@ var _last_known_pos: Vector3 = Vector3.ZERO
 @onready var r_drift:         Node3D   = $BaseCar/MainCar/Car2/RT/RightDrift
 @onready var l_smoke: GPUParticles3D = $BaseCar/MainCar/Car2/LT/LeftDrift/GPUParticles3D
 @onready var r_smoke: GPUParticles3D = $BaseCar/MainCar/Car2/RT/RightDrift/GPUParticles3D
-# NOTE: In Blender/GLB, T=front B=back. But double 180° rotation means
-# LT/RT are at world +Z = REAR, LB/RB are at world -Z = FRONT in Godot.
-@onready var _wheel_fl: MeshInstance3D = $BaseCar/MainCar/Car2/LB   # front-left (Godot -Z)
-@onready var _wheel_fr: MeshInstance3D = $BaseCar/MainCar/Car2/RB   # front-right (Godot -Z)
-@onready var _wheel_rl: MeshInstance3D = $BaseCar/MainCar/Car2/LT   # rear-left (Godot +Z)
-@onready var _wheel_rr: MeshInstance3D = $BaseCar/MainCar/Car2/RT   # rear-right (Godot +Z)
+# Blender names: T=tire(front in Blender +Z), B=back. Godot -Z=forward, so:
+# LB/RB at Car2 Z=-0.991 = world forward = FRONT wheels
+# LT/RT at Car2 Z=+0.991 = world backward = REAR wheels
+@onready var _wheel_fl: MeshInstance3D = $BaseCar/MainCar/Car2/LB   # front-left
+@onready var _wheel_fr: MeshInstance3D = $BaseCar/MainCar/Car2/RB   # front-right
+@onready var _wheel_rl: MeshInstance3D = $BaseCar/MainCar/Car2/LT   # rear-left
+@onready var _wheel_rr: MeshInstance3D = $BaseCar/MainCar/Car2/RT   # rear-right
 
 
 func _ready() -> void:
@@ -92,7 +82,6 @@ func _ready() -> void:
 	_original_collision_layer = collision_layer
 	_original_collision_mask = collision_mask
 	var is_local := (player_id == multiplayer.get_unique_id())
-	camera.current = is_local
 	name_label.text = player_name
 
 	# Remote karts: create snapshot buffer for interpolation
@@ -101,7 +90,7 @@ func _ready() -> void:
 
 	if OS.has_feature("web"):
 		var dbg_label := Label.new()
-		dbg_label.text = "pid=%d my_id=%d name=%s is_local=%s cam=%s" % [player_id, multiplayer.get_unique_id(), name, is_local, camera.current]
+		dbg_label.text = "pid=%d my_id=%d name=%s is_local=%s" % [player_id, multiplayer.get_unique_id(), name, is_local]
 		dbg_label.position = Vector2(10, 40 + player_id * 25)
 		dbg_label.add_theme_font_size_override("font_size", 18)
 		dbg_label.add_theme_color_override("font_color", Color.YELLOW)
@@ -164,24 +153,18 @@ func _on_dev_params_changed(data: Dictionary) -> void:
 	physics.drift_steer_threshold = data.get("DRIFT_STEER_THRESHOLD",  physics.drift_steer_threshold)
 	physics.grip_loss_rate        = data.get("GRIP_LOSS_RATE",         physics.grip_loss_rate)
 	physics.grip_recovery_rate    = data.get("GRIP_RECOVERY_RATE",     physics.grip_recovery_rate)
+	physics.drift_steer_boost         = data.get("DRIFT_STEER_BOOST",    physics.drift_steer_boost)
 	physics.drift_lateral_force       = data.get("DRIFT_LATERAL_FORCE",  physics.drift_lateral_force)
 	physics.drift_counter_steer_mult = data.get("DRIFT_COUNTER_STEER", physics.drift_counter_steer_mult)
 	physics.drift_same_steer_mult    = data.get("DRIFT_SAME_STEER",    physics.drift_same_steer_mult)
+	physics.drift_speed_penalty      = data.get("DRIFT_SPEED_PENALTY", physics.drift_speed_penalty)
+	physics.drift_min_speed          = data.get("DRIFT_MIN_SPEED",     physics.drift_min_speed)
+	physics.drift_full_speed         = data.get("DRIFT_FULL_SPEED",    physics.drift_full_speed)
 	physics.vfx_smoke_speed_threshold = data.get("VFX_SMOKE_THRESHOLD", physics.vfx_smoke_speed_threshold)
 	# Terrain
 	physics.gravity               = data.get("GRAVITY",               physics.gravity)
 	physics.floor_align_speed     = data.get("FLOOR_ALIGN_SPEED",     physics.floor_align_speed)
 	physics.slope_speed_influence = data.get("SLOPE_INFLUENCE",        physics.slope_speed_influence)
-	_cam_offset = Vector3(0.0,
-		data.get("CAMERA_HEIGHT",    _cam_offset.y),
-		absf(data.get("CAMERA_DISTANCE", absf(_cam_offset.z))))
-	_cam_look_forward = data.get("CAMERA_LOOK_AHEAD", _cam_look_forward)
-	_cam_lateral_max  = data.get("CAMERA_LATERAL_MAX", _cam_lateral_max)
-	_cam_lateral_speed = data.get("CAMERA_LATERAL_SPEED", _cam_lateral_speed)
-	_cam_fov_base     = data.get("FOV", _cam_fov_base)
-	_cam_fov_boost    = data.get("FOV_SPEED_BOOST", _cam_fov_boost)
-	if camera:
-		camera.fov = _cam_fov_base
 
 
 # ── State change handlers ────────────────────────────────────────────────────
@@ -275,12 +258,27 @@ func _physics_process(delta: float) -> void:
 	else:
 		fwd_speed = move_toward(fwd_speed, 0.0, physics.coast_decel * delta)
 
-	# ── 5. Drift intent (continuous 0.0–1.0, based on steer only) ────────────
+	# Drift speed penalty: explicit decel to drift max speed (not relying on slow lerp)
+	if _drift_intent > 0.0 and fwd_speed > 0.0:
+		var drift_max_speed: float = physics.max_speed * lerp(1.0, physics.drift_speed_penalty, _drift_intent)
+		if fwd_speed > drift_max_speed:
+			fwd_speed = move_toward(fwd_speed, drift_max_speed, 15.0 * delta)
+
+	# ── 5. Drift intent (continuous 0.0–1.0, smoothed steer for natural fade) ─
 	var raw_intent := absf(_steer_input)
 	var intent_target := 0.0
 	if raw_intent > physics.drift_steer_threshold:
 		intent_target = (raw_intent - physics.drift_steer_threshold) / maxf(1.0 - physics.drift_steer_threshold, 0.01)
-	_drift_intent = intent_target  # instant — smoothing comes from grip rate
+
+	# No drift while reversing
+	if fwd_speed < -0.5:
+		intent_target = 0.0
+
+	# Speed gate: suppress drift at very low speed (skip if both thresholds are 0)
+	if physics.drift_full_speed > physics.drift_min_speed:
+		var speed_gate: float = smoothstep(physics.drift_min_speed, physics.drift_full_speed, absf(fwd_speed))
+		intent_target *= speed_gate
+	_drift_intent = intent_target
 
 	# ── 6. Bicycle model steering (front-axle pivot) ─────────────────────────
 	var speed_ratio: float = clamp(absf(fwd_speed) / physics.max_speed, 0.0, 1.0)
@@ -299,20 +297,22 @@ func _physics_process(delta: float) -> void:
 			steer_modifier = lerp(1.0, physics.drift_same_steer_mult, blend)
 
 	# Bicycle model: yaw_rate = (speed / wheelbase) × tan(steer_angle)
-	var effective_steer_deg: float = _steer_input * steer_sign * physics.max_steer_angle * steer_mult * steer_modifier
+	# Drift boost: sharper arc during drift (SmashKarts-style: drift = tighter turn, not lateral slide)
+	var drift_boost: float = lerp(1.0, physics.drift_steer_boost, _drift_intent)
+	var effective_steer_deg: float = _steer_input * steer_sign * physics.max_steer_angle * steer_mult * steer_modifier * drift_boost
 	var steer_angle_rad: float = clamp(deg_to_rad(effective_steer_deg), deg_to_rad(-75.0), deg_to_rad(75.0))
 	var safe_speed: float = maxf(absf(fwd_speed), 0.1) * speed_scale
 	var yaw_rate: float = (safe_speed / maxf(physics.wheelbase, 0.1)) * tan(steer_angle_rad)
 
-	# Front-axle pivot: record position BEFORE rotation, correct AFTER
+	# Pivot: front axle when going forward, rear axle when reversing
 	var half_wb := physics.wheelbase * 0.5
-	var front_axle_pre := global_position - global_transform.basis.z * half_wb
+	var pivot_sign: float = -1.0 if fwd_speed >= 0.0 else 1.0
+	var pivot_pre := global_position + global_transform.basis.z * (half_wb * pivot_sign)
 
 	rotate_y(yaw_rate * delta)
 
-	# Shift so front axle stays put — rear swings out
-	var front_axle_post := global_position - global_transform.basis.z * half_wb
-	global_position += front_axle_pre - front_axle_post
+	var pivot_post := global_position + global_transform.basis.z * (half_wb * pivot_sign)
+	global_position += pivot_pre - pivot_post
 
 	# Recompute dirs after rotation + translation
 	fwd_dir  = -global_transform.basis.z
@@ -365,7 +365,7 @@ func _physics_process(delta: float) -> void:
 	if _wheel_fl and _wheel_fr and _wheel_rl and _wheel_rr:
 		_wheel_roll_angle += fwd_speed * delta / maxf(physics.wheel_radius, 0.01)
 		_wheel_roll_angle = fmod(_wheel_roll_angle, TAU)
-		# Double 180° rotation = identity → no sign flip needed
+		# No rotation flips — Car2 at identity
 		_wheel_rl.rotation.x = _wheel_roll_angle
 		_wheel_rr.rotation.x = _wheel_roll_angle
 		# Front wheels: combine roll + steer
@@ -487,45 +487,21 @@ func get_kart_mass() -> float:
 	return physics.mass if physics else 1.0
 
 
-# ── Camera + Remote interpolation ────────────────────────────────────────────
+# ── Remote interpolation ─────────────────────────────────────────────────────
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if multiplayer.get_unique_id() == player_id:
-		# Local kart: camera only
-		if not camera:
-			return
-		var flat_basis := Basis(Vector3.UP, global_rotation.y)
-
-		# Camera lateral offset in turns — shifts outward so you see around corners
-		var lateral_target: float = -_steer_input * _cam_lateral_max
-		_cam_lateral = lerp(_cam_lateral, lateral_target, _cam_lateral_speed * delta)
-		var side_flat := flat_basis.x
-
-		var target_pos := global_position + flat_basis * _cam_offset + side_flat * _cam_lateral
-		if not _cam_init:
-			_cam_pos  = target_pos
-			_cam_init = true
-		_cam_pos = _cam_pos.lerp(target_pos, 6.0 * delta)
-		camera.global_position = _cam_pos
-		var forward_flat := -flat_basis.z
-		var look_at_pt := global_position + forward_flat * _cam_look_forward + Vector3.UP * 0.55
-		camera.look_at(look_at_pt, Vector3.UP)
-
-		# Speed-dependent FOV
-		var speed_t: float = clamp(velocity.length() / physics.max_speed, 0.0, 1.0)
-		var target_fov: float = lerp(_cam_fov_base, _cam_fov_base + _cam_fov_boost, speed_t)
-		camera.fov = lerp(camera.fov, target_fov, 4.0 * delta)
-	else:
-		# Remote kart: snapshot buffer interpolation
-		if not _snapshot_buffer:
-			return
-		if StateManager.get_kart_state(player_id) == GameStates.KartState.DEAD:
-			return
-		var render_time := NetworkManager.get_synced_time() - SnapshotBufferClass.BUFFER_DELAY_MS
-		var state: Dictionary = _snapshot_buffer.sample(render_time)
-		if state["valid"]:
-			global_position = state["pos"]
-			global_rotation = state["rot"]
+		return   # local kart — CameraRig handles camera
+	# Remote kart: snapshot buffer interpolation
+	if not _snapshot_buffer:
+		return
+	if StateManager.get_kart_state(player_id) == GameStates.KartState.DEAD:
+		return
+	var render_time := NetworkManager.get_synced_time() - SnapshotBufferClass.BUFFER_DELAY_MS
+	var state: Dictionary = _snapshot_buffer.sample(render_time)
+	if state["valid"]:
+		global_position = state["pos"]
+		global_rotation = state["rot"]
 
 
 # ── Firing ───────────────────────────────────────────────────────────────────
@@ -538,7 +514,7 @@ func _fire() -> void:
 		for i in range(muzzle_transforms.size()):
 			var tr := muzzle_transforms[i]
 			var rocket_dir := _apply_rocket_spread(tr.basis.z.normalized(), i, muzzle_transforms.size())
-			_rpc_spawn_rocket.rpc(player_id, tr.origin, rocket_dir)
+			_rpc_spawn_projectile.rpc(player_id, tr.origin, rocket_dir)
 	else:
 		_rpc_request_fire.rpc_id(1)
 
@@ -595,17 +571,20 @@ func _rpc_request_fire() -> void:
 	for i in range(muzzle_transforms.size()):
 		var tr := muzzle_transforms[i]
 		var rocket_dir: Vector3 = kart._apply_rocket_spread(tr.basis.z.normalized(), i, muzzle_transforms.size())
-		_rpc_spawn_rocket.rpc(shooter_id, tr.origin, rocket_dir)
+		_rpc_spawn_projectile.rpc(shooter_id, tr.origin, rocket_dir)
 
 
 @rpc("authority", "call_local", "reliable")
-func _rpc_spawn_rocket(shooter_id: int, pos: Vector3, dir: Vector3) -> void:
+func _rpc_spawn_projectile(shooter_id: int, pos: Vector3, dir: Vector3) -> void:
 	var rocket := ROCKET_SCENE.instantiate()
-	get_tree().current_scene.add_child(rocket)
-	rocket.shooter_id = shooter_id
+	rocket.setup(ROCKET_CONFIG.duplicate(), shooter_id, dir)
 	rocket.global_position = pos
-	rocket.direction = dir.normalized()
 	rocket.look_at(pos + dir.normalized(), Vector3.UP)
+	var container := get_tree().current_scene.get_node_or_null("Projectiles")
+	if container:
+		container.add_child(rocket)
+	else:
+		get_tree().current_scene.add_child(rocket)
 
 
 func _apply_rocket_spread(base_dir: Vector3, index: int, total: int) -> Vector3:
@@ -677,7 +656,7 @@ func _clear_launchers() -> void:
 	_launcher_nodes.clear()
 
 
-# ── Damage (server-side entry point) ─────────────────────────────────────────
+# ── Damage (DEPRECATED — projectiles now call HealthComponent.apply_damage directly) ──
 
 func take_damage(damage: int, attacker_id: int, damage_type: DamageInfo.Type = DamageInfo.Type.PROJECTILE, hit_position: Vector3 = Vector3.ZERO) -> void:
 	if not multiplayer.is_server():
@@ -693,8 +672,9 @@ func _on_health_died(_killer_id: int) -> void:
 # ── Respawn (visual reset, called via RPC from game_world) ───────────────────
 
 @rpc("authority", "call_local", "reliable")
-func respawn(spawn_pos: Vector3) -> void:
+func respawn(spawn_pos: Vector3, spawn_rot: float = 0.0) -> void:
 	global_position = spawn_pos
+	rotation.y = spawn_rot
 	velocity = Vector3.ZERO
 	_throttle = 0.0
 	_steer_input = 0.0

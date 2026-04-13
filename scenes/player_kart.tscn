@@ -1,9 +1,9 @@
-[gd_scene format=4]
+[gd_scene format=4 uid="uid://ck117ocekuiis"]
 
 [ext_resource type="Script" uid="uid://cw1we7npbhxy1" path="res://scripts/kart_controller.gd" id="1_1rmgi"]
-[ext_resource type="PackedScene" path="res://scenes/base_car.tscn" id="2_6lm7g"]
-[ext_resource type="Texture2D" path="res://assets/Explosions/1/1_1.png" id="2_upytd"]
-[ext_resource type="Script" uid="uid://bh3x9kqm7yp2c" path="res://scripts/health_component.gd" id="3_hlthcmp"]
+[ext_resource type="PackedScene" uid="uid://cupdu5hd0xxsr" path="res://scenes/base_car.tscn" id="2_6lm7g"]
+[ext_resource type="Texture2D" uid="uid://baeqy54gm6aew" path="res://assets/Explosions/1/1_1.png" id="2_upytd"]
+[ext_resource type="Script" uid="uid://bh3yakqm7yp2c" path="res://scripts/health_component.gd" id="3_hlthcmp"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fc3gl"]
 resource_name = "basecolor"
@@ -382,66 +382,34 @@ script = ExtResource("1_1rmgi")
 [node name="BaseCar" parent="." unique_id=358117560 instance=ExtResource("2_6lm7g")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
 
-[node name="Socket_Left" parent="BaseCar" index="0" unique_id=282843129]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3546462, 0.61905324, 0.63135004)
-
-[node name="Socket_Right" parent="BaseCar" index="1" unique_id=1741245770]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3947143, 0.6298427, 0.63860357)
-
-[node name="Socket_Center" parent="BaseCar" index="2" unique_id=995822031]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.005925417, 0.31185567, 1.1002692)
-
-[node name="MainCar" parent="BaseCar" index="3" unique_id=587672237]
-transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0, 0, 0)
-
-[node name="Car2" parent="BaseCar/MainCar" index="0" unique_id=1608341542]
-transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 0, 0, 0)
+[node name="Car2" parent="BaseCar/MainCar" parent_id_path=PackedInt32Array(358117560, 587672237) index="0" unique_id=1608341542]
 
 [node name="Car" parent="BaseCar/MainCar/Car2" index="0" unique_id=522920122]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 mesh = SubResource("ArrayMesh_r1d0i")
 
 [node name="RT" parent="BaseCar/MainCar/Car2" index="1" unique_id=725594792]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8497367, 0.52199316, 0.9912547)
 mesh = SubResource("ArrayMesh_y2si7")
 
-[node name="RightDrift" parent="BaseCar/MainCar/Car2/RT" index="0" unique_id=1458398523]
-transform = Transform3D(-1.6666665, 0, 1.4570462e-07, 0, 1.6666665, 0, -1.4570462e-07, 0, -1.6666665, 0.067570865, -0.54651254, 0.27541202)
-
-[node name="GPUParticles3D" parent="BaseCar/MainCar/Car2/RT/RightDrift" index="0" unique_id=1166281601]
-transform = Transform3D(1, 0, -8.4703295e-22, 0, 1, 0, 8.4703295e-22, 0, 1, 0.18235096, 0.32031396, 0)
-emitting = false
-amount = 35
+[node name="GPUParticles3D" parent="BaseCar/MainCar/Car2/RT/RightDrift" parent_id_path=PackedInt32Array(358117560, 1458398523) index="0" unique_id=1166281601]
 process_material = SubResource("ParticleProcessMaterial_a4qrm")
 draw_pass_1 = SubResource("QuadMesh_umnlq")
 
 [node name="RB" parent="BaseCar/MainCar/Car2" index="2" unique_id=652050303]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8497368, 0.52199316, -0.9912548)
 mesh = SubResource("ArrayMesh_g54gg")
 
 [node name="LT" parent="BaseCar/MainCar/Car2" index="3" unique_id=8884428]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8497369, 0.52199316, 0.9912547)
 mesh = SubResource("ArrayMesh_1n7dy")
 
-[node name="LeftDrift" parent="BaseCar/MainCar/Car2/LT" index="0" unique_id=45871805]
-transform = Transform3D(-1.6666664, 0, 1.4570463e-07, 0, 1.6666664, 0, -1.4570463e-07, 0, -1.6666664, 0.40447533, -0.024519384, 1.2666664)
-
-[node name="GPUParticles3D" parent="BaseCar/MainCar/Car2/LT/LeftDrift" index="0" unique_id=1909145678]
-transform = Transform3D(1, 0, 1.4210855e-14, 0, 1, 0, -1.4210855e-14, 0, 1, 0.11048016, 0.039699405, -1.1920929e-07)
-emitting = false
-amount = 35
+[node name="GPUParticles3D" parent="BaseCar/MainCar/Car2/LT/LeftDrift" parent_id_path=PackedInt32Array(358117560, 45871805) index="0" unique_id=1909145678]
 process_material = SubResource("ParticleProcessMaterial_a4qrm")
 draw_pass_1 = SubResource("QuadMesh_umnlq")
 
 [node name="LB" parent="BaseCar/MainCar/Car2" index="4" unique_id=162084406]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.84973705, 0.52199316, -0.9912548)
 mesh = SubResource("ArrayMesh_ofrd3")
 
 [node name="BodyCollision" type="CollisionShape3D" parent="." unique_id=1044797573]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.38932073, 0.004272461)
 shape = SubResource("BoxShape3D_1rmgi")
-
-[node name="Camera3D" type="Camera3D" parent="." unique_id=872941527]
 
 [node name="NameLabel" type="Label3D" parent="." unique_id=1512045965]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7066083, 0)

@@ -1,24 +1,15 @@
 extends Node3D
 
 const KART_SCENE := preload("res://scenes/player_kart.tscn")
+const CameraRigScript := preload("res://scripts/camera_rig.gd")
 
-const SPAWN_POINTS: Array[Vector3] = [
-	Vector3( 7, 3.5,  0),
-	Vector3(-7, 3.5,  0),
-	Vector3( 0, 3.5,  7),
-	Vector3( 0, 3.5, -7),
-	Vector3( 5, 3.5,  5),
-	Vector3(-5, 3.5, -5),
-	Vector3( 5, 3.5, -5),
-	Vector3(-5, 3.5,  5),
-]
-
-var _spawn_index: int = 0
 var _players: Dictionary = {}  # { pid: { name: String, pos: Vector3 } }
 var synced_peers: Array[int] = []
 
 @onready var karts: Node3D = $Karts
 @onready var hud: CanvasLayer = $HUD
+@onready var spawn_manager: SpawnManager = $SpawnManager
+@onready var projectiles: Node3D = $Projectiles
 
 
 func _ready() -> void:
@@ -33,13 +24,10 @@ func _ready() -> void:
 		print("[GameWorld] Client mode - telling server we're ready")
 		_register.rpc_id(1, PlayerData.my_name)
 
-	GameManager.scores_updated.connect(hud.update_scores)
 	StateManager.kart_state_changed.connect(_on_kart_state_changed)
 
 
 func _exit_tree() -> void:
-	if GameManager.scores_updated.is_connected(hud.update_scores):
-		GameManager.scores_updated.disconnect(hud.update_scores)
 	if StateManager.kart_state_changed.is_connected(_on_kart_state_changed):
 		StateManager.kart_state_changed.disconnect(_on_kart_state_changed)
 	if multiplayer.is_server() and NetworkManager.player_disconnected.is_connected(_on_player_disconnected):
@@ -63,7 +51,8 @@ func _register(player_name: String) -> void:
 		var info = _players[existing_pid]
 		var kart_node = karts.get_node_or_null(str(existing_pid))
 		var pos = kart_node.global_position if kart_node else info["pos"]
-		_rpc_spawn_kart.rpc_id(pid, existing_pid, info["name"], pos)
+		var rot: float = kart_node.rotation.y if kart_node else 0.0
+		_rpc_spawn_kart.rpc_id(pid, existing_pid, info["name"], pos, rot)
 
 	# 3. Spawn new player's kart (on all clients)
 	_spawn_for_player(pid, player_name)
@@ -136,17 +125,16 @@ func _apply_pending_hp(pid: int) -> void:
 func _spawn_for_player(pid: int, player_name: String) -> void:
 	print("[GameWorld] Spawning kart for pid=", pid, " name=", player_name)
 	GameManager.register_player(pid, player_name)
-	var idx := _spawn_index
-	_spawn_index += 1
-	var spawn_pos := SPAWN_POINTS[idx % SPAWN_POINTS.size()]
+	var spawn_pos: Vector3 = spawn_manager.get_initial_spawn_point()
+	var spawn_rot: float = _face_center_rotation(spawn_pos)
 
 	_players[pid] = { "name": player_name, "pos": spawn_pos }
 
-	_rpc_spawn_kart.rpc(pid, player_name, spawn_pos)
+	_rpc_spawn_kart.rpc(pid, player_name, spawn_pos, spawn_rot)
 
 
 @rpc("authority", "call_local", "reliable")
-func _rpc_spawn_kart(pid: int, player_name: String, spawn_pos: Vector3) -> void:
+func _rpc_spawn_kart(pid: int, player_name: String, spawn_pos: Vector3, spawn_rot: float = 0.0) -> void:
 	if karts.has_node(str(pid)):
 		return
 	print("[GameWorld] _rpc_spawn_kart: pid=", pid, " name=", player_name)
@@ -155,8 +143,13 @@ func _rpc_spawn_kart(pid: int, player_name: String, spawn_pos: Vector3) -> void:
 	kart.player_name = player_name
 	kart.name        = str(pid)
 	kart.position    = spawn_pos
+	kart.rotation.y  = spawn_rot
 	karts.add_child(kart, true)
 	call_deferred("_apply_pending_hp", pid)
+
+	# CameraRig for local player only
+	if pid == multiplayer.get_unique_id():
+		_spawn_camera_rig(kart)
 
 
 # ── State changes ────────────────────────────────────────────────────────────
@@ -172,9 +165,18 @@ func _on_kart_respawning(pid: int) -> void:
 	var kart := karts.get_node_or_null(str(pid)) as CharacterBody3D
 	if not kart:
 		return
-	var spawn_pos := SPAWN_POINTS[randi() % SPAWN_POINTS.size()]
-	kart.respawn.rpc(spawn_pos)
+	var spawn_pos: Vector3 = spawn_manager.get_respawn_point(karts)
+	var spawn_rot: float = _face_center_rotation(spawn_pos)
+	kart.respawn.rpc(spawn_pos, spawn_rot)
 	StateManager.server_respawn_complete(pid)
+
+
+func _face_center_rotation(spawn_pos: Vector3) -> float:
+	var dir := Vector3.ZERO - spawn_pos
+	dir.y = 0.0
+	if dir.is_zero_approx():
+		return 0.0
+	return atan2(dir.x, dir.z)
 
 
 # ── Player disconnect ─────────────────────────────────────────────────────────
@@ -190,6 +192,26 @@ func _on_player_disconnected(pid: int) -> void:
 	var kart := karts.get_node_or_null(str(pid))
 	if kart:
 		kart.queue_free()
+
+
+func _spawn_camera_rig(kart: CharacterBody3D) -> void:
+	if get_node_or_null("CameraRig"):
+		return
+	var rig := Node3D.new()
+	rig.name = "CameraRig"
+	rig.set_script(CameraRigScript)
+
+	var shake_node := Node3D.new()
+	shake_node.name = "ShakeNode"
+
+	var camera := Camera3D.new()
+	camera.name = "Camera3D"
+
+	shake_node.add_child(camera)
+	rig.add_child(shake_node)
+	add_child(rig)
+
+	rig.call_deferred("set_target", kart)
 
 
 @rpc("authority", "call_remote", "reliable")
