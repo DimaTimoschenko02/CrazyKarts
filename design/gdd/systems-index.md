@@ -25,7 +25,7 @@ last-updated: 2026-04-03
 | 3 | HTML5 Export Pipeline | Infrastructure | 1 | MVP | Broken |
 | 4 | Health & Damage | Core | 2 | MVP | Designed |
 | 5 | Camera System | Core | 2 | MVP | Designed |
-| 6 | Kart Physics | Core | 2 | MVP | Designed |
+| 6 | Kart Physics | Core | 2 | MVP | Refactoring (v2 arcade, branch: `arcade-physics`) |
 | 7 | Kart Classes | Feature | 3 | Alpha | Not Started |
 | 8 | Spawn System | Core | 3 | MVP | Designed |
 | 9 | Pickup System | Core | 3 | MVP | Designed |
