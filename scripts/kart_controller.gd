@@ -360,8 +360,10 @@ func _physics_process(delta: float) -> void:
 	fwd_dir  = -global_transform.basis.z
 	side_dir =  global_transform.basis.x
 
-	# Re-project velocity onto new orientation (after rotation, fwd/side change)
-	fwd_speed  = velocity.dot(fwd_dir)
+	# Re-project side_speed only onto new basis after rotation.
+	# fwd_speed must NOT be re-projected here — it already includes thrust/drag/rolling
+	# integrated in step 4. Re-projecting fwd_speed would discard that integration,
+	# causing the kart to be unable to accelerate (movement regression bug).
 	side_speed = velocity.dot(side_dir)
 
 	# ── 7. Lateral ramp kick (v2.2 — replaces v2.1 one-shot impulse) ─────────
