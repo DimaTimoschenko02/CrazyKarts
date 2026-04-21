@@ -34,6 +34,10 @@ EventBus="*res://scripts/event_bus.gd"
 
 config_version=5
 
+[display]
+
+window/size/mode=3
+
 [editor_plugins]
 
 enabled=PackedStringArray()
