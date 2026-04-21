@@ -90,12 +90,10 @@ const PARAMS = {
   "Сглаживание ввода": [
     { key: "STEER_SLEW_IN", min: 1, max: 20, step: 0.5, unit: "/s",
       short: "Как быстро руль прокручивается до упора когда жмёшь A/D. Больше = отзывчивее",
-      deps: ["DRIFT_ENTER_THRESHOLD"],
-      detail: "Клавиатура даёт 'вкл/выкл' мгновенно, а физике нужна плавность. Этот параметр делает нажатие плавным.\n\nОриентиры:\n• 2: полный поворот за 0.5 сек — руль 'тяжёлый'\n• 5: 0.2 сек — отзывчиво\n• 10+: почти мгновенно — как тумблер\n\nВлияет на скорость входа в дрифт: чем выше, тем быстрее достигаешь порога начала дрифта." },
+      detail: "Клавиатура даёт 'вкл/выкл' мгновенно, а физике нужна плавность. Этот параметр делает нажатие плавным.\n\nОриентиры:\n• 2: полный поворот за 0.5 сек — руль 'тяжёлый'\n• 5: 0.2 сек — отзывчиво\n• 10+: почти мгновенно — как тумблер\n\nВ v2.3 дрифт нет бинарных порогов — intensity_target = pow(|steer|, exponent). Скорость руля влияет на то как быстро intensity нарастает." },
     { key: "STEER_SLEW_OUT", min: 1, max: 15, step: 0.5, unit: "/s",
-      short: "Как быстро руль возвращается в центр после отпускания A/D. Важно для выхода из дрифта",
-      deps: ["DRIFT_EXIT_THRESHOLD"],
-      detail: "Дрифт заканчивается когда руль достаточно вернётся к центру. Этот параметр определяет насколько быстро это происходит.\n\nБольше → быстрее выходишь из дрифта сразу после отпускания клавиши.\nМеньше → машина ещё 'доруливает' какое-то время после того как ты отпустил кнопку.\n\nЕсли дрифт заканчивается слишком резко → уменьши. Если машина долго тянется к центру → увеличь." },
+      short: "Как быстро руль возвращается в центр после отпускания A/D. Важно для хвоста дрифта",
+      detail: "В v2.3 нет порога выхода из дрифта — intensity_target падает плавно по мере возврата руля к центру через pow(|steer|, exp). Медленный возврат руля = плавный выход из дрифта.\n\nОриентиры:\n• 1.5: руль медленно возвращается, intensity плавно падает\n• 3.5: стандарт\n• 8+: руль мгновенно в центр, intensity сразу к 0" },
     { key: "THROTTLE_SLEW", min: 1, max: 20, step: 0.5, unit: "/s",
       short: "Как быстро газ раскручивается до полного при нажатии W. Меньше = мягче педаль",
       detail: "Делает газ плавным — как педаль, а не тумблер.\n\nОриентиры:\n• 2: ощущение педали, плавный набор\n• 5: средне\n• 10+: почти мгновенный газ (как кнопка)\n\nМаленькое значение добавляет реализма ускорению. Большое — аркадная отзывчивость." },
@@ -144,14 +142,9 @@ const PARAMS = {
       short: "[deprecated] Оставь 0. Legacy override v2.1 — grip через move_toward вместо intensity",
       deps: ["HIGH_GRIP", "LOW_GRIP"],
       detail: "[deprecated v2.1] В v2.2 grip автоматически восстанавливается через intensity decay. Этот параметр нужен только для отката к v2.1-поведению.\n\nОставь 0.0 — тогда работает новая intensity-based логика.\nНенулевое + GRIP_LOSS_RATE ненулевое → legacy override: grip восстанавливается через move_toward при выходе из дрифта." },
-    { key: "DRIFT_ENTER_THRESHOLD", min: 0.5, max: 0.95, step: 0.05, unit: "",
-      deps: ["DRIFT_EXIT_THRESHOLD"],
-      short: "Насколько сильно нужно крутить руль чтобы intensity начала расти к 1.0",
-      detail: "Дрифт начинается когда ты достаточно сильно выкрутил руль.\n\nОриентиры:\n• 0.5-0.6: intensity растёт от небольшого поворота — часто случайный дрифт\n• 0.75: стандарт — дрифт при близком к полному рулю\n• 0.9+: требует очень сильного зажатия руля\n\nВАЖНО: ENTER должен быть больше EXIT, иначе intensity будет осциллировать.\n\nДополнительно: нужна ещё и минимальная скорость (см. DRIFT_MIN_SPEED_RATIO)." },
-    { key: "DRIFT_EXIT_THRESHOLD", min: 0.1, max: 0.7, step: 0.05, unit: "",
-      deps: ["DRIFT_ENTER_THRESHOLD"],
-      short: "Насколько должен расслабиться руль чтобы intensity начала падать к 0.0",
-      detail: "В v2.2 intensity держит последнее направление пока руль в зоне [exit, enter].\n\nРазница между ENTER и EXIT = 'зона удержания'. Пока руль в этой зоне, intensity не меняется.\n\nВАЖНО: EXIT должен быть МЕНЬШЕ чем ENTER (формула покажет ⚠️ если неправильно).\n\nПример: ENTER=0.75, EXIT=0.35 → расслабил руль до 0.5 — intensity удерживается. До 0.3 — начинает падать." },
+    { key: "DRIFT_STEER_EXPONENT", min: 1.5, max: 5.0, step: 0.1, unit: "",
+      short: "Кривизна дрифта от руля. Больше = дрифт только при сильном повороте, меньше = дрифт от лёгкого касания",
+      detail: "В v2.3 дрифт ВСЕГДА есть при повороте руля, но его сила нарастает по степенной кривой: intensity_target = pow(|steer|, exponent) * speed_factor.\n\nТаблица intensity_target при типичных значениях руля:\n\n• exponent=2.0 (плавнее): steer=0.3 → 0.09, steer=0.5 → 0.25, steer=0.8 → 0.64\n• exponent=3.0 (стандарт): steer=0.3 → 0.027, steer=0.5 → 0.125, steer=0.8 → 0.512\n• exponent=5.0 (резкое): steer=0.3 → 0.002, steer=0.5 → 0.031, steer=0.8 → 0.328\n\nЕсли машину заносит от лёгкого прикосновения руля → увеличь. Если дрифт 'не чувствуется' даже при полном повороте → уменьши." },
     { key: "DRIFT_MIN_SPEED_RATIO", min: 0.1, max: 0.8, step: 0.05, unit: "x",
       deps: ["MAX_SPEED"],
       short: "Минимальная скорость для дрифта, как доля от MAX_SPEED. 0.15 = доступен почти всегда",
@@ -278,13 +271,11 @@ const FORMULAS = {
   },
   "STEER_SLEW_IN": p => {
     const s = safeNum(p.STEER_SLEW_IN);
-    const enter = safeNum(p.DRIFT_ENTER_THRESHOLD, 0.75);
-    return `Полный: ${fmt(s > 0 ? 1 / s : 0, 2)}s │ До дрифта: ${fmt(s > 0 ? enter / s : 0, 2)}s`;
+    return `Полный руль за ${fmt(s > 0 ? 1 / s : 0, 2)}s`;
   },
   "STEER_SLEW_OUT": p => {
     const s = safeNum(p.STEER_SLEW_OUT);
-    const gap = safeNum(p.DRIFT_ENTER_THRESHOLD, 0.75) - safeNum(p.DRIFT_EXIT_THRESHOLD, 0.35);
-    return `Центр за ${fmt(s > 0 ? 1 / s : 0, 2)}s │ Выход: ${fmt(s > 0 ? gap / s : 0, 2)}s`;
+    return `Центр за ${fmt(s > 0 ? 1 / s : 0, 2)}s`;
   },
   "THROTTLE_SLEW": p => `Полный газ за ${fmt(safeNum(p.THROTTLE_SLEW) > 0 ? 1 / p.THROTTLE_SLEW : 0, 2)}s`,
   "STEERING_SPEED": p => `Тихо: ${fmt(safeNum(p.STEERING_SPEED) * safeNum(p.STEER_LOW_MULT))} │ Макс: ${fmt(safeNum(p.STEERING_SPEED) * safeNum(p.STEER_HIGH_MULT))} rad/s`,
@@ -312,16 +303,9 @@ const FORMULAS = {
     const r = safeNum(p.GRIP_RECOVERY_RATE);
     return `LOW→HIGH: ${fmt(r > 0 ? delta / r : 0, 2)}s`;
   },
-  "DRIFT_ENTER_THRESHOLD": p => {
-    const slew = safeNum(p.STEER_SLEW_IN);
-    const t = safeNum(p.DRIFT_ENTER_THRESHOLD);
-    return `Время до порога: ${fmt(slew > 0 ? (t / slew) * 1000 : 0, 0)}ms`;
-  },
-  "DRIFT_EXIT_THRESHOLD": p => {
-    const enter = safeNum(p.DRIFT_ENTER_THRESHOLD);
-    const exit = safeNum(p.DRIFT_EXIT_THRESHOLD);
-    const ok = exit < enter;
-    return `Гистерезис: ${fmt(enter - exit, 2)} ${ok ? "✓" : "⚠️ EXIT >= ENTER!"}`;
+  "DRIFT_STEER_EXPONENT": p => {
+    const e = safeNum(p.DRIFT_STEER_EXPONENT, 3.0);
+    return `steer=0.5 → ${fmt(Math.pow(0.5, e), 3)} │ steer=0.8 → ${fmt(Math.pow(0.8, e), 3)}`;
   },
   "DRIFT_MIN_SPEED_RATIO": p => `Мин скорость: ${fmt(safeNum(p.MAX_SPEED) * safeNum(p.DRIFT_MIN_SPEED_RATIO))} m/s`,
   "DRIFT_YAW_MULTIPLIER": p => `При intensity=1.0: +${fmt((safeNum(p.DRIFT_YAW_MULTIPLIER) - 1) * 100, 0)}% поворота`,

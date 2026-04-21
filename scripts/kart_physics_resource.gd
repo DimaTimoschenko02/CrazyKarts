@@ -22,13 +22,13 @@ extends Resource
 @export var stationary_steer_threshold: float = 2.0      # m/s — below this, use stationary_steer_scale instead of speed_ratio
 @export var stationary_steer_scale: float = 0.4          # fractional speed_scale at near-zero speed (0.4 = 40% of full yaw rate)
 
-# v2.2 — Continuous Drift Intensity model. _drift_intensity: float [0..1] is the physics master.
-# All drift-dependent values lerp between base and drift endpoint through _drift_intensity.
-# _is_drifting: bool is derived (intensity > drift_active_threshold) — VFX/audio only.
-@export_group("Drift (Continuous v2.2)")
-@export var drift_enter_threshold: float = 0.75   # |steer_input| above this → intensity grows toward 1.0 (hysteresis high)
-@export var drift_exit_threshold: float = 0.35    # |steer_input| below this → intensity decays toward 0.0 (hysteresis low)
-@export var drift_min_speed_ratio: float = 0.4    # min speed as fraction of max_speed to enter/hold drift
+# v2.3 — Continuous Drift Intensity model. _drift_intensity: float [0..1] is the physics master.
+# intensity_target = pow(|steer_input|, drift_steer_exponent) * speed_factor — no binary thresholds.
+# _is_drifting: bool is derived with mini-hysteresis (±0.02 around drift_active_threshold) — VFX/audio only.
+@export_group("Drift (Continuous v2.3)")
+# REMOVED in v2.3: drift_enter_threshold, drift_exit_threshold — superseded by continuous pow() target
+@export var drift_steer_exponent: float = 3.0     # power curve exponent: intensity_target = pow(|steer|, exp) * speed_factor. Range 1.5–5.0.
+@export var drift_min_speed_ratio: float = 0.4    # speed_factor ramp origin: fraction of max_speed where drift starts becoming available
 @export var drift_intensity_enter_rate: float = 3.5  # /s — how fast intensity ramps to 1.0 on entry (default: 0→1 in ~0.29s)
 @export var drift_intensity_exit_rate: float = 3.0   # /s — how fast intensity falls to 0.0 on exit (default: 1→0 in ~0.33s)
 @export var drift_active_threshold: float = 0.7   # intensity above which _is_drifting=true (VFX/audio trigger)
