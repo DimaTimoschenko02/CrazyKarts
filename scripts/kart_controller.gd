@@ -165,6 +165,9 @@ func _on_dev_params_changed(data: Dictionary) -> void:
 	physics.drift_yaw_multiplier  = data.get("DRIFT_YAW_MULTIPLIER",   physics.drift_yaw_multiplier)
 	physics.drift_kick_force      = data.get("DRIFT_KICK_FORCE",       physics.drift_kick_force)
 	physics.vfx_smoke_speed_threshold = data.get("VFX_SMOKE_THRESHOLD", physics.vfx_smoke_speed_threshold)
+	# Drift resistance (v2.1)
+	physics.drift_drag_multiplier    = data.get("DRIFT_DRAG_MULTIPLIER",    physics.drift_drag_multiplier)
+	physics.drift_rolling_multiplier = data.get("DRIFT_ROLLING_MULTIPLIER", physics.drift_rolling_multiplier)
 	# Visuals
 	physics.visual_drift_max_deg  = data.get("VISUAL_DRIFT_MAX_DEG",   physics.visual_drift_max_deg)
 	# Terrain
@@ -260,11 +263,16 @@ func _physics_process(delta: float) -> void:
 	elif _throttle < -0.01:
 		thrust = _throttle * physics.accel_force * physics.reverse_ratio
 
+	# v2.1: drift resistance — multiply k_drag and k_rolling while drifting (tire scrubbing).
+	# GDD §Movement Model: active_k_drag = k_drag * (drift_drag_multiplier if _is_drifting else 1.0)
+	var drag_mult:    float = physics.drift_drag_multiplier    if _is_drifting else 1.0
+	var rolling_mult: float = physics.drift_rolling_multiplier if _is_drifting else 1.0
+
 	# Quadratic drag: dominates at high speed. Terminal velocity where thrust = drag + rolling.
-	var drag: float = -signf(fwd_speed) * physics.k_drag * fwd_speed * fwd_speed
+	var drag: float = -signf(fwd_speed) * physics.k_drag * drag_mult * fwd_speed * fwd_speed
 
 	# Linear rolling resistance: dominates at low speed, gives exponential coast-to-stop.
-	var rolling: float = -physics.k_rolling * fwd_speed
+	var rolling: float = -physics.k_rolling * rolling_mult * fwd_speed
 
 	# Brake: extra decel only when S is pressed and kart is moving forward.
 	var brake: float = 0.0

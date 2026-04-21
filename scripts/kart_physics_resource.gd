@@ -33,6 +33,9 @@ extends Resource
 @export var grip_loss_rate: float = 12.0          # /s — grip drops toward low_grip_target on drift entry
 @export var grip_recovery_rate: float = 3.0       # /s — grip returns toward high_grip_target on drift exit
 @export var vfx_smoke_speed_threshold: float = 3.0  # lateral speed (m/s) to trigger drift smoke
+# v2.1 — Drift resistance: speed cost for tight turns (tire scrubbing physics)
+@export_range(1.0, 3.0, 0.05) var drift_drag_multiplier: float = 1.8    # k_drag multiplied by this while _is_drifting (lowers terminal velocity)
+@export_range(1.0, 2.0, 0.05) var drift_rolling_multiplier: float = 1.3 # k_rolling multiplied by this while _is_drifting (scrubbing at low speed)
 
 @export_group("Visuals")
 @export var wheel_radius: float = 0.18           # for roll animation speed
