@@ -121,6 +121,10 @@ func _ready() -> void:
 		dbg.target = self
 		dbg.name = "DebugVectors3D"
 		get_tree().current_scene.add_child.call_deferred(dbg)
+		var dbg_input := preload("res://scripts/debug_input_overlay.gd").new()
+		dbg_input.target = self
+		dbg_input.name = "DebugInputOverlay"
+		get_tree().current_scene.add_child.call_deferred(dbg_input)
 
 
 func _exit_tree() -> void:
@@ -502,6 +506,14 @@ func get_grip_debug() -> float:
 
 func get_is_drifting_debug() -> bool:
 	return _is_drifting
+
+
+func get_throttle_debug() -> float:
+	return _throttle
+
+
+func get_steer_input_debug() -> float:
+	return _steer_input
 
 
 # ── Remote interpolation ─────────────────────────────────────────────────────
