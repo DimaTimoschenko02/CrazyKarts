@@ -25,7 +25,7 @@ last-updated: 2026-04-21
 | 3 | HTML5 Export Pipeline | Infrastructure | 1 | MVP | Broken |
 | 4 | Health & Damage | Core | 2 | MVP | Designed |
 | 5 | Camera System | Core | 2 | MVP | Designed |
-| 6 | Kart Physics | Core | 2 | MVP | v2.2 Implemented, movement regression fixed, testing pending |
+| 6 | Kart Physics | Core | 2 | MVP | v2.2 Implemented; v2.3 GDD active, code pending |
 | 7 | Kart Classes | Feature | 3 | Alpha | Not Started |
 | 8 | Spawn System | Core | 3 | MVP | Designed |
 | 9 | Pickup System | Core | 3 | MVP | Designed |
@@ -170,7 +170,7 @@ MVP systems first, ordered by dependencies (can't design #9 before #8, etc.)
 | HTML5 Export Pipeline | - | Working | ✅ | |
 | Health & Damage | Designed | Implemented | - | design/gdd/health-damage.md, scripts/health_component.gd, scripts/damage_info.gd, scripts/event_bus.gd |
 | Camera System | Designed | Implemented | Not tested | design/gdd/camera-system.md, scripts/camera_rig.gd |
-| Kart Physics | v2.2 Designed (v2.1 archived) | v2.2 Implemented | - | design/gdd/kart-physics.md, design/gdd/kart-physics-v2.1-archive.md, scripts/kart_physics_resource.gd, resources/kart_physics_default.tres |
+| Kart Physics | v2.3 Designed (v2.1, v2.2 archived) | v2.2 Implemented | - | design/gdd/kart-physics.md, design/gdd/kart-physics-v2.2-archive.md, design/gdd/kart-physics-v2.1-archive.md, scripts/kart_physics_resource.gd, resources/kart_physics_default.tres |
 | Kart Classes | - | - | - | |
 | Spawn System | Designed | Implemented | Not tested | design/gdd/spawn-system.md, scripts/spawn_manager.gd |
 | Pickup System | Designed | Partial | - | design/gdd/pickup-system.md |
