@@ -40,6 +40,7 @@ extends Resource
 @export_group("Visuals")
 @export var wheel_radius: float = 0.18           # for roll animation speed
 @export var visual_drift_max_deg: float = 40.0   # max visual body lean angle during drift (deg). 40 = SmashKarts-style
+@export var visual_lean_recovery_speed: float = 6.0  # rad/s — how fast body returns to 0 on drift exit. 6.0 ≈ 0.13s from 46°
 
 @export_group("Collision")
 @export var mass: float = 1.0

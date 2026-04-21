@@ -177,7 +177,8 @@ func _on_dev_params_changed(data: Dictionary) -> void:
 	physics.drift_drag_multiplier    = data.get("DRIFT_DRAG_MULTIPLIER",    physics.drift_drag_multiplier)
 	physics.drift_rolling_multiplier = data.get("DRIFT_ROLLING_MULTIPLIER", physics.drift_rolling_multiplier)
 	# Visuals
-	physics.visual_drift_max_deg  = data.get("VISUAL_DRIFT_MAX_DEG",   physics.visual_drift_max_deg)
+	physics.visual_drift_max_deg          = data.get("VISUAL_DRIFT_MAX_DEG",          physics.visual_drift_max_deg)
+	physics.visual_lean_recovery_speed    = data.get("VISUAL_LEAN_RECOVERY_SPEED",    physics.visual_lean_recovery_speed)
 	# Terrain
 	physics.gravity               = data.get("GRAVITY",               physics.gravity)
 	physics.floor_align_speed     = data.get("FLOOR_ALIGN_SPEED",     physics.floor_align_speed)
@@ -319,13 +320,14 @@ func _physics_process(delta: float) -> void:
 	var steer_mult: float = lerp(physics.steer_low_speed_mult, physics.steer_high_speed_mult, speed_ratio)
 	var steer_sign: float = 1.0 if fwd_speed >= -0.5 else -1.0
 
-	# Phase 4: stationary steering — below threshold use stationary_steer_scale so kart
-	# visually responds to A/D even when nearly stopped. Above threshold ramp normally.
-	var speed_scale: float
-	if absf(fwd_speed) < physics.stationary_steer_threshold:
-		speed_scale = physics.stationary_steer_scale
-	else:
-		speed_scale = clamp(absf(fwd_speed) / maxf(physics.steer_speed_threshold, 0.01), 0.0, 1.0)
+	# Phase 4: stationary steering — smoothstep blend around stationary_steer_threshold
+	# to avoid a step-jump at the threshold boundary. At v=0 → stationary_steer_scale;
+	# at v >> threshold → base_scale (clamped speed ratio). Blend zone: ±0.5 m/s.
+	var base_scale: float = clamp(absf(fwd_speed) / maxf(physics.steer_speed_threshold, 0.01), 0.0, 1.0)
+	var blend_low: float  = maxf(physics.stationary_steer_threshold - 0.5, 0.0)
+	var blend_high: float = physics.stationary_steer_threshold + 0.5
+	var blend: float = smoothstep(blend_low, blend_high, absf(fwd_speed))
+	var speed_scale: float = lerp(physics.stationary_steer_scale, base_scale, blend)
 
 	var drift_mult: float = physics.drift_yaw_multiplier if _is_drifting else 1.0
 	var yaw_rate: float = _steer_input * steer_sign * physics.steering_speed * steer_mult * speed_scale * drift_mult
@@ -355,7 +357,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 	# ── 10.5. Visual drift angle (Phase 5a) ───────────────────────────────────
-	# GDD §visual_drift_max_deg = 40°. On exit: snap to 0° immediately (SmashKarts feel).
+	# GDD §visual_drift_max_deg. On exit: smooth recovery at visual_lean_recovery_speed rad/s.
 	var vis_fwd  := velocity.dot(-global_transform.basis.z)
 	var vis_side := velocity.dot(global_transform.basis.x)
 	if _is_drifting:
@@ -365,8 +367,9 @@ func _physics_process(delta: float) -> void:
 			-max_vis_rad, max_vis_rad)
 		_visual_drift_angle = lerp(_visual_drift_angle, drift_angle_target, 12.0 * delta)
 	else:
-		# Instant snap to zero on drift exit — no lerp, intentional SmashKarts feel
-		_visual_drift_angle = 0.0
+		# Smooth recovery to zero on drift exit (visual_lean_recovery_speed rad/s).
+		# GDD: visual_lean_recovery_speed — fast but not instant, avoids snap jerk.
+		_visual_drift_angle = move_toward(_visual_drift_angle, 0.0, physics.visual_lean_recovery_speed * delta)
 	if $BaseCar:
 		$BaseCar.rotation.y = _base_car_rot_y + _visual_drift_angle
 
