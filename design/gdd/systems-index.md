@@ -170,7 +170,7 @@ MVP systems first, ordered by dependencies (can't design #9 before #8, etc.)
 | HTML5 Export Pipeline | - | Working | ✅ | |
 | Health & Damage | Designed | Implemented | - | design/gdd/health-damage.md, scripts/health_component.gd, scripts/damage_info.gd, scripts/event_bus.gd |
 | Camera System | Designed | Implemented | Not tested | design/gdd/camera-system.md, scripts/camera_rig.gd |
-| Kart Physics | Designed | Implemented | - | design/gdd/kart-physics.md, scripts/kart_physics_resource.gd, resources/kart_physics_default.tres |
+| Kart Physics | v2.2 Designed (v2.1 archived) | v2.1 Implemented | - | design/gdd/kart-physics.md, design/gdd/kart-physics-v2.1-archive.md, scripts/kart_physics_resource.gd, resources/kart_physics_default.tres |
 | Kart Classes | - | - | - | |
 | Spawn System | Designed | Implemented | Not tested | design/gdd/spawn-system.md, scripts/spawn_manager.gd |
 | Pickup System | Designed | Partial | - | design/gdd/pickup-system.md |
