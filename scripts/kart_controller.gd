@@ -282,8 +282,63 @@ func _physics_process(delta: float) -> void:
 	var fwd_speed  := velocity.dot(fwd_dir)
 	var side_speed := velocity.dot(side_dir)
 
-	# ── 4. Force-based acceleration (v2.2) ────────────────────────────────────
+	# ── 4. Drift intensity update (v2.2) — before rotation so fwd_speed is pre-thrust ────
+	# GDD §Drift Model v2.2: hysteresis on |steer_input| drives intensity direction,
+	# not a binary flip. enter_conditions → target=1.0; exit_conditions → target=0.0;
+	# dead zone [exit_threshold, enter_threshold] → hold last target (hysteresis).
+	# Reverse drift is explicitly blocked: requires fwd_speed > 0 (Core Rule 11).
+	var abs_steer: float = absf(_steer_input)
+	var drift_min_speed: float = physics.drift_min_speed_ratio * physics.max_speed
+
+	var enter_conditions: bool = (abs_steer > physics.drift_enter_threshold) and (fwd_speed > drift_min_speed)
+	var exit_conditions:  bool = (abs_steer < physics.drift_exit_threshold)  or  (fwd_speed <= drift_min_speed)
+
+	if enter_conditions:
+		_drift_target = 1.0
+		_drift_rate   = physics.drift_intensity_enter_rate
+	elif exit_conditions:
+		_drift_target = 0.0
+		_drift_rate   = physics.drift_intensity_exit_rate
+	# else: hysteresis zone — keep _drift_target and _drift_rate unchanged
+
+	_drift_intensity = move_toward(_drift_intensity, _drift_target, _drift_rate * delta)
+	_drift_intensity = clamp(_drift_intensity, 0.0, 1.0)
+
+	# Derived bool for VFX/audio/network (backward compat)
+	_is_drifting = _drift_intensity > physics.drift_active_threshold
+
+	# ── 5. Direct rotation (no bicycle model) ────────────────────────────────
+	# GDD §Movement Model: rotate_y() + velocity projection. No wheelbase, no tan(steer_angle).
+	# v2.2: yaw_mult = lerp(1.0, drift_yaw_multiplier, _drift_intensity) — continuous.
+	var speed_ratio: float = clamp(absf(fwd_speed) / maxf(physics.max_speed, 0.01), 0.0, 1.0)
+	var steer_mult: float = lerp(physics.steer_low_speed_mult, physics.steer_high_speed_mult, speed_ratio)
+	var steer_sign: float = 1.0 if fwd_speed >= -0.5 else -1.0
+
+	# Stationary steering — smoothstep blend around stationary_steer_threshold
+	var base_scale: float = clamp(absf(fwd_speed) / maxf(physics.steer_speed_threshold, 0.01), 0.0, 1.0)
+	var blend_low: float  = maxf(physics.stationary_steer_threshold - 0.5, 0.0)
+	var blend_high: float = physics.stationary_steer_threshold + 0.5
+	var blend: float = smoothstep(blend_low, blend_high, absf(fwd_speed))
+	var speed_scale: float = lerp(physics.stationary_steer_scale, base_scale, blend)
+
+	# v2.2: continuous yaw multiplier
+	var yaw_mult: float = lerp(1.0, physics.drift_yaw_multiplier, _drift_intensity)
+	var yaw_rate: float = _steer_input * steer_sign * physics.steering_speed * steer_mult * speed_scale * yaw_mult
+	rotate_y(yaw_rate * delta)
+
+	# Recompute dirs after rotation, then re-project BOTH fwd_speed and side_speed onto new basis.
+	# This is the bicycle-model momentum transfer: after rotate_y the kart heading changed but
+	# velocity still points in the old direction, so part of forward momentum becomes lateral.
+	# This is intentional — it is the mechanism that creates drift sliding.
+	# Thrust is applied AFTER re-projection (step 6) so it is not discarded by the dot-product.
+	fwd_dir  = -global_transform.basis.z
+	side_dir =  global_transform.basis.x
+	fwd_speed  = velocity.dot(fwd_dir)
+	side_speed = velocity.dot(side_dir)
+
+	# ── 6. Force-based acceleration (v2.2) ────────────────────────────────────
 	# Implements GDD §Movement Model: thrust + quadratic drag + linear rolling + explicit brake.
+	# Applied after re-projection so thrust is not lost to the dot-product reset.
 	# v2.2: drag_mult and rolling_mult are lerp(1.0, MULT, _drift_intensity) — continuous, no ternary.
 	var thrust: float = 0.0
 	if _throttle > 0.01:
@@ -311,60 +366,6 @@ func _physics_process(delta: float) -> void:
 	# Snap to zero near standstill when no throttle (avoids infinite float drift).
 	if absf(thrust) < 0.01 and absf(fwd_speed) < 0.1:
 		fwd_speed = 0.0
-
-	# ── 5. Drift intensity update (v2.2) ─────────────────────────────────────
-	# GDD §Drift Model v2.2: hysteresis on |steer_input| drives intensity direction,
-	# not a binary flip. enter_conditions → target=1.0; exit_conditions → target=0.0;
-	# dead zone [exit_threshold, enter_threshold] → hold last target (hysteresis).
-	# Reverse drift is explicitly blocked: requires fwd_speed > 0 (Core Rule 11).
-	var abs_steer: float = absf(_steer_input)
-	var drift_min_speed: float = physics.drift_min_speed_ratio * physics.max_speed
-
-	var enter_conditions: bool = (abs_steer > physics.drift_enter_threshold) and (fwd_speed > drift_min_speed)
-	var exit_conditions:  bool = (abs_steer < physics.drift_exit_threshold)  or  (fwd_speed <= drift_min_speed)
-
-	if enter_conditions:
-		_drift_target = 1.0
-		_drift_rate   = physics.drift_intensity_enter_rate
-	elif exit_conditions:
-		_drift_target = 0.0
-		_drift_rate   = physics.drift_intensity_exit_rate
-	# else: hysteresis zone — keep _drift_target and _drift_rate unchanged
-
-	_drift_intensity = move_toward(_drift_intensity, _drift_target, _drift_rate * delta)
-	_drift_intensity = clamp(_drift_intensity, 0.0, 1.0)
-
-	# Derived bool for VFX/audio/network (backward compat)
-	_is_drifting = _drift_intensity > physics.drift_active_threshold
-
-	# ── 6. Direct rotation (no bicycle model) ────────────────────────────────
-	# GDD §Movement Model: rotate_y() + velocity projection. No wheelbase, no tan(steer_angle).
-	# v2.2: yaw_mult = lerp(1.0, drift_yaw_multiplier, _drift_intensity) — continuous.
-	var speed_ratio: float = clamp(absf(fwd_speed) / maxf(physics.max_speed, 0.01), 0.0, 1.0)
-	var steer_mult: float = lerp(physics.steer_low_speed_mult, physics.steer_high_speed_mult, speed_ratio)
-	var steer_sign: float = 1.0 if fwd_speed >= -0.5 else -1.0
-
-	# Stationary steering — smoothstep blend around stationary_steer_threshold
-	var base_scale: float = clamp(absf(fwd_speed) / maxf(physics.steer_speed_threshold, 0.01), 0.0, 1.0)
-	var blend_low: float  = maxf(physics.stationary_steer_threshold - 0.5, 0.0)
-	var blend_high: float = physics.stationary_steer_threshold + 0.5
-	var blend: float = smoothstep(blend_low, blend_high, absf(fwd_speed))
-	var speed_scale: float = lerp(physics.stationary_steer_scale, base_scale, blend)
-
-	# v2.2: continuous yaw multiplier
-	var yaw_mult: float = lerp(1.0, physics.drift_yaw_multiplier, _drift_intensity)
-	var yaw_rate: float = _steer_input * steer_sign * physics.steering_speed * steer_mult * speed_scale * yaw_mult
-	rotate_y(yaw_rate * delta)
-
-	# Recompute dirs after rotation (velocity projection onto new orientation).
-	fwd_dir  = -global_transform.basis.z
-	side_dir =  global_transform.basis.x
-
-	# Re-project side_speed only onto new basis after rotation.
-	# fwd_speed must NOT be re-projected here — it already includes thrust/drag/rolling
-	# integrated in step 4. Re-projecting fwd_speed would discard that integration,
-	# causing the kart to be unable to accelerate (movement regression bug).
-	side_speed = velocity.dot(side_dir)
 
 	# ── 7. Lateral ramp kick (v2.2 — replaces v2.1 one-shot impulse) ─────────
 	# GDD §Lateral Ramp Kick: continuous force during entry phase only.
