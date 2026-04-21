@@ -22,25 +22,37 @@ extends Resource
 @export var stationary_steer_threshold: float = 2.0      # m/s — below this, use stationary_steer_scale instead of speed_ratio
 @export var stationary_steer_scale: float = 0.4          # fractional speed_scale at near-zero speed (0.4 = 40% of full yaw rate)
 
-@export_group("Drift (Binary v2)")
-@export var drift_enter_threshold: float = 0.75   # |steer_input| above this triggers drift entry (hysteresis high)
-@export var drift_exit_threshold: float = 0.35    # |steer_input| below this exits drift (hysteresis low). Must be < enter.
+# v2.2 — Continuous Drift Intensity model. _drift_intensity: float [0..1] is the physics master.
+# All drift-dependent values lerp between base and drift endpoint through _drift_intensity.
+# _is_drifting: bool is derived (intensity > drift_active_threshold) — VFX/audio only.
+@export_group("Drift (Continuous v2.2)")
+@export var drift_enter_threshold: float = 0.75   # |steer_input| above this → intensity grows toward 1.0 (hysteresis high)
+@export var drift_exit_threshold: float = 0.35    # |steer_input| below this → intensity decays toward 0.0 (hysteresis low)
 @export var drift_min_speed_ratio: float = 0.4    # min speed as fraction of max_speed to enter/hold drift
-@export var drift_yaw_multiplier: float = 1.7     # yaw rate boost while drifting (tighter arc, SmashKarts-style)
-@export var drift_kick_force: float = 4.0         # lateral impulse applied once on drift entry (rear swing)
-@export var low_grip_target: float = 0.8          # grip while drifting. Lower = more slide. Half-life = ln(2)/grip
-@export var high_grip_target: float = 18.0        # grip when not drifting. Higher = snappier recovery
-@export var grip_loss_rate: float = 12.0          # /s — grip drops toward low_grip_target on drift entry
-@export var grip_recovery_rate: float = 3.0       # /s — grip returns toward high_grip_target on drift exit
-@export var vfx_smoke_speed_threshold: float = 3.0  # lateral speed (m/s) to trigger drift smoke
-# v2.1 — Drift resistance: speed cost for tight turns (tire scrubbing physics)
-@export_range(1.0, 3.0, 0.05) var drift_drag_multiplier: float = 1.8    # k_drag multiplied by this while _is_drifting (lowers terminal velocity)
-@export_range(1.0, 2.0, 0.05) var drift_rolling_multiplier: float = 1.3 # k_rolling multiplied by this while _is_drifting (scrubbing at low speed)
+@export var drift_intensity_enter_rate: float = 3.5  # /s — how fast intensity ramps to 1.0 on entry (default: 0→1 in ~0.29s)
+@export var drift_intensity_exit_rate: float = 3.0   # /s — how fast intensity falls to 0.0 on exit (default: 1→0 in ~0.33s)
+@export var drift_active_threshold: float = 0.7   # intensity above which _is_drifting=true (VFX/audio trigger)
+@export var drift_lateral_ramp: float = 30.0      # m/s² lateral ramp force during intensity growth (replaces v2.1 one-shot kick)
+@export var drift_yaw_multiplier: float = 1.7     # yaw rate lerp endpoint at intensity=1.0 (tighter arc, SmashKarts-style)
+@export var low_grip_target: float = 0.8          # lateral damping at intensity=1.0 (full drift). Lower = more slide.
+@export var high_grip_target: float = 18.0        # lateral damping at intensity=0.0 (no drift). Higher = snappier recovery.
+
+# [deprecated — kept as legacy override for rollback]
+# When BOTH are non-zero: overrides intensity-based grip with move_toward behavior (v2.1 path).
+# Default 0.0 = disabled. Leave at 0.0 for v2.2 intensity-based grip derivation.
+@export var grip_loss_rate: float = 0.0           # /s — legacy grip drop rate (0.0 = disabled, uses intensity)
+@export var grip_recovery_rate: float = 0.0       # /s — legacy grip recovery rate (0.0 = disabled, uses intensity)
+
+# v2.1 — Drift resistance: speed cost for tight turns (tire scrubbing physics).
+# Lerp endpoints at full intensity=1.0.
+@export_range(1.0, 3.0, 0.05) var drift_drag_multiplier: float = 1.8    # k_drag lerp endpoint at intensity=1.0
+@export_range(1.0, 2.0, 0.05) var drift_rolling_multiplier: float = 1.3 # k_rolling lerp endpoint at intensity=1.0
 
 @export_group("Visuals")
 @export var wheel_radius: float = 0.18           # for roll animation speed
-@export var visual_drift_max_deg: float = 40.0   # max visual body lean angle during drift (deg). 40 = SmashKarts-style
-@export var visual_lean_recovery_speed: float = 6.0  # rad/s — how fast body returns to 0 on drift exit. 6.0 ≈ 0.13s from 46°
+@export var visual_drift_max_deg: float = 40.0   # max visual body lean angle at intensity=1.0 (deg)
+@export var visual_lean_recovery_speed: float = 6.0  # [maybe deprecated] overdamping for body mesh lag vs intensity. 0 = direct follow.
+@export var vfx_smoke_speed_threshold: float = 3.0  # lateral speed (m/s) to trigger drift smoke
 
 @export_group("Collision")
 @export var mass: float = 1.0
