@@ -1,8 +1,8 @@
 # Kart Physics System
 
-> **Status**: In Design (v2 arcade refactor)
+> **Status**: In Design (v2.1 drift resistance)
 > **Author**: Dima + game-designer + systems-designer + godot-specialist + technical-director
-> **Last Updated**: 2026-04-20 (v2: binary drift + hysteresis, direct rotation, force-based inertia)
+> **Last Updated**: 2026-04-21 (v2.1: drift drag+rolling multipliers — speed cost for tight turns)
 > **Implements Pillar**: Аркадный хаос (arcade feel, не симулятор) + Вариативность (kart classes via physics)
 
 ## Overview
@@ -70,6 +70,9 @@ extends Resource
 @export var drift_kick_force: float = 4.0         # lateral impulse applied once on drift entry
 @export var drift_yaw_multiplier: float = 1.7     # yaw_rate multiplier while drifting (tighter arc)
 @export var visual_drift_max_deg: float = 40.0    # max visual lean angle for body mesh decoupling
+# v2.1 — Drift resistance: speed cost for tight turns (tire scrubbing physics)
+@export var drift_drag_multiplier: float = 1.8    # k_drag multiplied by this while _is_drifting (lowers terminal velocity)
+@export var drift_rolling_multiplier: float = 1.3 # k_rolling multiplied by this while _is_drifting (scrubbing at low speed)
 
 @export_group("Collision")
 @export var mass: float = 1.0                     # relative mass (Heavy=2.0, Light=0.6)
@@ -98,8 +101,12 @@ thrust   = throttle_input * accel_force                    # throttle_input ∈ 
 if throttle_input < 0:
     thrust = throttle_input * accel_force * reverse_ratio
 
-drag     = -sign(fwd_speed) * k_drag * fwd_speed * fwd_speed
-rolling  = -k_rolling * fwd_speed
+# v2.1: drift resistance — multiply k_drag and k_rolling while drifting (tire scrubbing)
+active_k_drag    = k_drag    * (drift_drag_multiplier    if _is_drifting else 1.0)
+active_k_rolling = k_rolling * (drift_rolling_multiplier if _is_drifting else 1.0)
+
+drag     = -sign(fwd_speed) * active_k_drag * fwd_speed * fwd_speed
+rolling  = -active_k_rolling * fwd_speed
 brake    = -sign(fwd_speed) * brake_force                  # only when braking opposes motion
 
 fwd_speed += (thrust + drag + rolling + brake) * delta
@@ -109,10 +116,10 @@ fwd_speed += (thrust + drag + rolling + brake) * delta
 
 **Terminal velocity** (emergent — no hard clamp):
 ```
-At terminal: thrust = drag + rolling (rolling negligible at high speed)
-v_terminal ≈ sqrt(accel_force / k_drag)
+Normal:  v_terminal        ≈ sqrt(accel_force / k_drag)
+Drifting: v_terminal_drift ≈ sqrt(accel_force / (k_drag * drift_drag_multiplier))
 ```
-With defaults (`accel_force=400, k_drag=0.4`): `sqrt(1000) ≈ 31.6 m/s` theoretical, ~29 m/s after rolling. User tunes `max_speed` reference to match observed terminal (default `20` is placeholder — will be retuned empirically per Core Rule #9).
+With defaults (`accel_force=28, k_drag=0.03`): normal terminal ≈ 30.5 m/s, drift terminal ≈ 22.7 m/s (~74% of normal — visible slowdown in tight turns). User tunes `max_speed` reference to match observed terminal (per Core Rule #9).
 
 **Speed-dependent steering with stationary fix**:
 ```
@@ -283,24 +290,36 @@ if is_on_floor():
 ```
 fwd_speed(t+dt) = fwd_speed(t) + (thrust + drag + rolling + brake) * dt
 thrust   = throttle_input * accel_force                    (reverse: × reverse_ratio)
-drag     = -sign(fwd_speed) * k_drag * fwd_speed²
-rolling  = -k_rolling * fwd_speed
+
+# v2.1: effective resistance coefficients depend on drift state
+active_k_drag    = k_drag    * (drift_drag_multiplier    if _is_drifting else 1.0)
+active_k_rolling = k_rolling * (drift_rolling_multiplier if _is_drifting else 1.0)
+
+drag     = -sign(fwd_speed) * active_k_drag * fwd_speed²
+rolling  = -active_k_rolling * fwd_speed
 brake    = -sign(fwd_speed) * brake_force                  (only when braking opposes motion)
 ```
 
 | Variable | Type | Default | Range |
 |---|---|---|---|
-| `accel_force` | float | 400.0 | 200-600 |
-| `k_drag` | float | 0.4 | 0.1-1.0 |
-| `k_rolling` | float | 12.0 | 5-20 |
+| `accel_force` | float | 28.0 | 10-100 |
+| `k_drag` | float | 0.03 | 0.01-0.2 |
+| `k_rolling` | float | 1.5 | 0.5-5 |
 | `brake_force` | float | 40.0 | 20-60 m/s² |
-| `reverse_ratio` | float | 0.4 | 0.2-0.7 |
+| `reverse_ratio` | float | 0.5 | 0.2-0.7 |
+| `drift_drag_multiplier` | float | 1.8 | 1.2-3.0 |
+| `drift_rolling_multiplier` | float | 1.3 | 1.0-2.0 |
 
 **Terminal velocity** (solve `thrust = drag + rolling`, rolling negligible at high speed):
 ```
-v_terminal ≈ sqrt(accel_force / k_drag)
+v_terminal_normal ≈ sqrt(accel_force / k_drag)
+v_terminal_drift  ≈ sqrt(accel_force / (k_drag * drift_drag_multiplier))
+ratio             = 1 / sqrt(drift_drag_multiplier)
 ```
-With defaults: `sqrt(400 / 0.4) = sqrt(1000) ≈ 31.6 m/s` theoretical, ~29 m/s after rolling.
+With defaults (`accel_force=28, k_drag=0.03, drift_drag_multiplier=1.8`):
+- Normal terminal: `sqrt(28/0.03) ≈ 30.5 m/s`
+- Drift terminal:  `sqrt(28/0.054) ≈ 22.8 m/s` (~74.7% of normal)
+- Player perceives ~25% speed reduction when holding tight drift arc.
 
 **Acceleration timeline example** (accel_force=400, k_drag=0.4, k_rolling=12, 60fps):
 - 0.5s: ~18 m/s (62% of terminal)
@@ -457,6 +476,8 @@ push_force = clamp(abs(energy_diff) * 0.5, bump_min_force, bump_max_force)
 | `grip_recovery_rate` | 3.0 | 1-8 /s | Drift exit slide tail | Slides for 3+ sec after exit | Instant snap-straight |
 | `drift_kick_force` | 4.0 | 3-15 | Rear swing drama on entry | Subtle, barely noticeable | Spins out, unrecoverable |
 | `visual_drift_max_deg` | 40.0 | 20-50° | Body mesh visual lean during drift | Visual decoupling unnoticeable | Body faces sideways, disorienting |
+| `drift_drag_multiplier` | 1.8 | 1.2-3.0 | Terminal velocity reduction in drift: `v_drift = v_normal / sqrt(mult)` — 1.8→75%, 2.0→71%, 3.0→58% | No speed cost for tight turns — drift is free | Kart slows to crawl in any turn |
+| `drift_rolling_multiplier` | 1.3 | 1.0-2.0 | Extra low-speed scrubbing while drifting; felt during drift entry/exit transitions | No tactile scrubbing on drift entry | Abrupt stop feeling at low speed |
 | `mass` | 1.0 | 0.4-3.0 | Collision weight | Gets pushed easily | Immovable |
 | `slope_speed_influence` | 8.0 | 3-15 m/s² | Hill impact | Hills irrelevant | Hills dominate — unplayable on slopes |
 | `max_speed` (reference) | 20.0 | — | Camera + network normalization only | Camera/network teleport check wrong | FOV never widens, teleport threshold too lax |
@@ -464,6 +485,8 @@ push_force = clamp(abs(energy_diff) * 0.5, bump_min_force, bump_max_force)
 ### Knob Interactions
 
 - `accel_force` ÷ `k_drag` = terminal velocity squared — tune together, not independently
+- `drift_drag_multiplier` changes drift terminal: `v_drift = sqrt(accel_force / (k_drag * mult))` — tune when drift slowdown is too subtle or too punishing
+- `drift_drag_multiplier` is independent of `drift_rolling_multiplier` — former controls high-speed effect, latter controls low-speed scrubbing
 - `drift_enter_threshold` − `drift_exit_threshold` must stay ≥ 0.2 (hysteresis gap invariant)
 - `low_grip_target` × `drift_kick_force` = how extreme drift feels on entry
 - `grip_recovery_rate` × `high_grip_target` = tail length after drift exit
@@ -520,6 +543,8 @@ Minimal UI — the car physics FEEL is the primary feedback channel, not numbers
 - [ ] State Machine: no physics input during DEAD
 - [ ] Remote karts do not run physics (only interpolation)
 - [ ] `_is_drifting = false` and `_grip` reset to `high_grip_target` on DEAD state entry
+- [ ] While `_is_drifting = true`: effective drag coefficient = `k_drag * drift_drag_multiplier` (verified: terminal velocity emergent lower than normal)
+- [ ] While `_is_drifting = false`: effective drag = `k_drag` (no multiplier applied — drift resistance removed cleanly on exit)
 
 ### Network Tests (automated)
 
@@ -545,6 +570,7 @@ Minimal UI — the car physics FEEL is the primary feedback channel, not numbers
 - [ ] Driving over hills feels natural — kart follows terrain
 - [ ] Debug vectors (Phase 0) correlate visibly with felt motion
 - [ ] Overall: "this feels like SmashKarts but with more weight and drama on drift"
+- [ ] Drift speed cost visible: holding a full drift arc at full throttle, `fwd_speed` in debug overlay drops by ≥12% from steady-state normal terminal within 2 seconds of drift entry
 
 ## Open Questions
 

@@ -19,12 +19,18 @@
 thrust_accel     = throttle * ACCEL_FORCE          # forward direction
 brake_accel      = -brake * BRAKE_FORCE * sign(fwd_speed)
 reverse_accel    = -reverse * ACCEL_FORCE * REVERSE_RATIO
-drag             = -K_DRAG * |v| * v               # quadratic, against velocity
-rolling          = -K_ROLLING * v                  # linear, against velocity
+# v2.1: drift resistance — effective coefficients depend on drift state
+active_k_drag    = K_DRAG    * (DRIFT_DRAG_MULTIPLIER    if is_drifting else 1.0)
+active_k_rolling = K_ROLLING * (DRIFT_ROLLING_MULTIPLIER if is_drifting else 1.0)
+
+drag             = -active_k_drag * |v| * v        # quadratic, against velocity
+rolling          = -active_k_rolling * v            # linear, against velocity
 velocity        += (thrust + brake + reverse + drag + rolling) * dt
 
 # Эмерджентный top speed
-terminal_speed   ≈ sqrt(ACCEL_FORCE / K_DRAG)
+terminal_normal  ≈ sqrt(ACCEL_FORCE / K_DRAG)
+terminal_drift   ≈ sqrt(ACCEL_FORCE / (K_DRAG * DRIFT_DRAG_MULTIPLIER))
+# При DRIFT_DRAG_MULTIPLIER=1.8: terminal_drift ≈ 74.7% от terminal_normal
 
 # Поворот (direct rotation, без bicycle model)
 speed_scale      = clamp(|v| / STEER_SPEED_THRESHOLD, 0..1)
@@ -120,6 +126,24 @@ current_grip = move_toward(current_grip, target_grip,
 | `DRIFT_KICK_FORCE` | 4 m/s | 0–15 | One-shot боковой импульс при ENTER. Щелчок зада. |
 | `VFX_SMOKE_THRESHOLD` | 0.5 m/s | 0.5–10 | Порог `\|lateral_speed\|` для smoke VFX. |
 
+### Drift resistance (v2.1)
+
+| Параметр | Значение | Диапазон | Смысл |
+|---|---|---|---|
+| `DRIFT_DRAG_MULTIPLIER` | 1.8 | 1.2–3.0 | Множитель `K_DRAG` во время дрифта. Снижает terminal velocity: `v_drift = v_normal / sqrt(mult)`. 1.8 → 74.7%, 2.0 → 70.7%, 1.0 → без эффекта (старый v2). |
+| `DRIFT_ROLLING_MULTIPLIER` | 1.3 | 1.0–2.0 | Множитель `K_ROLLING` во время дрифта. Добавляет тактильный scrubbing на малых скоростях и в переходах входа/выхода. Не влияет на terminal (rolling пренебрежимо мало на высокой скорости). |
+
+**Таблица feel-эффекта по значению `DRIFT_DRAG_MULTIPLIER`:**
+
+| mult | terminal_drift / terminal_normal | Feel |
+|---|---|---|
+| 1.0 | 100% | Нет штрафа (v2 поведение) |
+| 1.3 | 87.7% | Едва заметно |
+| 1.5 | 81.6% | Лёгкий штраф |
+| 1.8 | 74.5% | **Дефолт** — заметное замедление без "стопа" |
+| 2.0 | 70.7% | Агрессивный штраф |
+| 3.0 | 57.7% | Дрифт = почти стоп |
+
 ---
 
 ## Визуал
@@ -179,6 +203,9 @@ current_grip = move_toward(current_grip, target_grip,
 | Не дрифтит на малой скорости | ↓ `DRIFT_MIN_SPEED_RATIO` (0.2) или ↑ `MAX_SPEED` |
 | Руль не чувствуется на скорости | ↑ `STEER_HIGH_MULT` (0.9–1.0) |
 | Спамит вход в дрифт | ↑ `DRIFT_ENTER_THRESHOLD` (0.8) |
+| Нет замедления в дрифте | ↑ `DRIFT_DRAG_MULTIPLIER` (1.8–2.5) |
+| В дрифте тормозит слишком резко | ↓ `DRIFT_DRAG_MULTIPLIER` (1.3–1.5) |
+| Нет scrubbing-ощущения при входе в дрифт | ↑ `DRIFT_ROLLING_MULTIPLIER` (1.4–1.7) |
 
 ---
 
