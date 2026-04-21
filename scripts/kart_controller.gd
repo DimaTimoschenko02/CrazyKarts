@@ -287,8 +287,12 @@ func _physics_process(delta: float) -> void:
 	if not _is_drifting:
 		if fwd_speed > drift_min_speed and abs_steer > physics.drift_enter_threshold:
 			_is_drifting = true
-			# Rear-swing kick: one-shot lateral impulse on false→true transition
-			velocity += side_dir * (-_steer_input * physics.drift_kick_force)
+			# Rear-swing kick: one-shot lateral impulse on false→true transition.
+			# Must modify side_speed (local var), NOT velocity directly — velocity is
+			# rebuilt from fwd_speed/side_speed at step 9, so direct velocity mutation
+			# here would be overwritten. Sign: turn left (_steer_input>0) → negative
+			# side_speed → zad goes right in kart-local space → nose swings left. Correct.
+			side_speed += -_steer_input * physics.drift_kick_force
 	else:
 		if abs_steer < physics.drift_exit_threshold or fwd_speed <= drift_min_speed:
 			_is_drifting = false
