@@ -27,6 +27,9 @@ last-updated: 2026-04-21
 - **`_is_drifting` mini-hysteresis**: `true` when `_drift_intensity > 0.72`, `false` when `_drift_intensity < 0.68`. Prevents VFX/audio flicker when intensity hovers around the threshold. (v2.2: simple threshold flip at 0.7)
 - **Lateral ramp condition updated**: `if target > prev_target AND _drift_intensity < target` — ramp fires only while intensity is actively climbing toward a higher target. Prevents ramp firing during steady-state or exit
 - **Steer sign preservation**: when `|steer_input| < 0.05`, preserve previous `steer_input` sign for visual lean and ramp direction. Prevents body-mesh flip from input jitter near center
+- **Floor-align yaw-lock**: `floor_align` slerp is applied to pitch and roll components of basis only — yaw is frozen to current heading after the slerp. This breaks the feedback loop between `floor_align` and `steer_mult`: slerp no longer silently mutates the yaw used by `fwd_dir = -basis.z` → `decompose velocity` → `speed_ratio` → `steer_mult` → `yaw_rate` (fix for circular-drift orientation oscillation)
+
+- **Floor-align yaw-lock (patch)**: `floor_align` slerp now applies only to pitch/roll; yaw is restored to pre-slerp value each frame. Breaks the feedback loop `floor_align → fwd_dir shift → speed_ratio → steer_mult (nonlinear) → yaw_rate oscillation` that caused orientation to alternate between two stances during sustained circular drift
 
 ### What is removed
 
@@ -143,7 +146,7 @@ extends Resource
 @export_group("Terrain")
 @export var slope_speed_influence: float = 8.0    # m/s² slope acceleration bonus
 @export var floor_snap_length: float = 0.3        # keep kart grounded on slopes
-@export var floor_align_speed: float = 8.0        # slerp speed for floor normal alignment
+@export var floor_align_speed: float = 8.0        # slerp speed for pitch/roll floor alignment (yaw not affected — prevents drift oscillation)
 ```
 
 **Removed in v2.3**:
@@ -350,6 +353,17 @@ See v2.1 archive for full scenario table.
 Slope speed influence, floor alignment, ramp launch: unchanged from v2.1. See archive for pseudocode.
 
 Key values: gravity = 35.0 m/s², `slope_speed_influence` = 8.0 m/s², `floor_snap_length` = 0.3 m.
+
+**Floor-align yaw-lock constraint**: after `slerp(basis, floor_normal_basis, floor_align_speed * delta)`, the yaw (rotation around world Y) must be restored to the pre-slerp value. Pseudocode:
+```
+saved_yaw = global_transform.basis.get_euler().y
+basis = basis.slerp(floor_normal_basis, floor_align_speed * delta)
+# Re-apply saved yaw: reconstruct basis from floor-aligned pitch/roll + original yaw
+euler = basis.get_euler()
+euler.y = saved_yaw
+basis = Basis.from_euler(euler)
+```
+Without this, `slerp` toward `floor_normal` mutates yaw silently, shifting `fwd_dir = -basis.z` → `speed_ratio` → `steer_mult` → non-linear yaw_rate oscillation on the next frame.
 
 ### Interactions with Other Systems
 
@@ -608,6 +622,33 @@ push_force = clamp(abs(energy_diff) * 0.5, bump_min_force, bump_max_force)
 
 ---
 
+### 11. Floor-Align Yaw-Lock
+
+```
+# Each physics frame, after rotate_y() and before move_and_slide():
+saved_yaw = global_transform.basis.get_euler().y
+
+# Build a basis aligned to floor_normal, pointing in current forward:
+forward_dir = -global_transform.basis.z
+floor_normal_basis = Basis.looking_at(forward_dir, floor_normal)
+
+# Slerp toward it (pitch/roll alignment):
+new_basis = global_transform.basis.slerp(floor_normal_basis, floor_align_speed * delta)
+
+# Re-freeze yaw to saved value:
+euler = new_basis.get_euler()
+euler.y = saved_yaw
+global_transform.basis = Basis.from_euler(euler)
+```
+
+| Variable | Default | Range | Effect |
+|---|---|---|---|
+| `floor_align_speed` | 8.0 | 3–20 /s | Speed of pitch/roll alignment to slope normal; yaw is not affected |
+
+**Why**: Without yaw-lock, `slerp` toward `floor_normal_basis` shifts the kart's heading by an imperceptible amount each frame. On the next frame `fwd_dir = -basis.z` is slightly rotated → `fwd_speed` from velocity decompose changes → `speed_ratio` changes → `steer_mult = lerp(1.4, 0.8, speed_ratio)` is non-linear → yaw_rate is different → next frame heading shifts again. On a circular path with constant steer the loop closes: orientation oscillates between two stances ("smena pozy"). Freezing yaw after slerp breaks the coupling entirely.
+
+---
+
 ## Edge Cases
 
 | Scenario | Resolution |
@@ -630,6 +671,7 @@ push_force = clamp(abs(energy_diff) * 0.5, bump_min_force, bump_max_force)
 | Frame rate drop (HTML5, 30fps) | All formulas are `× delta` — correct at any Hz by construction. |
 | Ramp/air state | **[OPEN — deferred to post-MVP]**: User intuition: no steering in air. Current: 0.15s lockout on landing. Final air control rule TBD based on map design. |
 | Spawn state | `_drift_intensity = 0.0` on spawn. `_steer_sign = 0.0`. Physics starts from clean state. Full specification deferred with spawn push system (post-MVP). |
+| **Circular drift (sustained steer)** | `_drift_intensity` stable → `intensity_target` stable → no lateral ramp → orientation stable. Floor-align yaw-lock ensures `rotate_y()` is the only source of yaw change: no orientation oscillation ("smena pozy"). |
 
 ---
 
@@ -704,6 +746,7 @@ var velocity: Vector3              # world-space velocity (CharacterBody3D)
 | `drift_rolling_multiplier` | 1.3 | 1.0–2.0 | Low-speed scrubbing at intensity=1.0 | No tactile scrubbing | Abrupt stop at low speed |
 | `mass` | 1.0 | 0.4–3.0 | Collision weight | Gets pushed easily | Immovable |
 | `slope_speed_influence` | 8.0 | 3–15 m/s² | Hill impact | Hills irrelevant | Hills dominate |
+| `floor_align_speed` | 8.0 | 3–20 /s | Pitch/roll snap to slope normal (yaw not affected — prevents drift oscillation) | Kart stays flat on steep slopes | Jittery visual pitch on bumpy terrain |
 | `max_speed` (reference) | 20.0 | — | Camera + network normalization only | Camera/network wrong | FOV never widens |
 
 ★ = new in v2.2 or v2.3 (`drift_steer_exponent` is v2.3 addition)
@@ -784,6 +827,7 @@ Debug overlay (dev builds only): `_drift_intensity` float bar, `_drift_intensity
 - [ ] **DEAD state: `steer_input` = 0, `intensity_target = 0`, `_drift_intensity` decays to 0 without special-case code**
 - [ ] Remote karts do not run physics (only interpolation)
 - [ ] deprecated `grip_loss_rate = 0.0`: intensity-based grip path used (verify no `move_toward` grip calls)
+- [ ] **Floor-align yaw-lock: holding A or D on dry flat terrain at stable speed — kart yaw-rate is stable within ±0.5 rad/s of target; no oscillation between two stances over 3+ seconds of sustained circular steer**
 
 ### Network Tests (automated)
 
