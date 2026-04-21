@@ -125,6 +125,10 @@ func _ready() -> void:
 		dbg_input.target = self
 		dbg_input.name = "DebugInputOverlay"
 		get_tree().current_scene.add_child.call_deferred(dbg_input)
+		var dbg_trails := preload("res://scripts/debug_wheel_trails.gd").new()
+		dbg_trails.target = self
+		dbg_trails.name = "DebugWheelTrails"
+		get_tree().current_scene.add_child.call_deferred(dbg_trails)
 
 
 func _exit_tree() -> void:
