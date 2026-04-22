@@ -142,27 +142,30 @@ const PARAMS = {
       short: "[deprecated] Оставь 0. Legacy override v2.1 — grip через move_toward вместо intensity",
       deps: ["HIGH_GRIP", "LOW_GRIP"],
       detail: "[deprecated v2.1] В v2.2 grip автоматически восстанавливается через intensity decay. Этот параметр нужен только для отката к v2.1-поведению.\n\nОставь 0.0 — тогда работает новая intensity-based логика.\nНенулевое + GRIP_LOSS_RATE ненулевое → legacy override: grip восстанавливается через move_toward при выходе из дрифта." },
-    { key: "DRIFT_STEER_EXPONENT", min: 1.5, max: 5.0, step: 0.1, unit: "",
-      short: "Кривизна дрифта от руля. Больше = дрифт только при сильном повороте, меньше = дрифт от лёгкого касания",
-      detail: "В v2.3 дрифт ВСЕГДА есть при повороте руля, но его сила нарастает по степенной кривой: intensity_target = pow(|steer|, exponent) * speed_factor.\n\nТаблица intensity_target при типичных значениях руля:\n\n• exponent=2.0 (плавнее): steer=0.3 → 0.09, steer=0.5 → 0.25, steer=0.8 → 0.64\n• exponent=3.0 (стандарт): steer=0.3 → 0.027, steer=0.5 → 0.125, steer=0.8 → 0.512\n• exponent=5.0 (резкое): steer=0.3 → 0.002, steer=0.5 → 0.031, steer=0.8 → 0.328\n\nЕсли машину заносит от лёгкого прикосновения руля → увеличь. Если дрифт 'не чувствуется' даже при полном повороте → уменьши." },
-    { key: "DRIFT_MIN_SPEED_RATIO", min: 0.1, max: 0.8, step: 0.05, unit: "x",
-      deps: ["MAX_SPEED"],
-      short: "Минимальная скорость для дрифта, как доля от MAX_SPEED. 0.15 = доступен почти всегда",
-      detail: "Дрифт невозможен на слишком малой скорости.\n\nОриентиры (при MAX_SPEED=28):\n• 0.15 → нужно 4.2 м/с — дрифт доступен почти всегда\n• 0.4 → нужно 11.2 м/с — только после разгона\n• 0.6 → нужно 16.8 м/с — только на высокой скорости\n\nЕсли хочешь чтоб дрифт был техничной фичей для разогнанного карта → ставь 0.4+. Если хочешь дрифтить всегда → 0.15-0.2." },
+    { key: "DRIFT_MIN_SPEED", min: 1.0, max: 8.0, step: 0.5, unit: "m/s",
+      short: "Hard gate: ниже этой скорости intensity гасится в 0 (нет дрифта)",
+      detail: "v2.4: абсолютное значение (м/с, не ratio). Ниже drift_min_speed `_drift_intensity` принудительно decay к 0 независимо от slip_angle. Предотвращает phantom drift от velocity decompose noise при почти-остановке.\n\nОриентиры:\n• 1-2: дрифт почти всегда (на любой скорости)\n• 3: стандарт — дрифт от 3 м/с\n• 6-8: дрифт только на разгоне\n\nУвеличь если дрифт активируется когда машина почти стоит." },
+    { key: "DRIFT_MAX_SLIP_ANGLE_DEG", min: 20, max: 55, step: 1, unit: "°",
+      short: "Угол между velocity и носом при котором slip_ratio=1.0 (полный дрифт)",
+      detail: "v2.4: slip_angle = atan2(|side_speed|, |fwd_speed|). При этом значении (в градусах) slip_ratio достигает 1.0 (полный intensity).\n\nОриентиры при fwd=20 м/с:\n• 20°: нужно side ≈ 7 м/с для полного — очень чувствительный дрифт\n• 35°: стандарт — нужно side ≈ 14 м/с\n• 50°: нужно side ≈ 24 м/с — только при сильном заносе\n\nЕсли дрифт слишком лёгкий → увеличь. Если даже сильный занос не даёт полный дрифт → уменьши." },
+    { key: "SLIP_SMOOTHING", min: 3, max: 20, step: 0.5, unit: "/s",
+      short: "Скорость экспоненциального lerp intensity→slip_ratio. Framerate-independent",
+      detail: "v2.4: alpha = 1 - exp(-SLIP_SMOOTHING * delta), потом intensity = lerp(intensity, slip_ratio, alpha).\nHalf-life = ln(2)/rate.\n\nОриентиры:\n• 3-5: лаг ~200ms, дрифт 'нарастает' плавно (может казаться отставанием)\n• 8: стандарт, half-life ~87ms\n• 15+: почти мгновенный отклик, может дёргаться на bumps\n\nЕсли дрифт 'отстаёт' от физики → увеличь. Если дёргается → уменьши." },
+    { key: "DRIFT_INTENT_MULTIPLIER", min: 0.0, max: 1.0, step: 0.05, unit: "",
+      short: "Arcade aid: доп yaw при committed steer. 0.0 = чисто emergent",
+      deps: ["DRIFT_INTENT_THRESHOLD"],
+      detail: "v2.4: при |steer| > INTENT_THRESHOLD добавляется intent_aid = MULT * smoothstep(threshold, 1.0, |steer|) * sign(steer), эффективный steer = steer + intent_aid.\n\nПри threshold=0.7, mult=0.4, |steer|=1.0: effective = 1.4 (+40% yaw).\n\nОриентиры:\n• 0.0: чисто emergent — дрифт только из физики скольжения\n• 0.2-0.3: мягкий aid — помогает входить\n• 0.4: стандарт — arcade feel\n• 0.6+: steer почти доминирует (v2.3 feel)\n\nЕсли дрифт не ощущается контролируемым → увеличь." },
+    { key: "DRIFT_INTENT_THRESHOLD", min: 0.5, max: 0.9, step: 0.05, unit: "",
+      short: "|steer| с которого smoothstep начинает добавлять intent aid",
+      deps: ["DRIFT_INTENT_MULTIPLIER"],
+      detail: "v2.4: порог после которого intent_aid начинает расти. Smoothstep даёт C1-continuous переход — aid плавно нарастает от 0 до MULT на диапазоне [threshold..1.0].\n\nSmoothstep values (threshold=0.7):\n• |steer|=0.7 → aid=0.0\n• |steer|=0.8 → aid=0.26*MULT\n• |steer|=0.9 → aid=0.74*MULT\n• |steer|=1.0 → aid=1.0*MULT\n\nЕсли aid срабатывает при casual turn → увеличь порог. Если нужен aid при слабом повороте → уменьши." },
+    { key: "GRIP_SLIP_EXPONENT", min: 1.0, max: 4.0, step: 0.1, unit: "",
+      short: "Экспонента grip curve. 1=линейный, 2=держит потом резко падает (SmashKarts)",
+      deps: ["HIGH_GRIP", "LOW_GRIP"],
+      detail: "v2.4: _grip = lerp(HIGH, LOW, pow(intensity, GRIP_SLIP_EXPONENT)). Нелинейная кривая 'машина грипует, потом отпускает'.\n\nПри HIGH=29, LOW=1.0:\n• exp=1.0 (линейный): intensity=0.5 → grip=15\n• exp=2.0 (стандарт): intensity=0.5 → grip=22, intensity=0.7 → grip=15.3\n• exp=3.0 (резче): intensity=0.5 → grip=25.5, intensity=0.8 → grip=14.8\n\nexp=2 даёт 'tipping point' — до 70% intensity почти полный грип, потом быстрый drop." },
     { key: "DRIFT_YAW_MULTIPLIER", min: 1.0, max: 3.0, step: 0.1, unit: "x",
-      short: "Lerp endpoint поворота при intensity=1.0. Тугая дрифт-дуга SmashKarts-стиль",
-      detail: "В v2.2 yaw_mult = lerp(1.0, DRIFT_YAW_MULTIPLIER, drift_intensity) — поворот плавно усиливается по мере нарастания дрифта.\n\nОриентиры:\n• 1.0: нет эффекта (дрифт через скольжение)\n• 1.3-1.5: умеренный эффект\n• 1.7-2.0: SmashKarts-стиль\n• 2.5+: экстрим, машина может стать неуправляемой\n\nЕсли дрифт по ощущениям 'не крутит' как в SmashKarts → увеличь." },
-    { key: "DRIFT_INTENSITY_ENTER_RATE", min: 1, max: 10, step: 0.5, unit: "/s",
-      short: "Как быстро intensity нарастает до 1.0 при входе в дрифт. 3.5 = 0.29с до полного",
-      deps: ["DRIFT_LATERAL_RAMP"],
-      detail: "v2.2: 1/rate = время в секундах от 0 до 1.0 при полном руле на нужной скорости.\n\nОриентиры:\n• 1.0-2.0: медленный вход (~0.5-1с), дрифт 'нарастает'\n• 3.5: стандарт (~0.29с) — SmashKarts-стиль\n• 7.0+: почти мгновенный вход, деградирует к v2.1 binary\n\nЕсли вход ощущается слишком медленным → увеличь. Если снова появляется 'рывок' → уменьши." },
-    { key: "DRIFT_INTENSITY_EXIT_RATE", min: 1, max: 10, step: 0.5, unit: "/s",
-      short: "Как быстро intensity падает до 0.0 при выходе из дрифта. Чуть медленнее entry = хвост",
-      detail: "v2.2: 1/rate = время в секундах от 1.0 до 0.0 после отпускания руля.\n\nОриентиры:\n• 1.5-2.0: длинный 'хвост' — машина долго скользит после выхода\n• 3.0: стандарт (~0.33с) — чуть медленнее entry, приятный хвост\n• 6.0+: быстрый выход, почти нет хвоста после отпускания\n\nДолжен быть немного меньше enter_rate для ощущения 'длиннее выходить чем входить'." },
-    { key: "DRIFT_LATERAL_RAMP", min: 0, max: 100, step: 2, unit: "m/s²",
-      short: "Сила бокового толчка при входе в дрифт (нарастает, не мгновенный удар)",
-      deps: ["DRIFT_INTENSITY_ENTER_RATE"],
-      detail: "v2.2: заменяет DRIFT_KICK_FORCE. Это непрерывная сила: максимальна при intensity=0, плавно падает к 0 при intensity→1.\n\nПолный боковой импульс за вход: Δside_speed ≈ RAMP * (1/enter_rate) * 0.5\nПри 30 м/с² и enter_rate=3.5: ≈ 30 * 0.29 * 0.5 ≈ 4.4 м/с за 0.3с\n\nОриентиры:\n• 0: нет бокового толчка, только скольжение\n• 15-20: лёгкий занос зада\n• 30: стандарт — заметный но не резкий занос\n• 60: сильное выбрасывание зада на входе\n\n0 = без толчка. 30 = стандарт. 60 = сильное выбрасывание." },
+      short: "Lerp endpoint поворота при intensity=1.0. Тугая дрифт-дуга",
+      detail: "yaw_mult = lerp(1.0, DRIFT_YAW_MULTIPLIER, intensity) — поворот плавно усиливается по мере нарастания дрифта.\n\nОриентиры:\n• 1.0: нет эффекта\n• 1.3-1.5: умеренный\n• 1.7-2.0: SmashKarts-стиль\n• 2.5+: экстрим, может стать неуправляемым\n\nЕсли дрифт 'не крутит' → увеличь." },
     { key: "DRIFT_ACTIVE_THRESHOLD", min: 0.3, max: 0.95, step: 0.05, unit: "",
       short: "С какой intensity включается дым/звук дрифта. 0.7 = при ~70% полного дрифта",
       detail: "v2.2: _is_drifting = (drift_intensity > этот порог). Используется только для VFX и аудио — не влияет на физику.\n\nОриентиры:\n• 0.3-0.4: дым появляется уже при лёгком входе в дрифт (много дыма)\n• 0.7: стандарт — дым/звук когда дрифт уже серьёзный\n• 0.9: дым только в самом глубоком дрифте\n\nДолжен быть ≥ 0.5 чтобы VFX не мелькали при лёгком касании порога." },
@@ -303,32 +306,41 @@ const FORMULAS = {
     const r = safeNum(p.GRIP_RECOVERY_RATE);
     return `LOW→HIGH: ${fmt(r > 0 ? delta / r : 0, 2)}s`;
   },
-  "DRIFT_STEER_EXPONENT": p => {
-    const e = safeNum(p.DRIFT_STEER_EXPONENT, 3.0);
-    return `steer=0.5 → ${fmt(Math.pow(0.5, e), 3)} │ steer=0.8 → ${fmt(Math.pow(0.8, e), 3)}`;
+  "DRIFT_MIN_SPEED": p => `Hard gate: drift disabled при fwd_speed < ${fmt(safeNum(p.DRIFT_MIN_SPEED, 3.0))} m/s`,
+  "DRIFT_MAX_SLIP_ANGLE_DEG": p => {
+    const a = safeNum(p.DRIFT_MAX_SLIP_ANGLE_DEG, 35);
+    const needed = Math.tan(a * Math.PI / 180) * 20;
+    return `При fwd=20 м/с: side ≈ ${fmt(needed, 1)} m/s → slip_ratio=1.0`;
   },
-  "DRIFT_MIN_SPEED_RATIO": p => `Мин скорость: ${fmt(safeNum(p.MAX_SPEED) * safeNum(p.DRIFT_MIN_SPEED_RATIO))} m/s`,
+  "SLIP_SMOOTHING": p => {
+    const r = safeNum(p.SLIP_SMOOTHING, 8);
+    return `Half-life: ${fmt(r > 0 ? Math.LN2 / r : 0, 3)}s │ 60fps alpha: ${fmt(1 - Math.exp(-r/60), 3)}`;
+  },
+  "DRIFT_INTENT_MULTIPLIER": p => {
+    const m = safeNum(p.DRIFT_INTENT_MULTIPLIER, 0.4);
+    return `При |steer|=1.0: effective steer = 1 + ${fmt(m, 2)} = ${fmt(1 + m, 2)}`;
+  },
+  "DRIFT_INTENT_THRESHOLD": p => {
+    const t = safeNum(p.DRIFT_INTENT_THRESHOLD, 0.7);
+    const m = safeNum(p.DRIFT_INTENT_MULTIPLIER, 0.4);
+    const at80 = Math.max(0, Math.min(1, (0.8 - t) / (1 - t)));
+    const smoothstep80 = at80 * at80 * (3 - 2 * at80);
+    return `При |steer|=0.8 → aid=${fmt(smoothstep80 * m, 3)}`;
+  },
+  "GRIP_SLIP_EXPONENT": p => {
+    const e = safeNum(p.GRIP_SLIP_EXPONENT, 2.0);
+    const hi = safeNum(p.HIGH_GRIP, 29);
+    const lo = safeNum(p.LOW_GRIP, 1);
+    const grip50 = hi + (lo - hi) * Math.pow(0.5, e);
+    const grip70 = hi + (lo - hi) * Math.pow(0.7, e);
+    return `intensity=0.5 → grip=${fmt(grip50, 1)} │ 0.7 → ${fmt(grip70, 1)}`;
+  },
   "DRIFT_YAW_MULTIPLIER": p => `При intensity=1.0: +${fmt((safeNum(p.DRIFT_YAW_MULTIPLIER) - 1) * 100, 0)}% поворота`,
   "GRIP_LOSS_RATE": p => `[deprecated] При 0.0 — intensity path active`,
   "GRIP_RECOVERY_RATE": p => `[deprecated] При 0.0 — intensity path active`,
-  "DRIFT_INTENSITY_ENTER_RATE": p => {
-    const r = safeNum(p.DRIFT_INTENSITY_ENTER_RATE, 3.5);
-    return `0→1 за ${fmt(r > 0 ? 1 / r : 0, 2)}s │ VFX at ${fmt(r > 0 ? safeNum(p.DRIFT_ACTIVE_THRESHOLD, 0.7) / r : 0, 2)}s`;
-  },
-  "DRIFT_INTENSITY_EXIT_RATE": p => {
-    const r = safeNum(p.DRIFT_INTENSITY_EXIT_RATE, 3.0);
-    return `1→0 за ${fmt(r > 0 ? 1 / r : 0, 2)}s │ Хвост ~${fmt(r > 0 ? 1 / r : 0, 2)}s`;
-  },
-  "DRIFT_LATERAL_RAMP": p => {
-    const ramp = safeNum(p.DRIFT_LATERAL_RAMP, 30);
-    const rate = safeNum(p.DRIFT_INTENSITY_ENTER_RATE, 3.5);
-    const total = rate > 0 ? ramp * (1 / rate) * 0.5 : 0;
-    return `Δside ≈ ${fmt(total, 1)} m/s за вход (~${fmt(rate > 0 ? 1/rate : 0, 2)}s)`;
-  },
   "DRIFT_ACTIVE_THRESHOLD": p => {
-    const t = safeNum(p.DRIFT_ACTIVE_THRESHOLD, 0.7);
-    const r = safeNum(p.DRIFT_INTENSITY_ENTER_RATE, 3.5);
-    return `VFX включится через ~${fmt(r > 0 ? t / r : 0, 2)}s после входа`;
+    const t = safeNum(p.DRIFT_ACTIVE_THRESHOLD, 0.55);
+    return `VFX on при intensity > ${fmt(t + 0.02, 2)} │ off при < ${fmt(t - 0.02, 2)} (mini-hyst)`;
   },
   "DRIFT_DRAG_MULTIPLIER": p => {
     const a = safeNum(p.ACCEL_FORCE); const kd = safeNum(p.K_DRAG); const m = safeNum(p.DRIFT_DRAG_MULTIPLIER, 1);

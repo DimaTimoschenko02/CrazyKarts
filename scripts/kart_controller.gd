@@ -3,19 +3,17 @@ extends CharacterBody3D
 # ── Physics resource ──────────────────────────────────────────────────────────
 @export var physics: KartPhysicsResource = KartPhysicsResource.new()
 
-# ── Drift (v2.3 — Continuous Intensity Target) ────────────────────────────────
-# Implements GDD kart-physics.md v2.3: intensity_target = pow(|steer|, exponent) * speed_factor.
-# No binary enter/exit thresholds — continuous float target from steer input.
-# _is_drifting is a derived bool with mini-hysteresis (±0.02 around drift_active_threshold).
-# All drift-dependent physics values use lerp(base, drift_value, _drift_intensity).
-var _drift_intensity: float = 0.0         # primary physics master [0..1]
-var _drift_intensity_target: float = 0.0  # computed each frame from steer + speed_factor (v2.3)
-var _drift_intensity_prev_target: float = 0.0  # previous frame target for lateral ramp condition (v2.3)
+# ── Drift (v2.4 — Emergent Slip-Angle) ───────────────────────────────────────
+# Implements GDD kart-physics.md v2.4.
+# _drift_intensity is derived from measured slip_angle (atan2), NOT from steer input.
+# Framerate-independent: side_speed *= exp(-_grip*delta), alpha = 1-exp(-rate*delta).
+# Slip is measured BEFORE move_and_slide() to avoid false spikes from wall contact.
+var _drift_intensity: float = 0.0    # physics master [0..1]
+var _slip_angle_deg: float = 0.0     # debug/telemetry — measured slip angle
+var _slip_ratio: float = 0.0         # debug/telemetry — normalized slip [0..1]
 var _grip: float = 18.0              # initialised in _ready from physics.high_grip_target
-# _is_drifting: bool — mini-hysteresis: true above (threshold+0.02), false below (threshold-0.02).
-# VFX/audio/network only. Updated each frame from _drift_intensity.
+# _is_drifting: bool — mini-hysteresis ±0.02 around drift_active_threshold. VFX/audio/network only.
 var _is_drifting: bool = false
-var _steer_sign: float = 0.0         # sign of last non-jitter steer (preserved at |steer|<0.05) — v2.3
 var _visual_drift_angle: float = 0.0
 var _cached_side_speed: float = 0.0  # stored for VFX threshold check
 var _base_car_rot_y: float = 0.0     # BaseCar initial rotation.y (0 after 180° fix)
@@ -153,7 +151,7 @@ func _exit_tree() -> void:
 func _on_dev_params_changed(data: Dictionary) -> void:
 	if not physics:
 		return
-	# Speed (v2: force-based)
+	# Speed (force-based)
 	physics.max_speed             = data.get("MAX_SPEED",              physics.max_speed)
 	physics.accel_force           = data.get("ACCEL_FORCE",            physics.accel_force)
 	physics.k_drag                = data.get("K_DRAG",                 physics.k_drag)
@@ -172,29 +170,30 @@ func _on_dev_params_changed(data: Dictionary) -> void:
 	physics.stationary_steer_threshold = data.get("STATIONARY_STEER_THRESHOLD", physics.stationary_steer_threshold)
 	physics.stationary_steer_scale     = data.get("STATIONARY_STEER_SCALE",     physics.stationary_steer_scale)
 	physics.wheel_radius          = data.get("WHEEL_RADIUS",           physics.wheel_radius)
-	# Drift (v2.3: continuous intensity target from pow(|steer|, exponent) * speed_factor)
-	physics.high_grip_target           = data.get("HIGH_GRIP",                    physics.high_grip_target)
-	physics.low_grip_target            = data.get("LOW_GRIP",                     physics.low_grip_target)
-	physics.grip_loss_rate             = data.get("GRIP_LOSS_RATE",               physics.grip_loss_rate)
-	physics.grip_recovery_rate         = data.get("GRIP_RECOVERY_RATE",           physics.grip_recovery_rate)
-	physics.drift_steer_exponent       = data.get("DRIFT_STEER_EXPONENT",         physics.drift_steer_exponent)
-	physics.drift_min_speed_ratio      = data.get("DRIFT_MIN_SPEED_RATIO",        physics.drift_min_speed_ratio)
-	physics.drift_yaw_multiplier       = data.get("DRIFT_YAW_MULTIPLIER",         physics.drift_yaw_multiplier)
-	physics.drift_intensity_enter_rate = data.get("DRIFT_INTENSITY_ENTER_RATE",   physics.drift_intensity_enter_rate)
-	physics.drift_intensity_exit_rate  = data.get("DRIFT_INTENSITY_EXIT_RATE",    physics.drift_intensity_exit_rate)
-	physics.drift_lateral_ramp         = data.get("DRIFT_LATERAL_RAMP",           physics.drift_lateral_ramp)
-	physics.drift_active_threshold     = data.get("DRIFT_ACTIVE_THRESHOLD",       physics.drift_active_threshold)
-	physics.vfx_smoke_speed_threshold  = data.get("VFX_SMOKE_THRESHOLD",          physics.vfx_smoke_speed_threshold)
-	# Drift resistance (v2.1 — lerp endpoints at intensity=1.0)
-	physics.drift_drag_multiplier      = data.get("DRIFT_DRAG_MULTIPLIER",        physics.drift_drag_multiplier)
-	physics.drift_rolling_multiplier   = data.get("DRIFT_ROLLING_MULTIPLIER",     physics.drift_rolling_multiplier)
+	# Drift (v2.4: emergent slip-angle)
+	physics.high_grip_target          = data.get("HIGH_GRIP",                   physics.high_grip_target)
+	physics.low_grip_target           = data.get("LOW_GRIP",                    physics.low_grip_target)
+	physics.grip_loss_rate            = data.get("GRIP_LOSS_RATE",              physics.grip_loss_rate)
+	physics.grip_recovery_rate        = data.get("GRIP_RECOVERY_RATE",          physics.grip_recovery_rate)
+	physics.drift_min_speed           = data.get("DRIFT_MIN_SPEED",             physics.drift_min_speed)
+	physics.drift_max_slip_angle_deg  = data.get("DRIFT_MAX_SLIP_ANGLE_DEG",    physics.drift_max_slip_angle_deg)
+	physics.slip_smoothing            = data.get("SLIP_SMOOTHING",              physics.slip_smoothing)
+	physics.drift_intent_multiplier   = data.get("DRIFT_INTENT_MULTIPLIER",     physics.drift_intent_multiplier)
+	physics.drift_intent_threshold    = data.get("DRIFT_INTENT_THRESHOLD",      physics.drift_intent_threshold)
+	physics.grip_slip_exponent        = data.get("GRIP_SLIP_EXPONENT",          physics.grip_slip_exponent)
+	physics.drift_yaw_multiplier      = data.get("DRIFT_YAW_MULTIPLIER",        physics.drift_yaw_multiplier)
+	physics.drift_active_threshold    = data.get("DRIFT_ACTIVE_THRESHOLD",      physics.drift_active_threshold)
+	physics.vfx_smoke_speed_threshold = data.get("VFX_SMOKE_THRESHOLD",         physics.vfx_smoke_speed_threshold)
+	# Drift resistance (lerp endpoints at intensity=1.0)
+	physics.drift_drag_multiplier     = data.get("DRIFT_DRAG_MULTIPLIER",       physics.drift_drag_multiplier)
+	physics.drift_rolling_multiplier  = data.get("DRIFT_ROLLING_MULTIPLIER",    physics.drift_rolling_multiplier)
 	# Visuals
-	physics.visual_drift_max_deg       = data.get("VISUAL_DRIFT_MAX_DEG",         physics.visual_drift_max_deg)
-	physics.visual_lean_recovery_speed = data.get("VISUAL_LEAN_RECOVERY_SPEED",   physics.visual_lean_recovery_speed)
+	physics.visual_drift_max_deg      = data.get("VISUAL_DRIFT_MAX_DEG",        physics.visual_drift_max_deg)
+	physics.visual_lean_recovery_speed = data.get("VISUAL_LEAN_RECOVERY_SPEED", physics.visual_lean_recovery_speed)
 	# Terrain
-	physics.gravity                    = data.get("GRAVITY",                      physics.gravity)
-	physics.floor_align_speed          = data.get("FLOOR_ALIGN_SPEED",            physics.floor_align_speed)
-	physics.slope_speed_influence      = data.get("SLOPE_INFLUENCE",              physics.slope_speed_influence)
+	physics.gravity                   = data.get("GRAVITY",                     physics.gravity)
+	physics.floor_align_speed         = data.get("FLOOR_ALIGN_SPEED",           physics.floor_align_speed)
+	physics.slope_speed_influence     = data.get("SLOPE_INFLUENCE",             physics.slope_speed_influence)
 
 
 # ── State change handlers ────────────────────────────────────────────────────
@@ -215,12 +214,11 @@ func _on_enter_dead() -> void:
 	collision_layer = 0
 	collision_mask = 0
 	_clear_launchers()
-	# v2.3: reset intensity and all derived state immediately (steer_input=0 → target=0 next frame anyway).
+	# v2.4: reset intensity and all derived state immediately.
 	_drift_intensity = 0.0
-	_drift_intensity_target = 0.0
-	_drift_intensity_prev_target = 0.0
+	_slip_angle_deg = 0.0
+	_slip_ratio = 0.0
 	_is_drifting = false
-	_steer_sign = 0.0
 	_visual_drift_angle = 0.0
 	_cached_side_speed = 0.0
 	_wheel_roll_angle = 0.0
@@ -281,54 +279,9 @@ func _physics_process(delta: float) -> void:
 	var fwd_speed  := velocity.dot(fwd_dir)
 	var side_speed := velocity.dot(side_dir)
 
-	# ── 4. Drift intensity update (v2.3 — Continuous Target) ────────────────────
-	# GDD §Drift Model v2.3: intensity_target = pow(|steer|, exponent) * speed_factor.
-	# No binary enter/exit thresholds — full continuous float target.
-	# _is_drifting uses mini-hysteresis ±0.02 around drift_active_threshold (VFX/audio only).
-
-	# Steer sign preservation: freeze sign when |steer| < 0.05 to prevent body flip from jitter.
-	if absf(_steer_input) >= 0.05:
-		_steer_sign = signf(_steer_input)
-	# else: _steer_sign unchanged — preserves last known direction
-
-	var drift_min_speed: float = physics.drift_min_speed_ratio * physics.max_speed
-	# speed_factor: linear ramp from 0 at drift_min_speed to 1 at 2*drift_min_speed.
-	# fwd_speed <= 0 → speed_factor = 0 → target = 0 (blocks reverse drift implicitly).
-	var speed_factor: float = clamp((fwd_speed - drift_min_speed) / maxf(drift_min_speed, 0.001), 0.0, 1.0)
-
-	# Continuous intensity_target: pow(|steer|, exponent) * speed_factor.
-	var intensity_target: float = pow(absf(_steer_input), physics.drift_steer_exponent) * speed_factor
-	intensity_target = clamp(intensity_target, 0.0, 1.0)
-
-	# Rate selection: enter_rate when climbing, exit_rate when falling.
-	var drift_rate: float
-	if intensity_target > _drift_intensity:
-		drift_rate = physics.drift_intensity_enter_rate
-	else:
-		drift_rate = physics.drift_intensity_exit_rate
-
-	# Advance prev/current target bookkeeping BEFORE updating intensity (needed for ramp condition).
-	_drift_intensity_prev_target = _drift_intensity_target
-	_drift_intensity_target = intensity_target
-
-	_drift_intensity = move_toward(_drift_intensity, _drift_intensity_target, drift_rate * delta)
-	_drift_intensity = clamp(_drift_intensity, 0.0, 1.0)
-
-	# Derived _is_drifting: mini-hysteresis band ±0.02 around drift_active_threshold.
-	# Prevents VFX/audio flicker when intensity oscillates near the threshold.
-	var hyst_high: float = physics.drift_active_threshold + 0.02
-	var hyst_low: float  = physics.drift_active_threshold - 0.02
-	if _is_drifting:
-		if _drift_intensity < hyst_low:
-			_is_drifting = false
-	else:
-		if _drift_intensity > hyst_high:
-			_is_drifting = true
-	# else: no change — hysteresis hold
-
-	# ── 5. Direct rotation (no bicycle model) ────────────────────────────────
+	# ── 4. Direct rotation (no bicycle model) ────────────────────────────────
 	# GDD §Movement Model: rotate_y() + velocity projection. No wheelbase, no tan(steer_angle).
-	# v2.2: yaw_mult = lerp(1.0, drift_yaw_multiplier, _drift_intensity) — continuous.
+	# Yaw multiplier is continuous from _drift_intensity (emergent feedback loop).
 	var speed_ratio: float = clamp(absf(fwd_speed) / maxf(physics.max_speed, 0.01), 0.0, 1.0)
 	var steer_mult: float = lerp(physics.steer_low_speed_mult, physics.steer_high_speed_mult, speed_ratio)
 	var steer_sign: float = 1.0 if fwd_speed >= -0.5 else -1.0
@@ -340,42 +293,44 @@ func _physics_process(delta: float) -> void:
 	var blend: float = smoothstep(blend_low, blend_high, absf(fwd_speed))
 	var speed_scale: float = lerp(physics.stationary_steer_scale, base_scale, blend)
 
-	# v2.2: continuous yaw multiplier
+	# Continuous yaw multiplier from drift intensity
 	var yaw_mult: float = lerp(1.0, physics.drift_yaw_multiplier, _drift_intensity)
-	var yaw_rate: float = _steer_input * steer_sign * physics.steering_speed * steer_mult * speed_scale * yaw_mult
+
+	# GDD §Smoothstep Intent Aid: continuous extra yaw at committed steer, active above drift_min_speed.
+	# smoothstep gives C1-continuous ramp — no binary threshold snap.
+	var intent_aid: float = 0.0
+	if fwd_speed > physics.drift_min_speed:
+		var intent_scale: float = smoothstep(physics.drift_intent_threshold, 1.0, absf(_steer_input))
+		intent_aid = physics.drift_intent_multiplier * intent_scale * signf(_steer_input)
+
+	var yaw_rate: float = (_steer_input + intent_aid) * steer_sign * physics.steering_speed * steer_mult * speed_scale * yaw_mult
 	rotate_y(yaw_rate * delta)
 
 	# Recompute dirs after rotation, then re-project BOTH fwd_speed and side_speed onto new basis.
 	# This is the bicycle-model momentum transfer: after rotate_y the kart heading changed but
 	# velocity still points in the old direction, so part of forward momentum becomes lateral.
 	# This is intentional — it is the mechanism that creates drift sliding.
-	# Thrust is applied AFTER re-projection (step 6) so it is not discarded by the dot-product.
+	# Thrust is applied AFTER re-projection (step 5) so it is not discarded by the dot-product.
 	fwd_dir  = -global_transform.basis.z
 	side_dir =  global_transform.basis.x
 	fwd_speed  = velocity.dot(fwd_dir)
 	side_speed = velocity.dot(side_dir)
 
-	# ── 6. Force-based acceleration (v2.2) ────────────────────────────────────
-	# Implements GDD §Movement Model: thrust + quadratic drag + linear rolling + explicit brake.
+	# ── 5. Force-based acceleration ───────────────────────────────────────────
+	# GDD §Movement Model: thrust + quadratic drag + linear rolling + explicit brake.
 	# Applied after re-projection so thrust is not lost to the dot-product reset.
-	# v2.2: drag_mult and rolling_mult are lerp(1.0, MULT, _drift_intensity) — continuous, no ternary.
 	var thrust: float = 0.0
 	if _throttle > 0.01:
 		thrust = _throttle * physics.accel_force
 	elif _throttle < -0.01:
 		thrust = _throttle * physics.accel_force * physics.reverse_ratio
 
-	# v2.2: continuous lerp multipliers — no step functions
 	var drag_mult:    float = lerp(1.0, physics.drift_drag_multiplier,    _drift_intensity)
 	var rolling_mult: float = lerp(1.0, physics.drift_rolling_multiplier, _drift_intensity)
 
-	# Quadratic drag: dominates at high speed. Terminal velocity where thrust = drag + rolling.
 	var drag: float = -signf(fwd_speed) * physics.k_drag * drag_mult * fwd_speed * fwd_speed
-
-	# Linear rolling resistance: dominates at low speed, gives exponential coast-to-stop.
 	var rolling: float = -physics.k_rolling * rolling_mult * fwd_speed
 
-	# Brake: extra decel only when S is pressed and kart is moving forward.
 	var brake: float = 0.0
 	if Input.is_action_pressed("move_backward") and fwd_speed > 0.5:
 		brake = -physics.brake_force
@@ -386,48 +341,73 @@ func _physics_process(delta: float) -> void:
 	if absf(thrust) < 0.01 and absf(fwd_speed) < 0.1:
 		fwd_speed = 0.0
 
-	# ── 7. Lateral ramp kick (v2.3 — updated condition) ─────────────────────
-	# GDD §Lateral Ramp Kick v2.3: fires only while target is actively rising AND intensity
-	# hasn't caught up. This means: entry phase + mid-drift steer increase. NOT during
-	# steady-state hold or on exit (target falling).
-	# Applied to side_speed (local var), NOT velocity directly — velocity is rebuilt
-	# at step 9, so mutations to velocity here would be overwritten. (v2.1 kick bug fix)
-	# _steer_sign used (not raw steer_input) — prevents direction flip at |steer|<0.05 jitter.
-	if _drift_intensity_target > _drift_intensity_prev_target and _drift_intensity < _drift_intensity_target:
-		var lateral_force: float = physics.drift_lateral_ramp * (1.0 - _drift_intensity) * _steer_sign * -1.0
-		side_speed += lateral_force * delta
+	# ── 6. Slip angle measurement (BEFORE move_and_slide) ────────────────────
+	# GDD §Drift Model v2.4 Step 1: slip_angle measured here, after velocity decompose from
+	# rotated basis but BEFORE move_and_slide(). Post-slide velocity includes wall-slide
+	# lateral components that would falsely spike intensity on wall contact.
+	# atan2 denominator clamped to 0.5 — prevents phantom slip at near-zero fwd_speed.
+	var slip_angle_rad: float = atan2(absf(side_speed), maxf(absf(fwd_speed), 0.5))
+	_slip_angle_deg = rad_to_deg(slip_angle_rad)
+	_slip_ratio = clamp(_slip_angle_deg / maxf(physics.drift_max_slip_angle_deg, 0.001), 0.0, 1.0)
 
-	# ── 8. Derived grip + lateral damping ─────────────────────────────────────
-	# GDD §Derived Grip (v2.2):
-	#   Default path: lerp from high_grip to low_grip via _drift_intensity (no animation, frame-derived).
-	#   Legacy override: when both grip_loss_rate > 0 AND grip_recovery_rate > 0, use move_toward.
+	# ── 7. Intensity update (framerate-independent exponential lerp) ──────────
+	# GDD §Drift Model v2.4 Step 2.
+	# Hard gate: below drift_min_speed or in reverse, target decays to 0.
+	var target_intensity: float
+	if fwd_speed < physics.drift_min_speed or fwd_speed <= 0.0:
+		target_intensity = 0.0
+	else:
+		target_intensity = _slip_ratio
+
+	var alpha: float = 1.0 - exp(-physics.slip_smoothing * delta)
+	_drift_intensity = lerp(_drift_intensity, target_intensity, alpha)
+	_drift_intensity = clamp(_drift_intensity, 0.0, 1.0)
+
+	# ── 8. Derived _is_drifting: mini-hysteresis ──────────────────────────────
+	# GDD §Drift Model v2.4 Step 3. Band ±0.02 prevents VFX/audio flicker.
+	var hyst_high: float = physics.drift_active_threshold + 0.02
+	var hyst_low: float  = physics.drift_active_threshold - 0.02
+	if _is_drifting:
+		if _drift_intensity < hyst_low:
+			_is_drifting = false
+	else:
+		if _drift_intensity > hyst_high:
+			_is_drifting = true
+
+	# ── 9. Derived grip (non-linear curve) ───────────────────────────────────
+	# GDD §Drift Model v2.4 Step 4.
+	# grip_slip_exponent > 1.0: grip stays near high_grip_target at low intensity,
+	# then drops sharply at high intensity ("tipping point" SmashKarts-style).
 	if physics.grip_loss_rate == 0.0 and physics.grip_recovery_rate == 0.0:
-		# v2.2 default: derived each frame from intensity
-		_grip = lerp(physics.high_grip_target, physics.low_grip_target, _drift_intensity)
+		var curved_intensity: float = pow(_drift_intensity, physics.grip_slip_exponent)
+		_grip = lerp(physics.high_grip_target, physics.low_grip_target, curved_intensity)
 	else:
 		# [deprecated] Legacy v2.1 path — move_toward with binary _is_drifting target
 		var grip_target: float = physics.low_grip_target  if _is_drifting else physics.high_grip_target
 		var grip_rate: float   = physics.grip_loss_rate   if _is_drifting else physics.grip_recovery_rate
 		_grip = move_toward(_grip, grip_target, grip_rate * delta)
 
-	# Lateral damping: high grip → side_speed decays fast (tight handling). Low grip → decays slow (slide).
-	side_speed = move_toward(side_speed, 0.0, _grip * delta)
+	# ── 10. Framerate-independent side speed damping ──────────────────────────
+	# GDD §Drift Model v2.4 Step 5: exp(-_grip*delta) is framerate-independent.
+	# Equivalent behavior at 30fps and 60fps — critical for HTML5 vs desktop parity.
+	side_speed *= exp(-_grip * delta)
 
 	# Cache for VFX
 	_cached_side_speed = side_speed
 
-	# ── 9. Rebuild velocity ───────────────────────────────────────────────────
+	# ── 11. Rebuild velocity ──────────────────────────────────────────────────
 	velocity = fwd_dir * fwd_speed + side_dir * side_speed + Vector3(0.0, velocity.y, 0.0)
 
-	# ── 10. Move ──────────────────────────────────────────────────────────────
+	# ── 12. Move (Step 6 in GDD) ──────────────────────────────────────────────
+	# Slip angle was measured before this — wall collision cannot feed back into intensity
+	# until next frame's Step 1 (new velocity decompose after next rotate_y).
 	move_and_slide()
 
-	# ── 10.5. Visual drift angle (v2.3) ──────────────────────────────────────
-	# GDD §Visual Lean v2.3: use _steer_sign (not raw steer_input) to prevent body mesh
-	# flip when |steer_input| crosses zero with input jitter.
-	# If visual_lean_recovery_speed > 0: overdamping (body mesh lags intensity for heavier feel).
-	# If == 0: direct assignment (instant follow of intensity).
-	var target_visual_angle: float = deg_to_rad(_drift_intensity * physics.visual_drift_max_deg * _steer_sign)
+	# ── 12.5. Visual lean (Step 7 in GDD) ────────────────────────────────────
+	# Direction from sign(side_speed) — emergent from physics, not from steer sign.
+	# Prevents body mesh direction mismatch during counter-steer / steer reversal.
+	var lean_dir: float = signf(side_speed) if absf(side_speed) > 0.1 else 0.0
+	var target_visual_angle: float = deg_to_rad(_drift_intensity * physics.visual_drift_max_deg * lean_dir * -1.0)
 	if physics.visual_lean_recovery_speed > 0.0:
 		_visual_drift_angle = move_toward(_visual_drift_angle, target_visual_angle,
 				physics.visual_lean_recovery_speed * delta)
@@ -436,13 +416,13 @@ func _physics_process(delta: float) -> void:
 	if $BaseCar:
 		$BaseCar.rotation.y = _base_car_rot_y + _visual_drift_angle
 
-	# ── 10.6. Visual front wheel steering ────────────────────────────────────
+	# ── 12.6. Visual front wheel steering ────────────────────────────────────
 	if _wheel_fl and _wheel_fr:
 		var max_wheel_steer_rad: float = deg_to_rad(25.0)  # visual only, fixed reasonable angle
 		var target_steer: float = _steer_input * max_wheel_steer_rad
 		_steer_visual_angle = lerp(_steer_visual_angle, target_steer, 18.0 * delta)
 
-	# ── 10.7. Wheel roll animation ───────────────────────────────────────────
+	# ── 12.7. Wheel roll animation ────────────────────────────────────────────
 	if _wheel_fl and _wheel_fr and _wheel_rl and _wheel_rr:
 		_wheel_roll_angle += fwd_speed * delta / maxf(physics.wheel_radius, 0.01)
 		_wheel_roll_angle = fmod(_wheel_roll_angle, TAU)
@@ -453,7 +433,7 @@ func _physics_process(delta: float) -> void:
 		_wheel_fl.rotation = Vector3(_wheel_roll_angle, _steer_visual_angle, 0.0)
 		_wheel_fr.rotation = Vector3(_wheel_roll_angle, _steer_visual_angle, 0.0)
 
-	# ── 11. Slope speed influence (post-slide, uses is_on_floor) ─────────────
+	# ── 13. Slope speed influence (post-slide, uses is_on_floor) ─────────────
 	if is_on_floor():
 		var slope_factor := -global_transform.basis.z.dot(Vector3.UP)
 		var cur_fwd  := -global_transform.basis.z
@@ -463,23 +443,18 @@ func _physics_process(delta: float) -> void:
 		cur_fwd_speed += slope_factor * physics.slope_speed_influence * delta
 		velocity = cur_fwd * cur_fwd_speed + cur_side * cur_side_speed + Vector3(0.0, velocity.y, 0.0)
 
-	# ── 11.5. Floor alignment — yaw-lock variant ──────────────────────────────
+	# ── 13.5. Floor alignment — yaw-lock variant ──────────────────────────────
 	# GDD floor-align fix (Variant C): slerp only affects pitch/roll, NOT yaw.
-	# Problem: naive slerp to floor-normal basis rotates yaw → fwd_speed/side_speed
-	#   decompose differently next frame → steer_mult oscillates → "pose jitter in drift".
-	# Fix: extract current yaw BEFORE slerp, perform slerp, then force-restore yaw.
-	#   This locks heading while still smoothly aligning pitch/roll to terrain slope.
+	# Yaw saved before slerp and restored after — prevents yaw feedback loop in circular drift.
 	if is_on_floor() and physics.floor_align_speed > 0.0:
 		var floor_n := get_floor_normal()
 		var projected_fwd := fwd_dir - floor_n * fwd_dir.dot(floor_n)
 		if projected_fwd.length_squared() > 0.0001:
-			# Save current yaw before slerp changes it.
 			var yaw_before: float = global_transform.basis.get_euler().y
 
 			var target_basis := Basis.looking_at(projected_fwd, floor_n)
 			var new_basis: Basis = global_transform.basis.slerp(target_basis, physics.floor_align_speed * delta).orthonormalized()
 
-			# Restore yaw: decompose slerped basis to euler, override Y, rebuild.
 			var euler_after: Vector3 = new_basis.get_euler()
 			euler_after.y = yaw_before
 			global_transform.basis = Basis.from_euler(euler_after).orthonormalized()
@@ -791,10 +766,9 @@ func respawn(spawn_pos: Vector3, spawn_rot: float = 0.0) -> void:
 	_throttle = 0.0
 	_steer_input = 0.0
 	_drift_intensity = 0.0
-	_drift_intensity_target = 0.0
-	_drift_intensity_prev_target = 0.0
+	_slip_angle_deg = 0.0
+	_slip_ratio = 0.0
 	_is_drifting = false
-	_steer_sign = 0.0
 	_visual_drift_angle = 0.0
 	_cached_side_speed = 0.0
 	_wheel_roll_angle = 0.0
