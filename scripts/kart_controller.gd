@@ -187,6 +187,7 @@ func _on_dev_params_changed(data: Dictionary) -> void:
 	# Drift resistance (lerp endpoints at intensity=1.0)
 	physics.drift_drag_multiplier     = data.get("DRIFT_DRAG_MULTIPLIER",       physics.drift_drag_multiplier)
 	physics.drift_rolling_multiplier  = data.get("DRIFT_ROLLING_MULTIPLIER",    physics.drift_rolling_multiplier)
+	physics.cornering_drag_coeff      = data.get("CORNERING_DRAG_COEFF",        physics.cornering_drag_coeff)
 	# Visuals
 	physics.visual_drift_max_deg      = data.get("VISUAL_DRIFT_MAX_DEG",        physics.visual_drift_max_deg)
 	physics.visual_lean_recovery_speed = data.get("VISUAL_LEAN_RECOVERY_SPEED", physics.visual_lean_recovery_speed)
@@ -331,11 +332,20 @@ func _physics_process(delta: float) -> void:
 	var drag: float = -signf(fwd_speed) * physics.k_drag * drag_mult * fwd_speed * fwd_speed
 	var rolling: float = -physics.k_rolling * rolling_mult * fwd_speed
 
+	# GDD §Force-based acceleration (v2.4): tire scrubbing — extra fwd decel proportional to |side_speed|.
+	# Works at ANY slip magnitude, independent of _drift_intensity. Fills gap where drift_drag_multiplier
+	# doesn't activate in light turns (intensity stays low → negligible drag effect).
+	# sign(fwd_speed) ensures deceleration always opposes forward motion.
+	# Guard at |fwd_speed| < 0.1: sign(≈0) = 0 by design, but explicit guard for clarity.
+	var cornering_drag: float = 0.0
+	if absf(fwd_speed) >= 0.1:
+		cornering_drag = -signf(fwd_speed) * physics.cornering_drag_coeff * absf(side_speed)
+
 	var brake: float = 0.0
 	if Input.is_action_pressed("move_backward") and fwd_speed > 0.5:
 		brake = -physics.brake_force
 
-	fwd_speed += (thrust + drag + rolling + brake) * delta
+	fwd_speed += (thrust + drag + rolling + cornering_drag + brake) * delta
 
 	# Snap to zero near standstill when no throttle (avoids infinite float drift).
 	if absf(thrust) < 0.01 and absf(fwd_speed) < 0.1:

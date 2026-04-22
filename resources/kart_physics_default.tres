@@ -33,6 +33,7 @@ visual_drift_max_deg = 34.0
 visual_lean_recovery_speed = 5.0
 drift_drag_multiplier = 2.6
 drift_rolling_multiplier = 1.45
+cornering_drag_coeff = 0.3
 grip_loss_rate = 0.0
 grip_recovery_rate = 0.0
 wheel_radius = 0.18

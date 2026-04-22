@@ -48,6 +48,7 @@ v2.3 derived `intensity_target` from `steer_input` via a power curve. The kart d
 - `DRIFT_INTENT_THRESHOLD` — `|steer_input|` at which smoothstep begins ramping intent aid
 - `SLIP_SMOOTHING` — rate for `_drift_intensity` exponential tracking toward `slip_ratio`
 - `GRIP_SLIP_EXPONENT` — optional exponent on grip lerp curve (default 2.0)
+- `CORNERING_DRAG_COEFF` — tire scrubbing coefficient: fwd deceleration proportional to `|side_speed|`. Works at any slip, independent of intensity (fills the gap where `drift_drag_multiplier` doesn't activate in light turns)
 
 **What stays from v2.3** (unchanged):
 - Force-based inertia (thrust + k_drag·v² + k_rolling·v + brake)
@@ -156,6 +157,7 @@ extends Resource
 
 @export var drift_drag_multiplier: float = 2.6    # k_drag lerp endpoint at intensity=1.0
 @export var drift_rolling_multiplier: float = 1.45
+@export var cornering_drag_coeff: float = 0.3     # tire scrubbing: extra fwd decel proportional to |side_speed|. Independent from intensity — works at ANY slip
 
 # [deprecated — kept for rollback]
 @export var grip_loss_rate: float = 0.0
@@ -179,7 +181,7 @@ extends Resource
 
 ### Movement Model
 
-**Force-based acceleration** (identical to v2.3):
+**Force-based acceleration** (v2.4 adds cornering_drag):
 
 ```
 thrust   = throttle_input * accel_force
@@ -188,12 +190,15 @@ if throttle_input < 0: thrust *= reverse_ratio
 active_k_drag    = k_drag    * lerp(1.0, drift_drag_multiplier,    _drift_intensity)
 active_k_rolling = k_rolling * lerp(1.0, drift_rolling_multiplier, _drift_intensity)
 
-drag    = -sign(fwd_speed) * active_k_drag * fwd_speed^2
-rolling = -active_k_rolling * fwd_speed
-brake   = -sign(fwd_speed) * brake_force   [only when braking opposes motion and |fwd_speed|>0.5]
+drag           = -sign(fwd_speed) * active_k_drag * fwd_speed^2
+rolling        = -active_k_rolling * fwd_speed
+cornering_drag = -sign(fwd_speed) * cornering_drag_coeff * abs(side_speed)   # tire scrubbing
+brake          = -sign(fwd_speed) * brake_force   [only when braking opposes motion and |fwd_speed|>0.5]
 
-fwd_speed += (thrust + drag + rolling + brake) * delta
+fwd_speed += (thrust + drag + rolling + cornering_drag + brake) * delta
 ```
+
+**Why cornering_drag** is separate from `drift_drag_multiplier`: `drift_drag_multiplier` scales `k_drag` via `_drift_intensity` (smoothed physics state). In light turns intensity stays low → negligible drag effect → player complains "no speed loss in turns". `cornering_drag` directly converts lateral motion into fwd deceleration, working at ANY slip magnitude regardless of whether the kart is "officially drifting" (intensity > threshold). Physically it models tire scrubbing: wheels sliding sideways consume kinetic energy as heat.
 
 **Terminal velocity** (emergent):
 ```
@@ -654,6 +659,7 @@ var velocity: Vector3
 | `drift_yaw_multiplier` | 1.8 | 1.2–2.5 | Extra rotation during drift | Drift arc same as normal | Spin-out |
 | `drift_drag_multiplier` | 2.6 | 1.2–3.5 | Terminal velocity penalty in drift | No speed cost | Crawls in any turn |
 | `drift_rolling_multiplier` | 1.45 | 1.0–2.0 | Low-speed scrubbing | No tactile scrubbing | Abrupt stop |
+| **`cornering_drag_coeff`** ★ | 0.3 | 0.0–1.5 | Tire scrubbing: extra fwd decel × \|side_speed\|. Works at ANY slip (not just full drift) | No speed loss in light turns | Kart "digs in" aggressively in any turn |
 | `visual_drift_max_deg` | 34.0 | 20–50° | Body lean at intensity=1.0 | Unnoticeable | Body sideways |
 | `mass` | 1.0 | 0.4–3.0 | Collision weight | Pushed easily | Immovable |
 | `floor_align_speed` | 8.0 | 3–20 /s | Pitch/roll slope snap (yaw frozen) | Stays flat | Jittery pitch |

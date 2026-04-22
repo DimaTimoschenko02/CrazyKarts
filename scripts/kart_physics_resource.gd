@@ -42,6 +42,7 @@ extends Resource
 
 @export var drift_drag_multiplier: float = 2.6    # k_drag lerp endpoint at intensity=1.0
 @export var drift_rolling_multiplier: float = 1.45
+@export var cornering_drag_coeff: float = 0.3     # tire scrubbing: extra fwd decel proportional to |side_speed|. Independent from intensity — works at ANY slip
 
 # [deprecated — kept for rollback]
 # When BOTH are non-zero: overrides intensity-based grip with move_toward behavior (v2.1 path).
