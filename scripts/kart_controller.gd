@@ -162,6 +162,7 @@ func _on_dev_params_changed(data: Dictionary) -> void:
 	physics.steer_slew_rate_in    = data.get("STEER_SLEW_IN",          physics.steer_slew_rate_in)
 	physics.steer_slew_rate_out   = data.get("STEER_SLEW_OUT",         physics.steer_slew_rate_out)
 	physics.throttle_slew_rate    = data.get("THROTTLE_SLEW",          physics.throttle_slew_rate)
+	physics.steer_visual_rate     = data.get("STEER_VISUAL_RATE",      physics.steer_visual_rate)
 	# Steering
 	physics.steering_speed        = data.get("STEERING_SPEED",         physics.steering_speed)
 	physics.steer_low_speed_mult  = data.get("STEER_LOW_MULT",         physics.steer_low_speed_mult)
@@ -267,8 +268,14 @@ func _physics_process(delta: float) -> void:
 		steer_slew = physics.steer_slew_rate_in
 	else:
 		steer_slew = physics.steer_slew_rate_out
-	_steer_input = move_toward(_steer_input, raw_steer, steer_slew * delta)
-	_throttle    = move_toward(_throttle, raw_throttle, physics.throttle_slew_rate * delta)
+	# Fix #3b: exp-lerp for framerate-independent input smoothing.
+	# move_toward was fps-dependent. exp-lerp converges asymptotically — snap at ≈0 prevents micro-creep.
+	var steer_alpha: float = 1.0 - exp(-steer_slew * delta)
+	_steer_input = lerp(_steer_input, raw_steer, steer_alpha)
+	if absf(_steer_input) < 0.01 and absf(raw_steer) < 0.01:
+		_steer_input = 0.0
+	var throttle_alpha: float = 1.0 - exp(-physics.throttle_slew_rate * delta)
+	_throttle = lerp(_throttle, raw_throttle, throttle_alpha)
 
 	# ── 2. Gravity ────────────────────────────────────────────────────────────
 	if not is_on_floor():
@@ -285,7 +292,8 @@ func _physics_process(delta: float) -> void:
 	# Yaw multiplier is continuous from _drift_intensity (emergent feedback loop).
 	var speed_ratio: float = clamp(absf(fwd_speed) / maxf(physics.max_speed, 0.01), 0.0, 1.0)
 	var steer_mult: float = lerp(physics.steer_low_speed_mult, physics.steer_high_speed_mult, speed_ratio)
-	var steer_sign: float = 1.0 if fwd_speed >= -0.5 else -1.0
+	# Fix #4: smoothstep replaces binary flip — no discrete yaw-sign jump when reversing.
+	var steer_sign: float = lerp(-1.0, 1.0, smoothstep(-1.0, 0.0, fwd_speed))
 
 	# Stationary steering — smoothstep blend around stationary_steer_threshold
 	var base_scale: float = clamp(absf(fwd_speed) / maxf(physics.steer_speed_threshold, 0.01), 0.0, 1.0)
@@ -299,10 +307,14 @@ func _physics_process(delta: float) -> void:
 
 	# GDD §Smoothstep Intent Aid: continuous extra yaw at committed steer, active above drift_min_speed.
 	# smoothstep gives C1-continuous ramp — no binary threshold snap.
+	# drift_intent_curve (optional): shape the speed-based scale of intent. Fallback: flat 1.0.
 	var intent_aid: float = 0.0
 	if fwd_speed > physics.drift_min_speed:
 		var intent_scale: float = smoothstep(physics.drift_intent_threshold, 1.0, absf(_steer_input))
-		intent_aid = physics.drift_intent_multiplier * intent_scale * signf(_steer_input)
+		var intent_speed_scale: float = 1.0
+		if physics.drift_intent_curve:
+			intent_speed_scale = physics.drift_intent_curve.sample(speed_ratio)
+		intent_aid = physics.drift_intent_multiplier * intent_scale * signf(_steer_input) * intent_speed_scale
 
 	var yaw_rate: float = (_steer_input + intent_aid) * steer_sign * physics.steering_speed * steer_mult * speed_scale * yaw_mult
 	rotate_y(yaw_rate * delta)
@@ -337,9 +349,13 @@ func _physics_process(delta: float) -> void:
 	# doesn't activate in light turns (intensity stays low → negligible drag effect).
 	# sign(fwd_speed) ensures deceleration always opposes forward motion.
 	# Guard at |fwd_speed| < 0.1: sign(≈0) = 0 by design, but explicit guard for clarity.
+	# cornering_drag_curve (optional): shape drag vs |side_speed|. Fallback: flat 1.0 (linear).
 	var cornering_drag: float = 0.0
 	if absf(fwd_speed) >= 0.1:
-		cornering_drag = -signf(fwd_speed) * physics.cornering_drag_coeff * absf(side_speed)
+		var drag_scale: float = 1.0
+		if physics.cornering_drag_curve:
+			drag_scale = physics.cornering_drag_curve.sample(clamp(absf(side_speed) / 10.0, 0.0, 1.0))
+		cornering_drag = -signf(fwd_speed) * physics.cornering_drag_coeff * absf(side_speed) * drag_scale
 
 	var brake: float = 0.0
 	if Input.is_action_pressed("move_backward") and fwd_speed > 0.5:
@@ -369,7 +385,11 @@ func _physics_process(delta: float) -> void:
 	else:
 		target_intensity = _slip_ratio
 
-	var alpha: float = 1.0 - exp(-physics.slip_smoothing * delta)
+	# slip_smoothing_curve (optional): vary convergence rate by current intensity. Fallback: flat 1.0.
+	var smoothing_scale: float = 1.0
+	if physics.slip_smoothing_curve:
+		smoothing_scale = physics.slip_smoothing_curve.sample(_slip_ratio)
+	var alpha: float = 1.0 - exp(-physics.slip_smoothing * smoothing_scale * delta)
 	_drift_intensity = lerp(_drift_intensity, target_intensity, alpha)
 	_drift_intensity = clamp(_drift_intensity, 0.0, 1.0)
 
@@ -416,11 +436,13 @@ func _physics_process(delta: float) -> void:
 	# ── 12.5. Visual lean (Step 7 in GDD) ────────────────────────────────────
 	# Direction from sign(side_speed) — emergent from physics, not from steer sign.
 	# Prevents body mesh direction mismatch during counter-steer / steer reversal.
-	var lean_dir: float = signf(side_speed) if absf(side_speed) > 0.1 else 0.0
+	# Fix #1: smoothstep replaces binary threshold — no discrete lean-dir jump at |side_speed|=0.1.
+	var lean_dir: float = smoothstep(0.05, 0.25, absf(side_speed)) * signf(side_speed)
 	var target_visual_angle: float = deg_to_rad(_drift_intensity * physics.visual_drift_max_deg * lean_dir * -1.0)
+	# Fix #2: exp-lerp replaces move_toward — natural decay (fast at start, smooth near target).
 	if physics.visual_lean_recovery_speed > 0.0:
-		_visual_drift_angle = move_toward(_visual_drift_angle, target_visual_angle,
-				physics.visual_lean_recovery_speed * delta)
+		var lean_alpha: float = 1.0 - exp(-physics.visual_lean_recovery_speed * delta)
+		_visual_drift_angle = lerp(_visual_drift_angle, target_visual_angle, lean_alpha)
 	else:
 		_visual_drift_angle = target_visual_angle
 	if $BaseCar:
@@ -430,7 +452,9 @@ func _physics_process(delta: float) -> void:
 	if _wheel_fl and _wheel_fr:
 		var max_wheel_steer_rad: float = deg_to_rad(25.0)  # visual only, fixed reasonable angle
 		var target_steer: float = _steer_input * max_wheel_steer_rad
-		_steer_visual_angle = lerp(_steer_visual_angle, target_steer, 18.0 * delta)
+		# Fix #3a: exp-lerp for framerate-independent wheel visual smoothing.
+		var steer_vis_alpha: float = 1.0 - exp(-physics.steer_visual_rate * delta)
+		_steer_visual_angle = lerp(_steer_visual_angle, target_steer, steer_vis_alpha)
 
 	# ── 12.7. Wheel roll animation ────────────────────────────────────────────
 	if _wheel_fl and _wheel_fr and _wheel_rl and _wheel_rr:

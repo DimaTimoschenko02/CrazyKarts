@@ -123,7 +123,7 @@ func _process_follow(delta: float) -> void:
 	var lateral_vel: float = _target.velocity.dot(_target.global_transform.basis.x)
 	var t_drift: float = clampf(lateral_vel / maxf(max_speed, 1.0), -1.0, 1.0)
 	var target_drift_x: float = t_drift * drift_max_offset
-	_cam_drift_x = lerp(_cam_drift_x, target_drift_x, drift_lerp * delta)
+	_cam_drift_x = lerp(_cam_drift_x, target_drift_x, 1.0 - exp(-drift_lerp * delta))
 
 	# Target position
 	var target_pos: Vector3 = _target.global_position + flat_basis * cam_offset
@@ -135,7 +135,7 @@ func _process_follow(delta: float) -> void:
 
 	# Speed-dependent follow lerp
 	var lerp_factor: float = lerp(lerp_slow, lerp_fast, t)
-	_cam_pos = _cam_pos.lerp(target_pos, lerp_factor * delta)
+	_cam_pos = _cam_pos.lerp(target_pos, 1.0 - exp(-lerp_factor * delta))
 	global_position = _cam_pos
 
 	# Look-at
@@ -145,7 +145,7 @@ func _process_follow(delta: float) -> void:
 
 	# Speed-dependent FOV
 	var target_fov: float = fov_min + (fov_max - fov_min) * t_eased
-	_camera.fov = lerp(_camera.fov, target_fov, 5.0 * delta)
+	_camera.fov = lerp(_camera.fov, target_fov, 1.0 - exp(-5.0 * delta))
 
 
 # ── DEATH ─────────────────────────────────────────────────────────────────────
@@ -159,7 +159,7 @@ func _process_death(delta: float) -> void:
 	# Widen FOV for cinematic feel
 	var t: float = clampf(_death_elapsed / 3.0, 0.0, 1.0)
 	var target_fov: float = lerp(fov_min, fov_max, t)
-	_camera.fov = lerp(_camera.fov, target_fov, 3.0 * delta)
+	_camera.fov = lerp(_camera.fov, target_fov, 1.0 - exp(-3.0 * delta))
 
 
 # ── COUNTDOWN ─────────────────────────────────────────────────────────────────
@@ -172,7 +172,7 @@ func _process_countdown(delta: float) -> void:
 
 func _process_scoreboard(delta: float) -> void:
 	var overhead_pos: Vector3 = arena_center + Vector3(0.0, scoreboard_height, 0.0)
-	global_position = global_position.lerp(overhead_pos, 2.0 * delta)
+	global_position = global_position.lerp(overhead_pos, 1.0 - exp(-2.0 * delta))
 	_camera.look_at(arena_center, Vector3.FORWARD)
 
 

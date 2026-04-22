@@ -13,6 +13,7 @@ extends Resource
 @export var steer_slew_rate_in: float = 2.0    # /s — how fast steer ramps up (keyboard 0→1)
 @export var steer_slew_rate_out: float = 1.5   # /s — how fast steer returns to center
 @export var throttle_slew_rate: float = 2.0    # /s — throttle ramp rate
+@export var steer_visual_rate: float = 18.0    # /s — front-wheel visual angle exp-lerp rate
 
 @export_group("Steering")
 @export var steering_speed: float = 2.6                  # rad/s base yaw rate
@@ -43,6 +44,12 @@ extends Resource
 @export var drift_drag_multiplier: float = 2.6    # k_drag lerp endpoint at intensity=1.0
 @export var drift_rolling_multiplier: float = 1.45
 @export var cornering_drag_coeff: float = 0.3     # tire scrubbing: extra fwd decel proportional to |side_speed|. Independent from intensity — works at ANY slip
+
+# Optional shape curves — when null, fallback to linear multiplier=1.0 (no effect).
+# Edit via Inspector on the resource (.tres). Not hot-reloadable through dev_params.json.
+@export var cornering_drag_curve: Curve         # X=|side_speed|/10 [0..1], Y=drag multiplier [0..1.5]
+@export var drift_intent_curve: Curve           # X=speed_ratio [0..1], Y=intent multiplier [0..1]
+@export var slip_smoothing_curve: Curve         # X=_slip_ratio [0..1], Y=convergence-rate multiplier [0.2..1.5]
 
 # [deprecated — kept for rollback]
 # When BOTH are non-zero: overrides intensity-based grip with move_toward behavior (v2.1 path).

@@ -97,6 +97,9 @@ const PARAMS = {
     { key: "THROTTLE_SLEW", min: 1, max: 20, step: 0.5, unit: "/s",
       short: "Как быстро газ раскручивается до полного при нажатии W. Меньше = мягче педаль",
       detail: "Делает газ плавным — как педаль, а не тумблер.\n\nОриентиры:\n• 2: ощущение педали, плавный набор\n• 5: средне\n• 10+: почти мгновенный газ (как кнопка)\n\nМаленькое значение добавляет реализма ускорению. Большое — аркадная отзывчивость." },
+    { key: "STEER_VISUAL_RATE", min: 5, max: 40, step: 1, unit: "/s",
+      short: "Как быстро передние колёса визуально доворачиваются. Чисто косметика — на физику не влияет",
+      detail: "Это про анимацию самих передних колёс — как быстро они поворачиваются в ту сторону куда ты рулишь. Физика тут не меняется, только как выглядит.\n\nОриентиры:\n• 8: лениво, колёса медленно доворачивают — как будто руль тугой\n• 18: чётко, колёса следуют за рулём без видимой задержки (рекомендую)\n• 30+: будто на пружине, моментально щёлкают в нужную сторону\n\nЕсли картинка ощущается 'деревянной' при повороте — подними. Если колёса 'дёргаются' — опусти." },
   ],
   "Рулёжка": [
     { key: "STEERING_SPEED", min: 0.5, max: 5, step: 0.1, unit: "rad/s",
@@ -284,6 +287,10 @@ const FORMULAS = {
     return `Центр за ${fmt(s > 0 ? 1 / s : 0, 2)}s`;
   },
   "THROTTLE_SLEW": p => `Полный газ за ${fmt(safeNum(p.THROTTLE_SLEW) > 0 ? 1 / p.THROTTLE_SLEW : 0, 2)}s`,
+  "STEER_VISUAL_RATE": p => {
+    const r = safeNum(p.STEER_VISUAL_RATE);
+    return `Half-life ≈ ${fmt(r > 0 ? Math.LN2 / r : 0, 2)}s`;
+  },
   "STEERING_SPEED": p => `Тихо: ${fmt(safeNum(p.STEERING_SPEED) * safeNum(p.STEER_LOW_MULT))} │ Макс: ${fmt(safeNum(p.STEERING_SPEED) * safeNum(p.STEER_HIGH_MULT))} rad/s`,
   "STEER_LOW_MULT": p => `= ${fmt(safeNum(p.STEERING_SPEED) * safeNum(p.STEER_LOW_MULT))} rad/s на v≈0`,
   "STEER_HIGH_MULT": p => `= ${fmt(safeNum(p.STEERING_SPEED) * safeNum(p.STEER_HIGH_MULT))} rad/s на max`,
