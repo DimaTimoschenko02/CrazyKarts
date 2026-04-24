@@ -1,0 +1,121 @@
+{
+  "_comment": "3-level pyramid plateau with road (ramps) going +X from floor to top. L1 10x10 at y=1, L2 6x6 at y=2 centered, L3 2x2 at y=3 centered. Road path through Z=5 row via ramps rot=90 (ascending +X).",
+  "meta": {
+    "name": "test_multilevel",
+    "tile_size": 1.0,
+    "level_height": 0.5,
+    "origin_offset": [-6, 0, -6]
+  },
+  "rect_fills": [
+    {"_": "L1 plateau", "asset": "terrain", "x_min": 1, "z_min": 1, "x_max": 10, "z_max": 10, "y_level": 1, "rot": 0},
+    {"_": "L2 plateau", "asset": "terrain", "x_min": 3, "z_min": 3, "x_max": 8, "z_max": 8, "y_level": 2, "rot": 0},
+    {"_": "L3 plateau", "asset": "terrain", "x_min": 5, "z_min": 5, "x_max": 6, "z_max": 6, "y_level": 3, "rot": 0}
+  ],
+  "cells": [
+    {"_": "========== L1 sides (perimeter of 10x10 plateau, y_level=1) =========="},
+
+    {"_": "top border z=0 (skip nothing for L1)", "asset": "terrain_side", "x": 1, "z": 0, "y_level": 1, "rot": 0},
+    {"asset": "terrain_side", "x": 2, "z": 0, "y_level": 1, "rot": 0},
+    {"asset": "terrain_side", "x": 3, "z": 0, "y_level": 1, "rot": 0},
+    {"asset": "terrain_side", "x": 4, "z": 0, "y_level": 1, "rot": 0},
+    {"asset": "terrain_side", "x": 5, "z": 0, "y_level": 1, "rot": 0},
+    {"asset": "terrain_side", "x": 6, "z": 0, "y_level": 1, "rot": 0},
+    {"asset": "terrain_side", "x": 7, "z": 0, "y_level": 1, "rot": 0},
+    {"asset": "terrain_side", "x": 8, "z": 0, "y_level": 1, "rot": 0},
+    {"asset": "terrain_side", "x": 9, "z": 0, "y_level": 1, "rot": 0},
+    {"asset": "terrain_side", "x": 10, "z": 0, "y_level": 1, "rot": 0},
+
+    {"_": "bottom border z=11", "asset": "terrain_side", "x": 1, "z": 11, "y_level": 1, "rot": 180},
+    {"asset": "terrain_side", "x": 2, "z": 11, "y_level": 1, "rot": 180},
+    {"asset": "terrain_side", "x": 3, "z": 11, "y_level": 1, "rot": 180},
+    {"asset": "terrain_side", "x": 4, "z": 11, "y_level": 1, "rot": 180},
+    {"asset": "terrain_side", "x": 5, "z": 11, "y_level": 1, "rot": 180},
+    {"asset": "terrain_side", "x": 6, "z": 11, "y_level": 1, "rot": 180},
+    {"asset": "terrain_side", "x": 7, "z": 11, "y_level": 1, "rot": 180},
+    {"asset": "terrain_side", "x": 8, "z": 11, "y_level": 1, "rot": 180},
+    {"asset": "terrain_side", "x": 9, "z": 11, "y_level": 1, "rot": 180},
+    {"asset": "terrain_side", "x": 10, "z": 11, "y_level": 1, "rot": 180},
+
+    {"_": "left border x=0 — SKIP (0,5) for road entry ramp", "asset": "terrain_side", "x": 0, "z": 1, "y_level": 1, "rot": 90},
+    {"asset": "terrain_side", "x": 0, "z": 2, "y_level": 1, "rot": 90},
+    {"asset": "terrain_side", "x": 0, "z": 3, "y_level": 1, "rot": 90},
+    {"asset": "terrain_side", "x": 0, "z": 4, "y_level": 1, "rot": 90},
+    {"asset": "terrain_side", "x": 0, "z": 6, "y_level": 1, "rot": 90},
+    {"asset": "terrain_side", "x": 0, "z": 7, "y_level": 1, "rot": 90},
+    {"asset": "terrain_side", "x": 0, "z": 8, "y_level": 1, "rot": 90},
+    {"asset": "terrain_side", "x": 0, "z": 9, "y_level": 1, "rot": 90},
+    {"asset": "terrain_side", "x": 0, "z": 10, "y_level": 1, "rot": 90},
+
+    {"_": "right border x=11", "asset": "terrain_side", "x": 11, "z": 1, "y_level": 1, "rot": -90},
+    {"asset": "terrain_side", "x": 11, "z": 2, "y_level": 1, "rot": -90},
+    {"asset": "terrain_side", "x": 11, "z": 3, "y_level": 1, "rot": -90},
+    {"asset": "terrain_side", "x": 11, "z": 4, "y_level": 1, "rot": -90},
+    {"asset": "terrain_side", "x": 11, "z": 5, "y_level": 1, "rot": -90},
+    {"asset": "terrain_side", "x": 11, "z": 6, "y_level": 1, "rot": -90},
+    {"asset": "terrain_side", "x": 11, "z": 7, "y_level": 1, "rot": -90},
+    {"asset": "terrain_side", "x": 11, "z": 8, "y_level": 1, "rot": -90},
+    {"asset": "terrain_side", "x": 11, "z": 9, "y_level": 1, "rot": -90},
+    {"asset": "terrain_side", "x": 11, "z": 10, "y_level": 1, "rot": -90},
+
+    {"_": "L1 corners", "asset": "terrain_sideCorner", "x": 0, "z": 0, "y_level": 1, "rot": 90},
+    {"asset": "terrain_sideCorner", "x": 11, "z": 0, "y_level": 1, "rot": 0},
+    {"asset": "terrain_sideCorner", "x": 0, "z": 11, "y_level": 1, "rot": 180},
+    {"asset": "terrain_sideCorner", "x": 11, "z": 11, "y_level": 1, "rot": -90},
+
+    {"_": "========== L2 sides (perimeter of 6x6 plateau, y_level=2) =========="},
+
+    {"_": "top border z=2", "asset": "terrain_side", "x": 3, "z": 2, "y_level": 2, "rot": 0},
+    {"asset": "terrain_side", "x": 4, "z": 2, "y_level": 2, "rot": 0},
+    {"asset": "terrain_side", "x": 5, "z": 2, "y_level": 2, "rot": 0},
+    {"asset": "terrain_side", "x": 6, "z": 2, "y_level": 2, "rot": 0},
+    {"asset": "terrain_side", "x": 7, "z": 2, "y_level": 2, "rot": 0},
+    {"asset": "terrain_side", "x": 8, "z": 2, "y_level": 2, "rot": 0},
+
+    {"_": "bottom border z=9", "asset": "terrain_side", "x": 3, "z": 9, "y_level": 2, "rot": 180},
+    {"asset": "terrain_side", "x": 4, "z": 9, "y_level": 2, "rot": 180},
+    {"asset": "terrain_side", "x": 5, "z": 9, "y_level": 2, "rot": 180},
+    {"asset": "terrain_side", "x": 6, "z": 9, "y_level": 2, "rot": 180},
+    {"asset": "terrain_side", "x": 7, "z": 9, "y_level": 2, "rot": 180},
+    {"asset": "terrain_side", "x": 8, "z": 9, "y_level": 2, "rot": 180},
+
+    {"_": "left border x=2 — SKIP (2,5) for road", "asset": "terrain_side", "x": 2, "z": 3, "y_level": 2, "rot": 90},
+    {"asset": "terrain_side", "x": 2, "z": 4, "y_level": 2, "rot": 90},
+    {"asset": "terrain_side", "x": 2, "z": 6, "y_level": 2, "rot": 90},
+    {"asset": "terrain_side", "x": 2, "z": 7, "y_level": 2, "rot": 90},
+    {"asset": "terrain_side", "x": 2, "z": 8, "y_level": 2, "rot": 90},
+
+    {"_": "right border x=9", "asset": "terrain_side", "x": 9, "z": 3, "y_level": 2, "rot": -90},
+    {"asset": "terrain_side", "x": 9, "z": 4, "y_level": 2, "rot": -90},
+    {"asset": "terrain_side", "x": 9, "z": 5, "y_level": 2, "rot": -90},
+    {"asset": "terrain_side", "x": 9, "z": 6, "y_level": 2, "rot": -90},
+    {"asset": "terrain_side", "x": 9, "z": 7, "y_level": 2, "rot": -90},
+    {"asset": "terrain_side", "x": 9, "z": 8, "y_level": 2, "rot": -90},
+
+    {"_": "L2 corners", "asset": "terrain_sideCorner", "x": 2, "z": 2, "y_level": 2, "rot": 90},
+    {"asset": "terrain_sideCorner", "x": 9, "z": 2, "y_level": 2, "rot": 0},
+    {"asset": "terrain_sideCorner", "x": 2, "z": 9, "y_level": 2, "rot": 180},
+    {"asset": "terrain_sideCorner", "x": 9, "z": 9, "y_level": 2, "rot": -90},
+
+    {"_": "========== L3 sides (perimeter of 2x2 plateau, y_level=3) =========="},
+
+    {"_": "top border z=4", "asset": "terrain_side", "x": 5, "z": 4, "y_level": 3, "rot": 0},
+    {"asset": "terrain_side", "x": 6, "z": 4, "y_level": 3, "rot": 0},
+    {"_": "bottom border z=7", "asset": "terrain_side", "x": 5, "z": 7, "y_level": 3, "rot": 180},
+    {"asset": "terrain_side", "x": 6, "z": 7, "y_level": 3, "rot": 180},
+
+    {"_": "left border x=4 — SKIP (4,5) for road", "asset": "terrain_side", "x": 4, "z": 6, "y_level": 3, "rot": 90},
+
+    {"_": "right border x=7", "asset": "terrain_side", "x": 7, "z": 5, "y_level": 3, "rot": -90},
+    {"asset": "terrain_side", "x": 7, "z": 6, "y_level": 3, "rot": -90},
+
+    {"_": "L3 corners", "asset": "terrain_sideCorner", "x": 4, "z": 4, "y_level": 3, "rot": 90},
+    {"asset": "terrain_sideCorner", "x": 7, "z": 4, "y_level": 3, "rot": 0},
+    {"asset": "terrain_sideCorner", "x": 4, "z": 7, "y_level": 3, "rot": 180},
+    {"asset": "terrain_sideCorner", "x": 7, "z": 7, "y_level": 3, "rot": -90},
+
+    {"_": "========== Road: 3 ramps ascending in +X =========="},
+    {"_": "Floor -> L1", "asset": "terrain_ramp", "x": 0, "z": 5, "y_level": 1, "rot": 90},
+    {"_": "L1 -> L2 (replaces L2 side at (2,5))", "asset": "terrain_ramp", "x": 2, "z": 5, "y_level": 2, "rot": 90},
+    {"_": "L2 -> L3 (replaces L3 side at (4,5))", "asset": "terrain_ramp", "x": 4, "z": 5, "y_level": 3, "rot": 90}
+  ]
+}

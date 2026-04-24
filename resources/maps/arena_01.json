@@ -1,0 +1,46 @@
+{
+  "_comment": "Kenney-style arena: cross-shape outline (main plate 20x20 with 4 wing extensions), 4 mesas in corners (level 2), central pit 8x8 (level 0), decorative peak 2x2 (level 3) rising from pit. 4 ramps into pit, 4 ramps onto mesas. Auto-sides wrap every cliff edge. Rocks scattered on plateau.",
+  "meta": {
+    "name": "arena_01",
+    "tile_size": 1.0,
+    "level_height": 0.5,
+    "asset_scale": 1.0,
+    "origin_offset": [-14, 0, -14]
+  },
+  "rect_fills": [
+    {"_": "Main plate (level 1)", "asset": "terrain", "x_min": 4, "z_min": 4, "x_max": 23, "z_max": 23, "y_level": 1, "rot": 0},
+    {"_": "North wing", "asset": "terrain", "x_min": 10, "z_min": 0, "x_max": 13, "z_max": 3, "y_level": 1, "rot": 0},
+    {"_": "South wing", "asset": "terrain", "x_min": 10, "z_min": 24, "x_max": 13, "z_max": 27, "y_level": 1, "rot": 0},
+    {"_": "West wing", "asset": "terrain", "x_min": 0, "z_min": 10, "x_max": 3, "z_max": 13, "y_level": 1, "rot": 0},
+    {"_": "East wing", "asset": "terrain", "x_min": 24, "z_min": 10, "x_max": 27, "z_max": 13, "y_level": 1, "rot": 0},
+
+    {"_": "NW mesa (level 2)", "asset": "terrain", "x_min": 4, "z_min": 4, "x_max": 7, "z_max": 7, "y_level": 2, "rot": 0},
+    {"_": "NE mesa (level 2)", "asset": "terrain", "x_min": 20, "z_min": 4, "x_max": 23, "z_max": 7, "y_level": 2, "rot": 0},
+    {"_": "SW mesa (level 2)", "asset": "terrain", "x_min": 4, "z_min": 20, "x_max": 7, "z_max": 23, "y_level": 2, "rot": 0},
+    {"_": "SE mesa (level 2)", "asset": "terrain", "x_min": 20, "z_min": 20, "x_max": 23, "z_max": 23, "y_level": 2, "rot": 0},
+
+    {"_": "Central pit (level 0)", "asset": "terrain", "x_min": 10, "z_min": 10, "x_max": 17, "z_max": 17, "y_level": 0, "rot": 0},
+
+    {"_": "Peak (level 3) in pit", "asset": "terrain", "x_min": 13, "z_min": 13, "x_max": 14, "z_max": 14, "y_level": 3, "rot": 0}
+  ],
+  "individual": [
+    {"_": "Pit ramp W", "asset": "terrain_ramp", "x": 9, "z": 13, "y_level": 0, "rot": 0},
+    {"_": "Pit ramp E", "asset": "terrain_ramp", "x": 18, "z": 13, "y_level": 0, "rot": 180},
+    {"_": "Pit ramp N", "asset": "terrain_ramp", "x": 13, "z": 9, "y_level": 0, "rot": 90},
+    {"_": "Pit ramp S", "asset": "terrain_ramp", "x": 13, "z": 18, "y_level": 0, "rot": -90},
+
+    {"_": "NW mesa ramp (east side)", "asset": "terrain_ramp", "x": 8, "z": 5, "y_level": 1, "rot": 180},
+    {"_": "NE mesa ramp (west side)", "asset": "terrain_ramp", "x": 19, "z": 5, "y_level": 1, "rot": 0},
+    {"_": "SW mesa ramp (east side)", "asset": "terrain_ramp", "x": 8, "z": 22, "y_level": 1, "rot": 180},
+    {"_": "SE mesa ramp (west side)", "asset": "terrain_ramp", "x": 19, "z": 22, "y_level": 1, "rot": 0}
+  ],
+  "props": [
+    {"_": "Rock on NW mesa", "asset": "rock_largeA", "x": 5, "z": 6, "y_level": 2, "rot": 0, "scale": 0.8},
+    {"_": "Rock on NE mesa", "asset": "rock_largeB", "x": 22, "z": 6, "y_level": 2, "rot": 45, "scale": 0.7},
+    {"_": "Rock crystals on SW mesa", "asset": "rock_crystals", "x": 5, "z": 22, "y_level": 2, "rot": 0, "scale": 0.9},
+    {"_": "Rock on SE mesa", "asset": "rock_largeA", "x": 22, "z": 22, "y_level": 2, "rot": 120, "scale": 0.7},
+    {"_": "Scatter rock on plateau N", "asset": "rocks_smallA", "x": 6, "z": 13, "y_level": 1, "rot": 30, "scale": 1.0},
+    {"_": "Scatter rock on plateau S", "asset": "rocks_smallB", "x": 21, "z": 13, "y_level": 1, "rot": 200, "scale": 1.0},
+    {"_": "Rocket on peak", "asset": "rocket_baseA", "x": 13.5, "z": 13.5, "y_level": 3, "rot": 0, "scale": 0.5}
+  ]
+}

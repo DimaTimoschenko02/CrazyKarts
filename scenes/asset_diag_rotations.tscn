@@ -1,0 +1,140 @@
+[gd_scene format=3 uid="uid://diagrots01"]
+
+[ext_resource type="PackedScene" path="res://assets/map_materials/space-kit/terrain_side.glb" id="1_side"]
+[ext_resource type="PackedScene" path="res://assets/map_materials/space-kit/terrain.glb" id="2_terrain"]
+
+[sub_resource type="ProceduralSkyMaterial" id="Sky1"]
+sky_top_color = Color(0.38, 0.45, 0.55, 1)
+sky_horizon_color = Color(0.55, 0.6, 0.68, 1)
+ground_bottom_color = Color(0.15, 0.17, 0.2, 1)
+ground_horizon_color = Color(0.55, 0.6, 0.68, 1)
+
+[sub_resource type="Sky" id="Sky2"]
+sky_material = SubResource("Sky1")
+
+[sub_resource type="Environment" id="Env1"]
+background_mode = 2
+sky = SubResource("Sky2")
+ambient_light_source = 2
+ambient_light_color = Color(0.62, 0.64, 0.7, 1)
+ambient_light_energy = 0.5
+
+[sub_resource type="SphereMesh" id="MarkerMesh"]
+radius = 0.1
+height = 0.2
+radial_segments = 12
+rings = 6
+
+[sub_resource type="StandardMaterial3D" id="MarkerMat"]
+albedo_color = Color(1, 0.1, 0.1, 1)
+shading_mode = 0
+
+[node name="DiagRotations" type="Node3D"]
+
+[node name="Light" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.433, 0.25, 0, 0.5, 0.866, -0.5, -0.75, 0.433, 0, 10, 0)
+light_energy = 1.15
+shadow_enabled = true
+
+[node name="Env" type="WorldEnvironment" parent="."]
+environment = SubResource("Env1")
+
+[node name="RefTerrain" parent="." instance=ExtResource("2_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="RefTerrainLbl" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+pixel_size = 0.005
+text = "REF: terrain (0,0,0)"
+billboard = 1
+font_size = 28
+outline_size = 3
+modulate = Color(0.8, 1, 0.8, 1)
+
+[node name="Side_rot0" parent="." instance=ExtResource("1_side")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.5, 0)
+
+[node name="Side_rot0_Marker" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.5, 0)
+mesh = SubResource("MarkerMesh")
+material_override = SubResource("MarkerMat")
+
+[node name="Side_rot0_Lbl" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.6, 0)
+pixel_size = 0.005
+text = "side rot=0 @ (3, 0.5, 0)"
+billboard = 1
+font_size = 28
+outline_size = 3
+modulate = Color(1, 1, 0.5, 1)
+
+[node name="Side_rot90" parent="." instance=ExtResource("1_side")]
+transform = Transform3D(-4.371e-08, 0, 1, 0, 1, 0, -1, 0, -4.371e-08, 6, 0.5, 0)
+
+[node name="Side_rot90_Marker" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.5, 0)
+mesh = SubResource("MarkerMesh")
+material_override = SubResource("MarkerMat")
+
+[node name="Side_rot90_Lbl" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.6, 0)
+pixel_size = 0.005
+text = "side rot=90 @ (6, 0.5, 0)"
+billboard = 1
+font_size = 28
+outline_size = 3
+modulate = Color(1, 0.7, 1, 1)
+
+[node name="Side_rot180" parent="." instance=ExtResource("1_side")]
+transform = Transform3D(-1, 0, -8.742e-08, 0, 1, 0, 8.742e-08, 0, -1, 9, 0.5, 0)
+
+[node name="Side_rot180_Marker" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0.5, 0)
+mesh = SubResource("MarkerMesh")
+material_override = SubResource("MarkerMat")
+
+[node name="Side_rot180_Lbl" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1.6, 0)
+pixel_size = 0.005
+text = "side rot=180 @ (9, 0.5, 0)"
+billboard = 1
+font_size = 28
+outline_size = 3
+modulate = Color(0.5, 1, 1, 1)
+
+[node name="Side_rotNeg90" parent="." instance=ExtResource("1_side")]
+transform = Transform3D(-4.371e-08, 0, -1, 0, 1, 0, 1, 0, -4.371e-08, 12, 0.5, 0)
+
+[node name="Side_rotNeg90_Marker" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0.5, 0)
+mesh = SubResource("MarkerMesh")
+material_override = SubResource("MarkerMat")
+
+[node name="Side_rotNeg90_Lbl" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1.6, 0)
+pixel_size = 0.005
+text = "side rot=-90 @ (12, 0.5, 0)"
+billboard = 1
+font_size = 28
+outline_size = 3
+modulate = Color(1, 0.5, 0.5, 1)
+
+[node name="InfoLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 3, 0)
+pixel_size = 0.01
+text = "RED DOTS = cell center (where asset SHOULD be)
+SEE how far asset SHIFTS from dot at each rotation"
+modulate = Color(1, 1, 0.5, 1)
+billboard = 1
+font_size = 36
+outline_size = 5
+
+[node name="CamIso" type="Camera3D" parent="."]
+transform = Transform3D(0.866, -0.25, 0.433, 0, 0.866, 0.5, -0.5, -0.433, 0.75, 6, 8, 12)
+fov = 50
+current = true
+
+[node name="CamTop" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.0001, 1, 0, -1, 0.0001, 6, 15, 0)
+projection = 1
+size = 18

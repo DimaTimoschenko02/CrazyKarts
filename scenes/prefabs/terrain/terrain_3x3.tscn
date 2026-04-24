@@ -1,0 +1,39 @@
+[gd_scene load_steps=3 format=3 uid="uid://prefab_terrain_3x3_01"]
+
+[ext_resource type="PackedScene" uid="uid://beuvy8htkblvi" path="res://assets/map_materials/space-kit/terrain.glb" id="1_terrain"]
+
+[sub_resource type="BoxShape3D" id="Box"]
+size = Vector3(3, 0.5, 3)
+
+[node name="terrain_3x3" type="StaticBody3D"]
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
+shape = SubResource("Box")
+
+[node name="T_0_0" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, -1)
+
+[node name="T_1_0" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1)
+
+[node name="T_2_0" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, -1)
+
+[node name="T_0_1" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 0)
+
+[node name="T_1_1" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="T_2_1" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0)
+
+[node name="T_0_2" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 1)
+
+[node name="T_1_2" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
+
+[node name="T_2_2" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1)

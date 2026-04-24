@@ -1,0 +1,70 @@
+[gd_scene format=3 uid="uid://00topl88lxjt"]
+
+[ext_resource type="Script" uid="uid://c3jbgdqmiqn25" path="res://scripts/game_world.gd" id="1_gw"]
+[ext_resource type="Script" uid="uid://bcfs2rp7x2i3l" path="res://scripts/spawn_manager.gd" id="2_sm"]
+[ext_resource type="Script" uid="uid://tqn806ruiaen" path="res://scripts/hud.gd" id="4_hud"]
+
+[node name="Game" type="Node3D" unique_id=1919039921]
+script = ExtResource("1_gw")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=2099358710]
+transform = Transform3D(0.866025, -0.25, 0.433013, 0, 0.866025, 0.5, -0.5, -0.433013, 0.75, 0, 10, 0)
+light_energy = 1.2
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1319313516]
+
+[node name="Karts" type="Node3D" parent="." unique_id=1293099135]
+
+[node name="Projectiles" type="Node3D" parent="." unique_id=501664596]
+
+[node name="SpawnManager" type="Node" parent="." unique_id=976514369]
+script = ExtResource("2_sm")
+
+[node name="Arena" type="Node3D" parent="." unique_id=1536703726]
+
+[node name="SpawnPoints" type="Node3D" parent="Arena" unique_id=342353772]
+
+[node name="SpawnPoint1" type="Marker3D" parent="Arena/SpawnPoints" unique_id=1153492074 groups=["kart_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1, -6)
+
+[node name="SpawnPoint2" type="Marker3D" parent="Arena/SpawnPoints" unique_id=615235445 groups=["kart_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, -6)
+
+[node name="SpawnPoint3" type="Marker3D" parent="Arena/SpawnPoints" unique_id=1181432098 groups=["kart_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1, 6)
+
+[node name="SpawnPoint4" type="Marker3D" parent="Arena/SpawnPoints" unique_id=1562691799 groups=["kart_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, 6)
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=173251548]
+script = ExtResource("4_hud")
+
+[node name="ScorePanel" type="PanelContainer" parent="HUD" unique_id=1194993762]
+offset_right = 200.0
+offset_bottom = 100.0
+
+[node name="MarginContainer" type="MarginContainer" parent="HUD/ScorePanel" unique_id=801401628]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="HUD/ScorePanel/MarginContainer" unique_id=1079329309]
+layout_mode = 2
+
+[node name="HPBar" type="ProgressBar" parent="HUD" unique_id=6166937]
+offset_left = 10.0
+offset_top = 110.0
+offset_right = 210.0
+offset_bottom = 130.0
+value = 100.0
+
+[node name="WeaponLabel" type="Label" parent="HUD" unique_id=1583245596]
+offset_left = 10.0
+offset_top = 140.0
+offset_right = 210.0
+offset_bottom = 170.0
+
+[node name="KillFeed" type="VBoxContainer" parent="HUD" unique_id=723466094]
+offset_left = 220.0
+offset_top = 10.0
+offset_right = 600.0
+offset_bottom = 200.0

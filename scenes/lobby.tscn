@@ -10,6 +10,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_lobby")
+game_scene = "uid://00topl88lxjt"
 
 [node name="BG" type="ColorRect" parent="." unique_id=67336484]
 layout_mode = 0

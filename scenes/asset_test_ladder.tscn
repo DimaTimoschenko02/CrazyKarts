@@ -1,0 +1,118 @@
+[gd_scene format=3 uid="uid://fcx8l0i7eou4"]
+
+[ext_resource type="PackedScene" path="res://assets/map_materials/space-kit/terrain.glb" id="1_terrain"]
+[ext_resource type="PackedScene" path="res://assets/map_materials/space-kit/terrain_ramp.glb" id="2_ramp"]
+[ext_resource type="PackedScene" path="res://assets/map_materials/space-kit/terrain_side.glb" id="3_side"]
+
+[sub_resource type="ProceduralSkyMaterial" id="Sky1"]
+sky_top_color = Color(0.38, 0.45, 0.55, 1)
+sky_horizon_color = Color(0.55, 0.6, 0.68, 1)
+ground_bottom_color = Color(0.15, 0.17, 0.2, 1)
+ground_horizon_color = Color(0.55, 0.6, 0.68, 1)
+
+[sub_resource type="Sky" id="Sky2"]
+sky_material = SubResource("Sky1")
+
+[sub_resource type="Environment" id="Env1"]
+background_mode = 2
+sky = SubResource("Sky2")
+ambient_light_source = 2
+ambient_light_color = Color(0.62, 0.64, 0.7, 1)
+ambient_light_energy = 0.5
+
+[node name="LadderTest" type="Node3D"]
+
+[node name="Light" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.433, 0.25, 0, 0.5, 0.866, -0.5, -0.75, 0.433, 0, 8, 0)
+light_energy = 1.15
+shadow_enabled = true
+
+[node name="Env" type="WorldEnvironment" parent="."]
+environment = SubResource("Env1")
+
+[node name="Cell0_Terrain_y0" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="Cell0_Label" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+pixel_size = 0.005
+text = "0: terrain y=0"
+billboard = 1
+font_size = 28
+outline_size = 3
+modulate = Color(0.8, 1, 0.8, 1)
+
+[node name="Cell1_Ramp_y0_rot0" parent="." instance=ExtResource("2_ramp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0)
+
+[node name="Cell1_Label" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1.2, 0)
+pixel_size = 0.005
+text = "1: ramp y=0 rot=0"
+billboard = 1
+font_size = 28
+outline_size = 3
+modulate = Color(1, 0.95, 0.6, 1)
+
+[node name="Cell2_Terrain_y05" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.5, 0)
+
+[node name="Cell2_Label" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1.7, 0)
+pixel_size = 0.005
+text = "2: terrain y=0.5"
+billboard = 1
+font_size = 28
+outline_size = 3
+modulate = Color(0.8, 1, 0.8, 1)
+
+[node name="Cell3_Side_y05_rot0" parent="." instance=ExtResource("3_side")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.5, 0)
+
+[node name="Cell3_Label" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.7, 0)
+pixel_size = 0.005
+text = "3: side y=0.5 rot=0"
+billboard = 1
+font_size = 28
+outline_size = 3
+modulate = Color(1, 0.6, 0.6, 1)
+
+[node name="Cell4_Terrain_y0" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 0)
+
+[node name="Cell4_Label" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1.2, 0)
+pixel_size = 0.005
+text = "4: terrain y=0"
+billboard = 1
+font_size = 28
+outline_size = 3
+modulate = Color(0.8, 1, 0.8, 1)
+
+[node name="LegendLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 2.5, 0)
+pixel_size = 0.008
+text = "GREEN=plate  YELLOW=ramp  RED=side"
+billboard = 1
+font_size = 36
+outline_size = 5
+modulate = Color(1, 1, 0.4, 1)
+
+[node name="XAxisLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, -0.3, -1)
+pixel_size = 0.006
+text = "+X = direction of ladder (cells 0..4)"
+billboard = 1
+font_size = 24
+outline_size = 3
+modulate = Color(0.9, 0.9, 0.9, 1)
+
+[node name="CamSide" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.5, 6)
+fov = 35
+
+[node name="CamIso" type="Camera3D" parent="."]
+transform = Transform3D(0.707, -0.29, 0.645, 0, 0.912, 0.41, -0.707, -0.29, 0.645, 8, 5, 5)
+fov = 45
+current = true

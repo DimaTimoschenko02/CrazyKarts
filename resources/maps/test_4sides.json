@@ -1,0 +1,17 @@
+{
+  "_comment": "Isolation test — 4 terrain_side at (X=2, Z=2,5,8,11) with rotations 0, 90, 180, -90. Plus reference terrain at origin. All on y_level=1 so sides should sit at same height. Goal: see if all 4 rotations work equivalently.",
+  "meta": {
+    "name": "test_4sides",
+    "tile_size": 1.0,
+    "level_height": 0.5,
+    "origin_offset": [0, 0, 0]
+  },
+  "cells": [
+    {"_": "reference terrain at (0, 0) y=1", "asset": "terrain", "x": 0, "z": 0, "y_level": 1, "rot": 0},
+
+    {"_": "side rot=0  at (2, 2) — slope toward +X", "asset": "terrain_side", "x": 2, "z": 2, "y_level": 1, "rot": 0},
+    {"_": "side rot=90 at (2, 5) — slope toward -Z", "asset": "terrain_side", "x": 2, "z": 5, "y_level": 1, "rot": 90},
+    {"_": "side rot=180 at (2, 8) — slope toward -X", "asset": "terrain_side", "x": 2, "z": 8, "y_level": 1, "rot": 180},
+    {"_": "side rot=-90 at (2, 11) — slope toward +Z", "asset": "terrain_side", "x": 2, "z": 11, "y_level": 1, "rot": -90}
+  ]
+}

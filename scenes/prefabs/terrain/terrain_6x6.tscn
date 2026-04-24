@@ -1,0 +1,120 @@
+[gd_scene load_steps=3 format=3 uid="uid://prefab_terrain_6x6_01"]
+
+[ext_resource type="PackedScene" uid="uid://beuvy8htkblvi" path="res://assets/map_materials/space-kit/terrain.glb" id="1_terrain"]
+
+[sub_resource type="BoxShape3D" id="Box"]
+size = Vector3(6, 0.5, 6)
+
+[node name="terrain_6x6" type="StaticBody3D"]
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
+shape = SubResource("Box")
+
+[node name="T_0_0" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -2.5)
+
+[node name="T_1_0" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -2.5)
+
+[node name="T_2_0" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -2.5)
+
+[node name="T_3_0" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -2.5)
+
+[node name="T_4_0" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -2.5)
+
+[node name="T_5_0" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -2.5)
+
+[node name="T_0_1" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -1.5)
+
+[node name="T_1_1" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -1.5)
+
+[node name="T_2_1" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -1.5)
+
+[node name="T_3_1" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -1.5)
+
+[node name="T_4_1" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -1.5)
+
+[node name="T_5_1" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -1.5)
+
+[node name="T_0_2" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -0.5)
+
+[node name="T_1_2" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -0.5)
+
+[node name="T_2_2" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -0.5)
+
+[node name="T_3_2" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -0.5)
+
+[node name="T_4_2" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -0.5)
+
+[node name="T_5_2" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -0.5)
+
+[node name="T_0_3" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, 0.5)
+
+[node name="T_1_3" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 0.5)
+
+[node name="T_2_3" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 0.5)
+
+[node name="T_3_3" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 0.5)
+
+[node name="T_4_3" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 0.5)
+
+[node name="T_5_3" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, 0.5)
+
+[node name="T_0_4" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, 1.5)
+
+[node name="T_1_4" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 1.5)
+
+[node name="T_2_4" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 1.5)
+
+[node name="T_3_4" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 1.5)
+
+[node name="T_4_4" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 1.5)
+
+[node name="T_5_4" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, 1.5)
+
+[node name="T_0_5" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, 2.5)
+
+[node name="T_1_5" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 2.5)
+
+[node name="T_2_5" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 2.5)
+
+[node name="T_3_5" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 2.5)
+
+[node name="T_4_5" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 2.5)
+
+[node name="T_5_5" parent="." instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, 2.5)

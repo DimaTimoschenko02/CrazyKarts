@@ -1,5 +1,7 @@
 extends Control
 
+@export_file("*.tscn") var game_scene: String = "res://scenes/game.tscn"
+
 @onready var name_input:   LineEdit = $VBox/NameRow/NameInput
 @onready var ip_input:     LineEdit = $VBox/JoinRow/IPInput
 @onready var status_label: Label    = $VBox/StatusLabel
@@ -93,11 +95,11 @@ func _on_join_pressed() -> void:
 
 func _on_server_created() -> void:
 	status_label.text = "Server ready – loading game…"
-	get_tree().change_scene_to_file("res://scenes/game.tscn")
+	get_tree().change_scene_to_file(game_scene)
 
 func _on_joined_server() -> void:
 	status_label.text = "Connected! Loading game…"
-	get_tree().change_scene_to_file("res://scenes/game.tscn")
+	get_tree().change_scene_to_file(game_scene)
 
 func _on_connection_failed() -> void:
 	status_label.text = "Connection failed. Check IP and try again."

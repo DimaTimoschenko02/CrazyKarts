@@ -1,0 +1,43 @@
+{
+  "_comment": "4x4 plateau on y_level=1 with terrain_side ramps around perimeter. Rot semantics (verified via mesh vertex inspection after recenter_on_import.gd): rot=0→slope toward -Z, rot=90→-X, rot=180→+Z, rot=-90→+X. Each border side points slope outward from plateau.",
+  "meta": {
+    "name": "test_plateau",
+    "tile_size": 1.0,
+    "level_height": 0.5,
+    "origin_offset": [-2.5, 0, -2.5]
+  },
+  "rect_fills": [
+    {"_": "4x4 plateau on y=1", "asset": "terrain", "x_min": 1, "z_min": 1, "x_max": 4, "z_max": 4, "y_level": 1, "rot": 0}
+  ],
+  "cells": [
+    {"_": "top border z=0, rot=0 slope toward -Z (outward, away from plateau)", "asset": "terrain_side", "x": 1, "z": 0, "y_level": 1, "rot": 0},
+    {"asset": "terrain_side", "x": 2, "z": 0, "y_level": 1, "rot": 0},
+    {"asset": "terrain_side", "x": 3, "z": 0, "y_level": 1, "rot": 0},
+    {"asset": "terrain_side", "x": 4, "z": 0, "y_level": 1, "rot": 0},
+
+    {"_": "bottom border z=5, rot=180 slope toward +Z (outward)", "asset": "terrain_side", "x": 1, "z": 5, "y_level": 1, "rot": 180},
+    {"asset": "terrain_side", "x": 2, "z": 5, "y_level": 1, "rot": 180},
+    {"asset": "terrain_side", "x": 3, "z": 5, "y_level": 1, "rot": 180},
+    {"asset": "terrain_side", "x": 4, "z": 5, "y_level": 1, "rot": 180},
+
+    {"_": "left border x=0, rot=90 slope toward -X (outward)", "asset": "terrain_side", "x": 0, "z": 1, "y_level": 1, "rot": 90},
+    {"asset": "terrain_side", "x": 0, "z": 2, "y_level": 1, "rot": 90},
+    {"asset": "terrain_side", "x": 0, "z": 3, "y_level": 1, "rot": 90},
+    {"asset": "terrain_side", "x": 0, "z": 4, "y_level": 1, "rot": 90},
+
+    {"_": "right border x=5, rot=-90 slope toward +X (outward)", "asset": "terrain_side", "x": 5, "z": 1, "y_level": 1, "rot": -90},
+    {"asset": "terrain_side", "x": 5, "z": 2, "y_level": 1, "rot": -90},
+    {"asset": "terrain_side", "x": 5, "z": 3, "y_level": 1, "rot": -90},
+    {"asset": "terrain_side", "x": 5, "z": 4, "y_level": 1, "rot": -90},
+
+    {"_": "4 outer corners. rot chosen so high corner points toward plateau.", "asset": "terrain_sideCorner", "x": 0, "z": 0, "y_level": 1, "rot": 90},
+    {"_": "TR (plateau in -X,+Z)", "asset": "terrain_sideCorner", "x": 5, "z": 0, "y_level": 1, "rot": 0},
+    {"_": "BL (plateau in +X,-Z)", "asset": "terrain_sideCorner", "x": 0, "z": 5, "y_level": 1, "rot": 180},
+    {"_": "BR (plateau in -X,-Z)", "asset": "terrain_sideCorner", "x": 5, "z": 5, "y_level": 1, "rot": -90}
+  ],
+  "props": [
+    {"_": "big rock on plateau", "asset": "rock_largeA", "x": 3, "z": 2, "y_level": 1, "rot": 0, "scale": 1.0},
+    {"_": "small rocks pile 1", "asset": "rocks_smallA", "x": 1.5, "z": 4, "y_level": 1, "rot": 30, "scale": 1.0},
+    {"_": "small rocks pile 2", "asset": "rocks_smallB", "x": 4.3, "z": 3.5, "y_level": 1, "rot": -45, "scale": 1.0}
+  ]
+}

@@ -1,0 +1,352 @@
+[gd_scene format=3 uid="uid://ssetdiag01"]
+
+[ext_resource type="PackedScene" uid="uid://beuvy8htkblvi" path="res://assets/map_materials/space-kit/terrain.glb" id="1_terrain"]
+[ext_resource type="PackedScene" uid="uid://co570so21b6hx" path="res://assets/map_materials/space-kit/terrain_ramp.glb" id="2_ramp"]
+[ext_resource type="PackedScene" uid="uid://bvne3sunaeiog" path="res://assets/map_materials/space-kit/terrain_rampLarge.glb" id="3_rampLarge"]
+[ext_resource type="PackedScene" uid="uid://uawlrhw7kv0a" path="res://assets/map_materials/space-kit/terrain_rampLarge_detailed.glb" id="4_rampLargeDetailed"]
+[ext_resource type="PackedScene" uid="uid://bs51y7min8y" path="res://assets/map_materials/space-kit/terrain_side.glb" id="5_side"]
+[ext_resource type="PackedScene" uid="uid://re8cudsspfs8" path="res://assets/map_materials/space-kit/terrain_sideCliff.glb" id="6_sideCliff"]
+[ext_resource type="PackedScene" uid="uid://bha8781pvn5se" path="res://assets/map_materials/space-kit/terrain_sideCorner.glb" id="7_sideCorner"]
+[ext_resource type="PackedScene" uid="uid://h6siwecrs514" path="res://assets/map_materials/space-kit/terrain_sideCornerInner.glb" id="8_sideCornerInner"]
+[ext_resource type="PackedScene" uid="uid://n3jno6dcs5jb" path="res://assets/map_materials/space-kit/terrain_sideEnd.glb" id="9_sideEnd"]
+[ext_resource type="PackedScene" uid="uid://d6it5udyotqw" path="res://assets/map_materials/space-kit/terrain_roadStraight.glb" id="10_roadStraight"]
+[ext_resource type="PackedScene" uid="uid://cqr8ycdgnad4u" path="res://assets/map_materials/space-kit/terrain_roadCorner.glb" id="11_roadCorner"]
+[ext_resource type="PackedScene" uid="uid://cecgj5pucr4nx" path="res://assets/map_materials/space-kit/terrain_roadCross.glb" id="12_roadCross"]
+[ext_resource type="PackedScene" uid="uid://bgmr6auo6uk4v" path="res://assets/map_materials/space-kit/terrain_roadEnd.glb" id="13_roadEnd"]
+[ext_resource type="PackedScene" uid="uid://dy4kei5qpysg5" path="res://assets/map_materials/space-kit/terrain_roadSplit.glb" id="14_roadSplit"]
+[ext_resource type="PackedScene" uid="uid://prefab_terrain_2x2_01" path="res://scenes/prefabs/terrain/terrain_2x2.tscn" id="15_pf2"]
+[ext_resource type="PackedScene" uid="uid://prefab_terrain_3x3_01" path="res://scenes/prefabs/terrain/terrain_3x3.tscn" id="16_pf3"]
+[ext_resource type="PackedScene" uid="uid://prefab_terrain_4x4_01" path="res://scenes/prefabs/terrain/terrain_4x4.tscn" id="17_pf4"]
+[ext_resource type="PackedScene" uid="uid://prefab_terrain_5x5_01" path="res://scenes/prefabs/terrain/terrain_5x5.tscn" id="18_pf5"]
+[ext_resource type="PackedScene" uid="uid://prefab_terrain_6x6_01" path="res://scenes/prefabs/terrain/terrain_6x6.tscn" id="19_pf6"]
+
+[sub_resource type="ProceduralSkyMaterial" id="Sky1"]
+sky_top_color = Color(0.38, 0.45, 0.55, 1)
+sky_horizon_color = Color(0.55, 0.6, 0.68, 1)
+ground_bottom_color = Color(0.15, 0.17, 0.2, 1)
+ground_horizon_color = Color(0.55, 0.6, 0.68, 1)
+
+[sub_resource type="Sky" id="Sky2"]
+sky_material = SubResource("Sky1")
+
+[sub_resource type="Environment" id="Env1"]
+background_mode = 2
+sky = SubResource("Sky2")
+ambient_light_source = 2
+ambient_light_color = Color(0.6, 0.62, 0.68, 1)
+ambient_light_energy = 0.5
+
+[node name="AssetDiag" type="Node3D" unique_id=644766124]
+
+[node name="Light" type="DirectionalLight3D" parent="." unique_id=1005440053]
+transform = Transform3D(0.866, -0.433, 0.25, 0, 0.5, 0.866, -0.5, -0.75, 0.433, 0, 8, 0)
+light_energy = 1.1
+shadow_enabled = true
+
+[node name="Env" type="WorldEnvironment" parent="." unique_id=333058891]
+environment = SubResource("Env1")
+
+[node name="Grid" type="MeshInstance3D" parent="." unique_id=182939799]
+transform = Transform3D(30, 0, 0, 0, 1, 0, 0, 0, 30, 0, -0.01, 8)
+
+[node name="Row0_Plates_Label" type="Label3D" parent="." unique_id=1455514760]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 2, 0)
+pixel_size = 0.01
+billboard = 1
+modulate = Color(1, 1, 0.3, 1)
+text = "PLATES + RAMPS"
+font_size = 48
+outline_size = 6
+
+[node name="Terrain" parent="." unique_id=375865444 instance=ExtResource("1_terrain")]
+
+[node name="Terrain" parent="Terrain" unique_id=1295641970 instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.828665, 0, 4.0826607)
+
+[node name="TerrainLbl" type="Label3D" parent="." unique_id=434792485]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+pixel_size = 0.006
+billboard = 1
+text = "terrain"
+outline_size = 4
+
+[node name="Ramp" parent="." unique_id=1229531529 instance=ExtResource("2_ramp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 0)
+
+[node name="RampLbl" type="Label3D" parent="." unique_id=598581945]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.2, 0)
+pixel_size = 0.006
+billboard = 1
+text = "terrain_ramp"
+outline_size = 4
+
+[node name="RampLarge" parent="." unique_id=1242735682 instance=ExtResource("3_rampLarge")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 0)
+
+[node name="RampLargeLbl" type="Label3D" parent="." unique_id=1557900640]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.2, 0)
+pixel_size = 0.006
+billboard = 1
+text = "terrain_rampLarge"
+outline_size = 4
+
+[node name="RampLargeDet" parent="." unique_id=1175261097 instance=ExtResource("4_rampLargeDetailed")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0, 0)
+
+[node name="RampLargeDetLbl" type="Label3D" parent="." unique_id=1622190945]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1.2, 0)
+pixel_size = 0.006
+billboard = 1
+text = "terrain_rampLarge_detailed"
+outline_size = 4
+
+[node name="Row1_Sides_Label" type="Label3D" parent="." unique_id=389080120]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 2, 4)
+pixel_size = 0.01
+billboard = 1
+modulate = Color(1, 1, 0.3, 1)
+text = "SIDES"
+font_size = 48
+outline_size = 6
+
+[node name="Side" parent="." unique_id=1358297748 instance=ExtResource("5_side")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.828665, 0, 3.0826607)
+
+[node name="SideLbl" type="Label3D" parent="." unique_id=513150520]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 4)
+pixel_size = 0.006
+billboard = 1
+text = "terrain_side"
+outline_size = 4
+
+[node name="SideCliff" parent="." unique_id=536169493 instance=ExtResource("6_sideCliff")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 4)
+
+[node name="SideCliffLbl" type="Label3D" parent="." unique_id=1582692003]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.2, 4)
+pixel_size = 0.006
+billboard = 1
+text = "terrain_sideCliff"
+outline_size = 4
+
+[node name="SideCorner" parent="." unique_id=1323322897 instance=ExtResource("7_sideCorner")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 4)
+
+[node name="SideCornerLbl" type="Label3D" parent="." unique_id=990040311]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.2, 4)
+pixel_size = 0.006
+billboard = 1
+text = "terrain_sideCorner"
+outline_size = 4
+
+[node name="SideCornerInner" parent="." unique_id=399462250 instance=ExtResource("8_sideCornerInner")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0, 4)
+
+[node name="SideCornerInnerLbl" type="Label3D" parent="." unique_id=380556612]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1.2, 4)
+pixel_size = 0.006
+billboard = 1
+text = "terrain_sideCornerInner"
+outline_size = 4
+
+[node name="SideEnd" parent="." unique_id=769941774 instance=ExtResource("9_sideEnd")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 4)
+
+[node name="SideEndLbl" type="Label3D" parent="." unique_id=1690686809]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1.2, 4)
+pixel_size = 0.006
+billboard = 1
+text = "terrain_sideEnd"
+outline_size = 4
+
+[node name="Row2_Roads_Label" type="Label3D" parent="." unique_id=824630102]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 2, 8)
+pixel_size = 0.01
+billboard = 1
+modulate = Color(1, 1, 0.3, 1)
+text = "ROADS (terrain with road texture)"
+font_size = 48
+outline_size = 6
+
+[node name="RoadStraight" parent="." unique_id=1396015795 instance=ExtResource("10_roadStraight")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
+
+[node name="RoadStraightLbl" type="Label3D" parent="." unique_id=611464837]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 8)
+pixel_size = 0.006
+billboard = 1
+text = "terrain_roadStraight"
+outline_size = 4
+
+[node name="RoadCorner" parent="." unique_id=1950299319 instance=ExtResource("11_roadCorner")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 8)
+
+[node name="RoadCornerLbl" type="Label3D" parent="." unique_id=1775043788]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.2, 8)
+pixel_size = 0.006
+billboard = 1
+text = "terrain_roadCorner"
+outline_size = 4
+
+[node name="RoadCross" parent="." unique_id=1802457824 instance=ExtResource("12_roadCross")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 8)
+
+[node name="RoadCrossLbl" type="Label3D" parent="." unique_id=1357758118]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.2, 8)
+pixel_size = 0.006
+billboard = 1
+text = "terrain_roadCross"
+outline_size = 4
+
+[node name="RoadEnd" parent="." unique_id=148433004 instance=ExtResource("13_roadEnd")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0, 8)
+
+[node name="RoadEndLbl" type="Label3D" parent="." unique_id=2127015093]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1.2, 8)
+pixel_size = 0.006
+billboard = 1
+text = "terrain_roadEnd"
+outline_size = 4
+
+[node name="RoadSplit" parent="." unique_id=1531088451 instance=ExtResource("14_roadSplit")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 8)
+
+[node name="RoadSplitLbl" type="Label3D" parent="." unique_id=52159086]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1.2, 8)
+pixel_size = 0.006
+billboard = 1
+text = "terrain_roadSplit"
+outline_size = 4
+
+[node name="OriginMarker" type="Label3D" parent="." unique_id=1524539889]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -1.5)
+pixel_size = 0.008
+billboard = 1
+modulate = Color(0.9, 0.9, 0.9, 1)
+text = "+X -> (col=0..12)   +Z -> (row=0..8)"
+outline_size = 4
+
+[node name="Camera" type="Camera3D" parent="." unique_id=379950994]
+transform = Transform3D(0.866, -0.25, 0.433, 0, 0.866, 0.5, -0.5, -0.433, 0.75, 6, 10, 18)
+fov = 55.0
+
+[node name="SideEnd2" parent="." unique_id=791544012 instance=ExtResource("9_sideEnd")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.828665, 0, 3.0826607)
+
+[node name="SideCliff2" parent="." unique_id=81183805 instance=ExtResource("6_sideCliff")]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 17.828665, 0, 4.0826607)
+
+[node name="Side2" parent="." unique_id=1151827728 instance=ExtResource("5_side")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4)
+
+[node name="SideCornerInner2" parent="." unique_id=1160188407 instance=ExtResource("8_sideCornerInner")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.828665, 0, 5.0826607)
+
+[node name="SideCornerInner3" parent="." unique_id=801660694 instance=ExtResource("8_sideCornerInner")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 18.828665, 0, 5.0826607)
+
+[node name="SideCorner2" parent="." unique_id=1424032108 instance=ExtResource("7_sideCorner")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.828665, 0.5, 5.0826607)
+
+[node name="SideCliff3" parent="." unique_id=1657392324 instance=ExtResource("6_sideCliff")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.828665, 0.5, 5.0826607)
+
+[node name="Terrain2" parent="." unique_id=1684929973 instance=ExtResource("1_terrain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.828665, 0, 4.0826607)
+
+[node name="SideCornerInner4" parent="." unique_id=73723686 instance=ExtResource("8_sideCornerInner")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 14.828665, 0, 3.0826607)
+
+[node name="SideCornerInner5" parent="." unique_id=131672719 instance=ExtResource("8_sideCornerInner")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.828665, 0.5, 5.0826607)
+
+[node name="SideCorner3" parent="." unique_id=1208392728 instance=ExtResource("7_sideCorner")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.828665, 0.5, 4.0826607)
+
+[node name="SideCliff4" parent="." unique_id=2033106227 instance=ExtResource("6_sideCliff")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.828665, 0.5, 4.0826607)
+
+[node name="SideCliff5" parent="." unique_id=1169898768 instance=ExtResource("6_sideCliff")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.828665, 0, 3.0826607)
+
+[node name="RampLargeDet2" parent="." unique_id=696751193 instance=ExtResource("4_rampLargeDetailed")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0, 0)
+
+[node name="Side3" parent="." unique_id=1544797603 instance=ExtResource("5_side")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, 5)
+
+[node name="SideCliff6" parent="." unique_id=948129749 instance=ExtResource("6_sideCliff")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, -0.5)
+
+[node name="Ramp2" parent="." unique_id=1070748314 instance=ExtResource("2_ramp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, -0.5)
+
+[node name="RampLargeDet3" parent="." unique_id=8106651 instance=ExtResource("4_rampLargeDetailed")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.828665, -0.5, 3.0826607)
+
+[node name="SideCliff7" parent="." unique_id=401709639 instance=ExtResource("6_sideCliff")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19.828665, 0, 4.0826607)
+
+[node name="SideCorner4" parent="." unique_id=307823872 instance=ExtResource("7_sideCorner")]
+transform = Transform3D(1.1924881e-08, 0, 1, 0, 1, 0, -1, 0, 1.1924881e-08, 18.828665, 0, 4.0826607)
+
+[node name="terrain_2x2" parent="." unique_id=800000001 instance=ExtResource("15_pf2")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 0, 8)
+
+[node name="terrain_2x2_Lbl" type="Label3D" parent="." unique_id=800000002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 1.5, 8)
+pixel_size = 0.01
+billboard = 1
+modulate = Color(0.4, 1, 0.5, 1)
+text = "terrain_2x2"
+font_size = 48
+outline_size = 6
+
+[node name="terrain_3x3" parent="." unique_id=800000003 instance=ExtResource("16_pf3")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0, 8)
+
+[node name="terrain_3x3_Lbl" type="Label3D" parent="." unique_id=800000004]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 2, 8)
+pixel_size = 0.01
+billboard = 1
+modulate = Color(1, 0.8, 0.3, 1)
+text = "terrain_3x3"
+font_size = 48
+outline_size = 6
+
+[node name="terrain_4x4" parent="." unique_id=800000005 instance=ExtResource("17_pf4")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36, 0, 8)
+
+[node name="terrain_4x4_Lbl" type="Label3D" parent="." unique_id=800000006]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36, 2.5, 8)
+pixel_size = 0.01
+billboard = 1
+modulate = Color(0.4, 0.8, 1, 1)
+text = "terrain_4x4"
+font_size = 48
+outline_size = 6
+
+[node name="terrain_5x5" parent="." unique_id=800000007 instance=ExtResource("18_pf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43, 0, 8)
+
+[node name="terrain_5x5_Lbl" type="Label3D" parent="." unique_id=800000008]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43, 3, 8)
+pixel_size = 0.01
+billboard = 1
+modulate = Color(1, 0.5, 0.8, 1)
+text = "terrain_5x5"
+font_size = 48
+outline_size = 6
+
+[node name="terrain_6x6" parent="." unique_id=800000009 instance=ExtResource("19_pf6")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 51, 0, 8)
+
+[node name="terrain_6x6_Lbl" type="Label3D" parent="." unique_id=800000010]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 51, 3.5, 8)
+pixel_size = 0.01
+billboard = 1
+modulate = Color(0.8, 0.5, 1, 1)
+text = "terrain_6x6"
+font_size = 48
+outline_size = 6
+

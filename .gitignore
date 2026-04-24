@@ -32,3 +32,10 @@ Thumbs.db
 
 # Custom
 .firecrawl/
+
+# Raw Kenney source pack (full archive; committed subset lives in assets/map_materials/space-kit/)
+assets-full-data/
+
+# Windows bash crash dumps
+bash.exe.stackdump
+*.stackdump
