@@ -1,0 +1,30 @@
+[Unit]
+Description=Smash Karts Clone - Godot Dedicated Server
+After=network.target
+
+[Service]
+# Replace <USER> with the system user you want to run the server as.
+# Recommended: create a dedicated user: sudo useradd -r -s /bin/false smash-karts
+User=<USER>
+Group=<USER>
+
+WorkingDirectory=/opt/smash-karts/server
+
+# --headless: no display required
+# -- : separator between Godot flags and user args (none currently needed)
+ExecStart=/opt/smash-karts/server/smash-karts-server.x86_64 --headless
+
+Restart=on-failure
+RestartSec=5
+
+# Log to systemd journal (view with: journalctl -u smash-karts -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=smash-karts
+
+# Basic security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

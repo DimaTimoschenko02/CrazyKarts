@@ -13,8 +13,13 @@ export.cfg
 data_*/
 mono_crash.*.json
 
-# Build outputs
-build/
+# Build outputs — exclude generated artifacts, keep structure files
+build/web/*
+!build/web/.gitkeep
+build/server/*
+!build/server/.gitkeep
+# Legacy root-level build artifacts (old export path)
+build/index.*
 dist/
 *.exe
 *.pck
