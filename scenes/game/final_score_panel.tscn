@@ -1,0 +1,94 @@
+[gd_scene load_steps=3 format=3 uid="uid://final_score_panel001"]
+
+[ext_resource type="Script" path="res://scripts/game/final_score_panel.gd" id="1_fs"]
+[ext_resource type="Theme" uid="uid://theme_main_01" path="res://resources/ui/theme_main.tres" id="2_theme"]
+
+[node name="FinalScorePanel" type="CanvasLayer"]
+layer = 8
+script = ExtResource("1_fs")
+
+[node name="Dimmer" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.04, 0.06, 0.12, 0.82)
+mouse_filter = 1
+
+[node name="Center" type="CenterContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+theme = ExtResource("2_theme")
+
+[node name="Card" type="PanelContainer" parent="Center"]
+custom_minimum_size = Vector2(1040, 0)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Center/Card"]
+layout_mode = 2
+theme_override_constants/separation = 22
+
+[node name="Eyebrow" type="Label" parent="Center/Card/VBox"]
+layout_mode = 2
+text = "ИТОГИ МАТЧА"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.3, 0.92, 1, 1)
+
+[node name="Title" type="Label" parent="Center/Card/VBox"]
+layout_mode = 2
+text = "МАТЧ ОКОНЧЕН"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 84
+theme_override_colors/font_color = Color(1, 0.84, 0.2, 1)
+theme_override_constants/outline_size = 10
+theme_override_colors/font_outline_color = Color(0.04, 0.06, 0.13, 1)
+
+[node name="Subtitle" type="Label" parent="Center/Card/VBox"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.7, 0.78, 0.92, 1)
+
+[node name="Divider" type="HSeparator" parent="Center/Card/VBox"]
+layout_mode = 2
+
+[node name="Scroll" type="ScrollContainer" parent="Center/Card/VBox"]
+custom_minimum_size = Vector2(0, 420)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Rows" type="VBoxContainer" parent="Center/Card/VBox/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="Status" type="Label" parent="Center/Card/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.7, 0.78, 0.92, 1)
+
+[node name="Buttons" type="HBoxContainer" parent="Center/Card/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="LeaveBtn" type="Button" parent="Center/Card/VBox/Buttons"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(1, 0.6, 0.6, 1)
+theme_override_colors/font_hover_color = Color(1, 0.4, 0.4, 1)
+text = "←  В ЛОББИ"
+
+[node name="ReplayBtn" type="Button" parent="Center/Card/VBox/Buttons"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 26
+text = "ИГРАТЬ ЕЩЁ РАЗ  ▶"

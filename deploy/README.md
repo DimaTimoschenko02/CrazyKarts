@@ -3,6 +3,24 @@
 This guide walks through deploying Smash Karts Clone to a Linux VPS.
 All steps are manual — run them in a new shell session when you are ready.
 
+## Architecture (post-M11)
+
+```
+Browser  ──HTTPS──▶  nginx (443)
+                       │
+                       ├── /            ──▶  /var/www/smash-karts (HTML5 client)
+                       ├── /api/*       ──▶  Master (Node.js Express, 127.0.0.1:8080)
+                       └── /ws/{code}   ──▶  Master ──▶ per-room Godot (127.0.0.1:4445-4545)
+                                                        (spawned by master via child_process)
+```
+
+The legacy single-process Godot dedicated server (`smash-karts.service`,
+the Linux binary on a fixed port) is preserved for ad-hoc desktop hosting,
+but production now runs the **master server** which owns rooms / profiles /
+match stats and spawns per-room Godot subprocesses on demand.
+
+See `docs/architecture.md` for the full topology.
+
 Placeholders to replace everywhere in this file:
 - `<DOMAIN>` — your domain, e.g. `karts.example.com`
 - `<USER>` — the Linux user on your VPS that you SSH in as, e.g. `ubuntu` or `root`
@@ -18,7 +36,17 @@ Before starting, confirm:
 - [ ] VPS is running Ubuntu 22.04 or 24.04 (Debian-based)
 - [ ] You can SSH in: `ssh <USER>@<VPS_IP>`
 - [ ] nginx is installed: `nginx -v` (if not: `sudo apt install nginx`)
+- [ ] Node.js 20+ installed: `node --version` (if not: see Step 0 below)
 - [ ] Firewall tool available: `ufw status`
+
+### Step 0 — Install Node.js 20+
+
+```bash
+ssh <USER>@<VPS_IP>
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+node --version  # expect v20.x or higher
+```
 
 ---
 
@@ -98,7 +126,71 @@ ssh <USER>@<VPS_IP> "chmod +x /opt/smash-karts/server/smash-karts-server.x86_64"
 
 ---
 
-## Step 4 — Install and Start systemd Service
+## Step 3.5 — Install Master Server (Node.js)
+
+Upload the master server source and install dependencies on the VPS:
+
+```bash
+# From local machine: copy the server source
+rsync -avz --delete \
+  --exclude='node_modules' --exclude='data' --exclude='.env' \
+  server/ <USER>@<VPS_IP>:/opt/smash-karts/server/
+
+# Install production dependencies on VPS
+ssh <USER>@<VPS_IP>
+cd /opt/smash-karts/server
+sudo -u smash-karts npm install --production --omit=dev
+
+# Install env file
+sudo mkdir -p /etc/smash-karts
+sudo cp /opt/smash-karts/server/../deploy/master.env.example /etc/smash-karts/master.env
+# (or copy `deploy/master.env.example` from your laptop directly to /etc/smash-karts/master.env)
+
+# Edit values — at minimum set INTERNAL_TOKEN, PUBLIC_BASE_URL, PUBLIC_WS_BASE_URL
+sudo nano /etc/smash-karts/master.env
+sudo chmod 600 /etc/smash-karts/master.env
+sudo chown smash-karts:smash-karts /etc/smash-karts/master.env
+
+# Initialize SQLite DB directory
+sudo mkdir -p /opt/smash-karts/server/data
+sudo chown -R smash-karts:smash-karts /opt/smash-karts/server/data
+```
+
+Install and start the master systemd unit:
+
+```bash
+# From local machine, push the unit file
+scp deploy/smash-master.service <USER>@<VPS_IP>:/tmp/smash-master.service
+
+# On VPS:
+sudo cp /tmp/smash-master.service /etc/systemd/system/smash-master.service
+sudo nano /etc/systemd/system/smash-master.service
+# Replace User=<USER> / Group=<USER> with: smash-karts
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now smash-master
+
+# Verify
+sudo systemctl status smash-master
+curl http://127.0.0.1:8080/api/health
+# Expected: {"status":"ok",...}
+```
+
+Watch logs:
+```bash
+sudo journalctl -u smash-master -f
+```
+
+---
+
+## Step 4 — Install and Start systemd Service (legacy single-server, optional)
+
+Skip this step in the master-server flow — the master spawns per-room Godot
+subprocesses on demand and the dedicated `smash-karts.service` is no longer
+needed. Keep the unit file around only if you want a single, fixed port
+Godot dedicated server for ad-hoc testing.
+
+
 
 ```bash
 # Copy the unit file to your VPS
@@ -188,8 +280,9 @@ sudo nginx -s reload
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 
-# Godot server listens on 127.0.0.1:4444 (localhost-only, proxied by nginx)
-# Do NOT open 4444 publicly — nginx handles TLS and forwards internally.
+# Master listens on 127.0.0.1:8080. Per-room Godot listens on 127.0.0.1:4445-4545.
+# All internal — nginx proxies /api/* and /ws/{code} to master. Do NOT open
+# 8080 or 4445-4545 publicly.
 
 sudo ufw enable
 sudo ufw status

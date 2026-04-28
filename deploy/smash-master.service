@@ -1,0 +1,31 @@
+[Unit]
+Description=Smash Karts Clone - Master Server (Node.js)
+After=network.target
+Wants=network-online.target
+
+[Service]
+# Recommended: create a dedicated user: sudo useradd -r -s /bin/false smash-karts
+User=<USER>
+Group=<USER>
+
+WorkingDirectory=/opt/smash-karts/server
+EnvironmentFile=/etc/smash-karts/master.env
+
+ExecStart=/usr/bin/node /opt/smash-karts/server/main.js
+
+Restart=on-failure
+RestartSec=5
+
+# View logs with: journalctl -u smash-master -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=smash-master
+
+# Basic hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

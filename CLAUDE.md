@@ -2,224 +2,118 @@
 
 Браузерная 3D мультиплеер-игра для компании друзей. Клон SmashKarts.io с расширенной статистикой.
 
-## Стек
+## Стек (стабильное ядро)
 - **Движок:** Godot 4.6, GDScript
-- **Физика:** CharacterBody3D + move_and_slide() (arcade стиль)
-- **Мультиплеер:** WebSocketMultiplayerPeer (Godot High-Level Multiplayer API)
-- **Сервер:** Godot headless на dedicated VPS (Linux, 8GB RAM)
+- **Физика:** CharacterBody3D + move_and_slide() (arcade)
+- **Мультиплеер:** WebSocketMultiplayerPeer (Godot HL Multiplayer API)
+- **Master Server:** Node.js / Express (`server/`) — rooms, profiles, спавн Godot subprocess'ов
+- **DB:** SQLite WAL (`server/data/smashkarts.db`)
 - **Клиент:** HTML5 export → браузер
-- **Web server:** nginx (HTTPS, раздаёт HTML5 билд) + wss://порт 4444 (game server)
-- **Локальная разработка:** `build/serve.py` (порт 8060) — раздаёт HTML5 билд
+- **Web:** nginx → раздаёт HTML5 + reverse-proxy `/api/*` и `/ws/*` на master :8080
+- **Локалка:** `build/serve.py` (8060)
 
 ## Инструменты разработки
 
 - **Godot GUI:** `C:\Godot_v4.6.1-stable_win64.exe`
 - **Godot Console (headless):** `C:\Godot_v4.6.1-stable_win64_console.exe`
 - **Проект:** `C:\Users\dimti\do_chego_doshel_progress\smash-karts-clone\`
-- **Справочный проект (ассеты):** `C:\Users\dimti\do_chego_doshel_progress\Smash carts\` — Quaternius Ultimate Karts Pack
-- **MCP:** tugcantopaloglu/godot-mcp (149 tools) через `.mcp.json` → скилл `/godot-mcp`
-- **Hot-reload параметры:** `dev_params.json` — физика/камера, только debug builds
-- **На порту 8000 сидит чужой FastAPI** — не использовать, serve.py на 8060
+- **MCP:** tugcantopaloglu/godot-mcp через `.mcp.json` → скилл `/godot-mcp`
+- **Hot-reload параметров:** `dev_params.json` (физика/камера, debug only)
 
-## Запуск для разработки
-1. Открыть проект в Godot 4.6
-2. Запустить сцену `scenes/lobby.tscn`
-3. Одно окно: Host Game → вводит имя
-4. Второе окно (или другой браузер): Join с IP `127.0.0.1`
-5. Для HTML5: экспорт из Godot → `python build/serve.py` → `http://localhost:8060/index.html`
+## Точки входа (читай сначала)
 
-## Ключевые файлы
+| Зачем | Куда |
+|-------|------|
+| Архитектура (топология сервисов, sequence diagrams) | `docs/architecture.md` |
+| Дизайн систем (специфика реализации) | `design/gdd/*.md` + `design/gdd/systems-index.md` |
+| Dev workflow, команды запуска, порты | memory: `project_dev_workflow.md` |
+| Что реализовано / отложено | memory: `project_*_done.md`, `project_*_deferred.md`, `project_known_issues.md` |
+| Архитектурный overview, autoload'ы, ключевые файлы | memory: `project_architecture_overview.md` |
+| UI палитра / тема | `scripts/ui/ui_palette.gd` + `resources/ui/theme_main.tres` (memory: `decision_ui_neon_stadium.md`) |
+| Все memory записи | `MEMORY.md` (индекс) |
 
-| Файл | Роль |
-|------|------|
-| `scripts/network_manager.gd` | Autoload — WebSocket сервер/клиент |
-| `scripts/game_manager.gd` | Autoload — HP, kills, deaths, respawn |
-| `scripts/player_data.gd` | Autoload — имя локального игрока |
-| `scripts/kart_controller.gd` | CharacterBody3D — физика, дрифт, стрельба, синхронизация |
-| `scripts/base_projectile.gd` | BaseProjectile — движение, AOE урон, DamageInfo |
-| `scripts/rocket_projectile.gd` | RocketProjectile — взрыв при попадании/lifetime |
-| `scripts/projectile_resource.gd` | ProjectileResource — Resource конфиг снарядов |
-| `scripts/weapon_pickup.gd` | Area3D — подбор оружия |
-| `scripts/game_world.gd` | Главный скрипт игровой сцены, спавн картов |
-| `scripts/hud.gd` | Очки, HP-бар, kill feed |
-| `scripts/lobby.gd` | UI лобби — Host/Join |
-| `scripts/game_states.gd` | Autoload — enum'ы KartState/MatchState/WeaponState + transition tables |
-| `scripts/state_manager.gd` | Autoload — хранение состояний, RPC, серверные таймеры, сигналы |
-| `scenes/player_kart.tscn` | Сцена карта (BaseCar + Camera + NameLabel) |
-| `scenes/base_car.tscn` | Модель машинки (Car2.glb + drift VFX) |
-
-## Архитектура мультиплеера
-- Сервер **авторитарный** для урона и смертей (`GameManager` запускается на сервере)
-- Позиции картов синхронизируются через RPC (клиент → все) на частоте 30 Hz
-- Ракеты спавнятся по команде сервера на всех клиентах одновременно
-- Карты спавнятся через **ручной RPC** (НЕ MultiplayerSpawner): клиент шлёт `_register` из `game_world._ready()`, сервер отвечает `_rpc_spawn_kart` для каждого карта
-- **НЕ использовать MultiplayerSpawner** — он реплицирует ноды до загрузки сцены на клиенте (race condition)
-- **Авто-джоин:** URL-параметры `?join=АДРЕС&name=ИМЯ` пропускают лобби (lobby.gd `_try_auto_join`)
-- **Хостинг из браузера:** пока отключён (lobby.gd блокирует кнопку Host для web builds). Вопрос открыт — возможно стоит разрешить или сделать иначе. Требует обсуждения.
+**Список keyfiles в этом CLAUDE.md не дублируется** — он быстро устаревает. Используй `MEMORY.md` индекс или `git ls-files`.
 
 ## Управление
 - **W/S** — газ/тормоз
 - **A/D** — поворот
-- **Space или ЛКМ** — выстрел (если есть оружие)
+- **Space или ЛКМ** — выстрел
+- **ESC** — pause menu (Continue / Settings / Quit to Lobby)
 
 ## Принципы разработки
 
-- **Feel first** — ощущения от управления главный приоритет (подробнее в секции внизу).
+- **Feel first** — ощущения главный приоритет (физика, камера, звук, VFX, UI отзывчивость). Между "проще" и "лучше ощущается" — всегда feel.
 - **Arcade feel, не симулятор.** Дрифт, ускорение, повороты — отзывчивые и приятные.
-- **Планируется система типов машинок:** большие (медленные, высокий урон/HP), маленькие (быстрые, ловкие, меньше HP). Физические параметры карта — через `@export`, не хардкодить.
+- **MVP first.** Не добавлять фичи пока база не работает стабильно.
+- **GDD = апрувленная спецификация.** Не предложения — реализуй как написано, не переспрашивай уже описанное. Изменение GDD только через `/design-review` или `systems-designer`.
+- **Параметры карта через `@export`**, не хардкод (типы машинок: большие/маленькие).
 
 ## Правила работы AI
 
+### Memory актуализация (важно)
+
+**CLAUDE.md холодный, memory тёплая.** В CLAUDE.md только стабильные правила. Текущий статус, файлы, команды, архитектурный snapshot живут в `memory/` и обновляются при каждом изменении.
+
+Триггеры обновления memory:
+- Реализован milestone → `project_*_done.md`
+- Изменилась архитектура / autoload'ы → `project_architecture_overview.md`
+- Изменился dev workflow → `project_dev_workflow.md`
+- Принято архитектурное/дизайн решение → `decision_*.md`
+- Найден нетривиальный баг → новая запись с root cause
+
+Подробнее: memory `feedback_keep_memory_fresh.md`.
+
 ### Godot и пользователь
-- **ВАЖНО:** Нельзя запускать Godot из консоли (экспорт, проверка и т.д.) пока пользователь держит Godot открытым. Всегда спросить: "Godot закрыт?" перед запуском любой команды Godot.
-- Если нужен ре-экспорт или перезагрузка проекта — попросить пользователя сделать это из GUI, либо закрыть Godot чтобы AI мог запустить из консоли.
+- **НЕ спрашивать "Godot закрыт?"** — просто запустить команду. Если упало с ошибкой блокировки (`.godot/imported/.lock`, "Project is being edited") — отчитаться, попросить закрыть.
+- Перед запуском Godot — `tasklist | grep -i godot`. Свои фоновые headless'ы — kill через `taskkill //F //IM Godot_v4.6.1-stable_win64_console.exe` (двойной слэш в Git Bash). GUI Godot — попросить пользователя.
 
 ### Тестирование
-- **Одно изменение = один тест.** НЕ делать несколько изменений визуала/физики за раз.
-- **Синтаксическая проверка GDScript — автоматическая** через хук (`.claude/settings.json`). Срабатывает после каждого Edit/Write `.gd` файла. Ручной запуск если нужен: `"C:\Godot_v4.6.1-stable_win64_console.exe" --headless --check-only --quit --path "C:\Users\dimti\do_chego_doshel_progress\smash-karts-clone" 2>&1`
-- При изменении визуала/физики — чётко описать пользователю ЧТО должно измениться и КАК это проверить.
-- Использовать MCP Godot сервер когда доступен.
-- **Самостоятельное end-to-end тестирование.** Если пользователь закрыл Godot и просит протестировать — НЕ переспрашивать, не останавливаться на каждом шаге. Запускать всё что нужно (Godot headless как server через `--autohost`, `serve.py` через `py`, Chrome MCP), доходить до результата, отчитываться по факту. Спрашивать только если упёрся в реальный блокер (нет credentials, надо что-то деструктивное, нужен внешний ресурс). Промежуточные шаги типа "стоит ли мне нажать Join" — не задавать, нажимать.
-
-### Изменения дизайн-документов (GDD)
-- **GDD = апрувленная спецификация.** Всё что написано в `design/gdd/*.md` — уже принятые решения пользователя. Не предложения, не рекомендации — конкретный план реализации. При реализации НЕ переспрашивать то, что уже описано в GDD (формулы, архитектура, поведение, RPC-паттерны, сигналы). Просто реализовывать как написано.
-- **Уточнять только** то, чего в GDD нет: конкретные имена файлов/нод если не указаны, порядок реализации нескольких независимых частей, инструментальные вопросы (MCP vs ручной редактор и т.п.).
-- **ОБЯЗАТЕЛЬНО:** Перед любым **изменением** файлов в `design/gdd/` — провалидировать через `/design-review` или агента `systems-designer`. GDD нельзя менять без валидации.
-- Убирание/добавление состояний, переходов, формул — это дизайн-решение с downstream эффектами. Сначала анализ влияния, потом правка.
+- **Одно изменение = один тест.**
+- **Синтаксис GDScript** проверяется автоматически хуком (`.claude/settings.json`) после каждого Edit/Write `.gd`. Ручной запуск: `"C:\Godot_v4.6.1-stable_win64_console.exe" --headless --check-only --quit --path .`
+- **Самостоятельное end-to-end.** Если просят протестировать — идти до результата через MCP/Chrome без промежуточных вопросов. Спрашивать только на реальном блокере (см. memory `feedback_independent_testing.md`).
+- При изменении визуала/физики — описать пользователю ЧТО изменилось и КАК проверить.
 
 ### Качество кода
-- **ОБЯЗАТЕЛЬНО:** Перед реализацией любой фичи, связанной с Godot (физика, анимации, сеть, UI) — проверить документацию через Context7.
-- **Предпочитать нативные инструменты Godot:**
-  - `Resource` вместо `Dictionary` для структурированных данных
-  - `@export` вместо хардкода параметров
-  - `AnimationPlayer` вместо ручного tween-кода
-  - Сигналы вместо прямых вызовов между узлами
-- Перед написанием кастомного решения — спросить: "есть ли встроенный способ в Godot?"
-
-### Структура проекта
-- НЕ создавать новые файлы без необходимости. Предпочитать редактирование существующих.
-- Периодически чистить неиспользуемые файлы.
-- При значительных изменениях архитектуры — обновлять этот файл.
-
-### Общий принцип
-**MVP first.** Не добавлять фичи пока база не работает стабильно.
+- **Перед Godot фичей** (физика, анимации, сеть, UI) — Context7 для проверки API.
+- **Нативные инструменты Godot предпочтительнее:** `Resource` > `Dictionary`, `@export` > хардкод, `AnimationPlayer` > ручной tween, сигналы > прямые вызовы. Перед кастомным решением — "есть встроенный способ?"
+- НЕ создавать файлы без необходимости. Редактировать существующие.
 
 ## Game Studio Framework
 
-Проект использует **Claude Code Game Studios** — трёхслойную систему разработки.
-Это НЕ набор отдельных инструментов — это СИСТЕМА, где слои работают вместе.
+Проект использует **Claude Code Game Studios** — трёхслойную систему: Rules (auto, `.claude/rules/`) + Skills (точка входа, `/skill-name`) + Agents (эксперты).
 
-### Роль AI-ассистента (Claude) в Game Studio
+### Роль Claude
 
-**Claude = Project Manager / координатор между пользователем (клиент) и командой (скиллы → агенты).**
+**Claude = координатор между пользователем и командой (скиллы → агенты).** НЕ принимает технические/дизайн решения сам — делегирует специалистам:
+- Архитектурные решения → `technical-director`
+- Дизайн-решения → `game-designer` / `systems-designer`
+- Код / рефакторинг >20 строк → `godot-specialist` / `gameplay-programmer`
+- Дебаг → `godot-specialist` / `gameplay-programmer` (даже если кажется очевидным — Godot-контекст часто скрыт)
+- Изменение GDD → `/design-review` или `systems-designer`
+- Фиксы по review → валидация с `godot-specialist`
 
-Claude НЕ принимает технические, архитектурные или дизайнерские решения самостоятельно. Все решения принимают соответствующие специалисты. Claude:
-- Координирует работу: запускает нужные скиллы (приоритет) или агентов (если нет скилла), передаёт контекст
-- Представляет результаты пользователю: компактно, без собственных оценок поверх
-- Спрашивает пользователя когда нужно решение, но НЕ подменяет экспертизу специалистов своим мнением
-- Пишет код ПОСЛЕ того как архитектура/дизайн утверждены специалистами
+Claude пишет код **после** того как архитектура/дизайн утверждены. Не пишет "моя рекомендация" по техническим вопросам — пишет рекомендацию специалиста.
 
-**Порядок делегирования:**
-1. Сначала ВСЕГДА проверить — есть ли подходящий скилл. Скилл сам вызовет нужных агентов
-2. Если скилла нет — вызвать агента напрямую (директора для решений, специалистов для исполнения)
-3. Claude НИКОГДА не подставляет своё мнение вместо экспертизы скиллов/агентов
+### Порядок делегирования
 
-**Конкретно — кто что делает:**
-- Архитектурные решения → `technical-director` (opus) принимает, Claude передаёт пользователю
-- Дизайн-решения → `game-designer` или `systems-designer` принимает
-- Выбор между подходами → директор соответствующего домена оценивает и рекомендует
-- Claude НЕ пишет "моя рекомендация" по техническим вопросам — он пишет "рекомендация technical-director'а"
+1. **СНАЧАЛА СКИЛЛЫ.** Перед вызовом агента напрямую — проверь список скиллов. Если есть подходящий — используй его, скилл сам подберёт агентов.
+2. Агент напрямую — крайний случай (точечная консультация, нет скилла).
+3. Несколько агентов одновременно → параллельный вызов в одном сообщении.
+4. **GDD before code.** Читать `design/gdd/[system].md` ПЕРЕД реализацией.
+5. **Если сомневаешься вызывать ли агента — ВЫЗЫВАЙ.**
 
-**Конкретно — что Claude НЕ делает сам (ОБЯЗАТЕЛЬНО делегировать):**
-- **Написание кода:** Перед написанием нового кода или значительного рефакторинга (>20 строк) — консультация с `godot-specialist` или `gameplay-programmer` по паттернам. Claude пишет код только по их рекомендациям.
-- **Дебаг:** При любом баге — привлечь специалиста (`godot-specialist`, `gameplay-programmer`) для анализа root cause. Даже если баг кажется очевидным — специалист видит контекст который Claude пропускает (пример: `consume_weapon` до `_launch_visual` — порядок вызовов в signal chain).
-- **Изменение GDD:** см. секцию "Изменения дизайн-документов" выше.
-- **Фиксы по code review:** Применение фиксов по результатам review — валидация с `godot-specialist` что фикс не создаёт новых проблем.
-- **Оценки и рекомендации:** Claude не оценивает технические решения — он собирает оценки от агентов и передаёт пользователю.
+Список skills и agents — в system-reminder каждой сессии.
 
-**Почему это важно:**
-Claude склонен подменять специалистов когда задача кажется "простой". Именно в таких случаях появляются баги — потому что Claude не видит Godot-специфичный контекст (signal ordering, RPC call_local side effects, scene tree lifecycle). Правило простое: если сомневаешься вызывать ли агента — ВЫЗЫВАЙ.
+## При старте новой сессии
 
-### Три слоя
-
-**Rules** (`.claude/rules/`) — автоматические, триггерятся по паттернам файлов при записи. Не думай о них.  
-**Skills** — точка входа (`/skill-name`). Сами знают каких агентов вызвать. Вызывают другие скиллы внутри.  
-**Agents** — эксперты. Вызываются скиллами или напрямую. Агенты вызывают других агентов при необходимости.
-
-### Skills — основной интерфейс
-
-**Текущая фаза (Implementation):** `/feature-dev` — основной для реализации по GDD. `/godot-mcp` — для работы через MCP с движком.  
-**Все остальные skills** перечислены в system-reminder каждой сессии.
-
-### Agents — когда вызывать напрямую
-
-**ПРАВИЛО: СНАЧАЛА СКИЛЛЫ.** Перед вызовом агента напрямую — проверь список скиллов. Если есть подходящий скилл — используй его. Скилл сам подберёт агентов. Это не рекомендация, а обязательное требование.
-
-Агенты вызываются напрямую (через Agent tool) ТОЛЬКО когда:
-- Проверил список скиллов и нет подходящего
-- Нужна точечная консультация ("как сделать X в Godot?")
-- Нужен review конкретного решения
-
-**Агенты и их уровни:** все 34 специалиста перечислены в system-reminder. Directors (opus) — для архитектурных решений. Consultants (sonnet) — для дизайн/code architecture. Specialists (sonnet/haiku) — для конкретного кода и тестирования.
-
-**Агенты вызывают других агентов внутри себя** — не нужно собирать полную команду вручную.
-
-### Принципы работы системы
-
-1. **Skills first (ОБЯЗАТЕЛЬНО)** — ВСЕГДА проверь список скиллов перед вызовом агентов. Если есть подходящий skill — используй его, он сам подберёт агентов. Агенты напрямую — крайний случай.
-2. **Agents parallel** — если вызываешь напрямую, запускай параллельно (одно сообщение).
-3. **Rules automatic** — не думай о них, они работают при записи файлов.
-4. **GDD before code** — ВСЕГДА читай design/gdd/[system].md ПЕРЕД реализацией.
-5. **Incremental writes** — файлы пишутся секция за секцией, не целиком.
-6. **Feel first** — при любом выборе приоритет ощущениям (см. секцию внизу).
-
-## При старте новой сессии — что делать
-
-1. **Прочитать этот CLAUDE.md** (загружается автоматически)
-2. **Прочитать `design/gdd/systems-index.md`** — текущий прогресс, что designed/implemented
-3. **Спросить пользователя** что делаем сегодня (design / implement / fix)
-4. **Использовать агентов** для любой задачи (см. правила выше)
-5. **НЕ начинать писать код** без чтения соответствующего GDD файла
-
-## Design Documents
-
-Все design documents живут в `design/gdd/`. **Прочитать GDD ПЕРЕД реализацией системы.**
-
-### MVP Systems (10/10 designed):
-| System | GDD | Implementation |
-|--------|-----|---------------|
-| State Machine | `state-machine.md` | **Implemented** (game_states.gd + state_manager.gd) |
-| Network Layer | `network-layer.md` | **Implemented** (snapshot buffer, ping/pong, timeout, late join, disconnect broadcast) |
-| Health & Damage | `health-damage.md` | **Implemented** (HealthComponent, DamageInfo, EventBus, AOE falloff) |
-| Kart Physics | `kart-physics.md` | **v2.4 in progress** (branch: `arcade-physics`). Emergent slip-angle model: `intensity = slip_ratio` from `atan2(\|side_speed\|, \|fwd_speed\|)`. Framerate-independent `exp(-grip*delta)` decay. Smoothstep intent aid. Slip measured BEFORE move_and_slide. v2.1, v2.2, v2.3 archived. |
-| Camera System | `camera-system.md` | Implemented (not tested) |
-| Spawn System | `spawn-system.md` | Implemented (not tested, spawn push deferred) |
-| Projectile System | `projectile-system.md` | Partial (rockets only) |
-| Pickup System | `pickup-system.md` | Partial (weapon only) |
-| Weapon System | `weapon-system.md` | Partial (rockets only) |
-| Match System | `match-system.md` | Not started |
-
-### Other docs:
-- `game-concept.md` — общий концепт игры, pillars, vision
-- `systems-index.md` — индекс ВСЕХ 24 систем с зависимостями и приоритетами
-
-**Implementation Order:** см. `design/gdd/systems-index.md`.
-
-## Текущий статус проекта
-
-**Phase**: Implementation (steps 1-6/10 done, steps 4-6 not tested)
-**Что работает сейчас**: базовый мультиплеер (lobby → game → rockets → kill/respawn), State Machine (StateManager + GameStates autoloads)
-**Что сломано**: explosion VFX (stub), drift feel
-**Что нужно**: рефакторинг по GDD спецификациям (шаги 3-10), затем новые фичи
-**Known issues**: `docs/known-issues.md` (ping display не работает)
+1. CLAUDE.md (этот файл) — загружается автоматически
+2. `MEMORY.md` индекс — загружается автоматически
+3. Спросить пользователя что делаем (design / implement / fix)
+4. Перед реализацией читать соответствующий GDD + relevant memory записи
+5. Делегировать через скиллы / агентов
 
 ## Memory Server
 
-MCP tools: `mcp__memory__search_memory`, `add_memory`, `update_memory`, `delete_memory`, `list_memories`  
-Namespaces: `patterns`, `decisions`, `bugs`, `project_state`, `conventions`, `agent_insights`, `context`  
-**Правило:** искать контекст перед задачей → передавать найденное агентам в промпт → сохранять решения после.  
-Детальные инструкции и тип памяти каждого агента — `.claude/rules/memory-workflow.md`.
-
-## Принцип разработки: Feel First
-
-**Ощущения от управления — главный приоритет.** При любом выборе между "проще" и "лучше ощущается" — выбирать feel. Это касается: физики, камеры, звука, VFX, UI отзывчивости. Записано в memory как feedback.
+MCP tools: `mcp__memory__search_memory`, `add_memory`, `update_memory`, `delete_memory`, `list_memories`
+Namespaces: `patterns`, `decisions`, `bugs`, `project_state`, `conventions`, `agent_insights`, `context`
+Workflow: `.claude/rules/memory-workflow.md` (искать перед задачей → передавать агентам в промпт → сохранять решения после).

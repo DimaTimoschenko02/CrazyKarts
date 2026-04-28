@@ -38,6 +38,16 @@ Thumbs.db
 # Custom
 .firecrawl/
 
+# Master server (Node.js)
+server/node_modules/
+server/.env
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+server/data/*.sqlite
+server/data/*.sqlite-shm
+server/data/*.sqlite-wal
+
 # Raw Kenney source pack (full archive; committed subset lives in assets/map_materials/space-kit/)
 assets-full-data/
 

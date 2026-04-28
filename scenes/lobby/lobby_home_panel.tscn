@@ -1,0 +1,129 @@
+[gd_scene load_steps=2 format=3 uid="uid://lobby_home_panel001"]
+
+[ext_resource type="Script" path="res://scripts/lobby/panels/lobby_home_panel.gd" id="1_lh"]
+
+[node name="LobbyHomePanel" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_lh")
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Card" type="PanelContainer" parent="Center"]
+custom_minimum_size = Vector2(1080, 720)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Center/Card"]
+layout_mode = 2
+theme_override_constants/separation = 22
+
+[node name="Header" type="HBoxContainer" parent="Center/Card/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Greeting" type="Label" parent="Center/Card/VBox/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+text = "Привет, …"
+theme_override_font_sizes/font_size = 36
+theme_override_colors/font_color = Color(1, 0.84, 0.2, 1)
+theme_override_constants/outline_size = 4
+theme_override_colors/font_outline_color = Color(0.04, 0.06, 0.13, 1)
+
+[node name="Stats" type="Label" parent="Center/Card/VBox/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+horizontal_alignment = 2
+theme_override_font_sizes/font_size = 17
+theme_override_colors/font_color = Color(0.7, 0.78, 0.92, 1)
+
+[node name="LogoutBtn" type="Button" parent="Center/Card/VBox/Header"]
+custom_minimum_size = Vector2(140, 56)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_font_sizes/font_size = 18
+text = "Выйти"
+
+[node name="Divider" type="HSeparator" parent="Center/Card/VBox"]
+layout_mode = 2
+
+[node name="ListHeader" type="HBoxContainer" parent="Center/Card/VBox"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Center/Card/VBox/ListHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "ОТКРЫТЫЕ КОМНАТЫ"
+theme_override_font_sizes/font_size = 26
+theme_override_colors/font_color = Color(0.3, 0.92, 1, 1)
+
+[node name="Hint" type="Label" parent="Center/Card/VBox/ListHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+horizontal_alignment = 2
+text = "обновляется каждые 4 сек"
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.48, 0.56, 0.72, 1)
+
+[node name="EmptyLabel" type="Label" parent="Center/Card/VBox"]
+layout_mode = 2
+text = "Загружаю комнаты…"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.7, 0.78, 0.92, 1)
+
+[node name="Scroll" type="ScrollContainer" parent="Center/Card/VBox"]
+custom_minimum_size = Vector2(0, 360)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="RoomList" type="VBoxContainer" parent="Center/Card/VBox/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="StatusLabel" type="Label" parent="Center/Card/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 17
+
+[node name="Footer" type="HBoxContainer" parent="Center/Card/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="DurationLabel" type="Label" parent="Center/Card/VBox/Footer"]
+layout_mode = 2
+size_flags_vertical = 4
+text = "Длительность"
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.7, 0.78, 0.92, 1)
+
+[node name="DurationDropdown" type="OptionButton" parent="Center/Card/VBox/Footer"]
+custom_minimum_size = Vector2(220, 72)
+layout_mode = 2
+
+[node name="CreateBtn" type="Button" parent="Center/Card/VBox/Footer"]
+custom_minimum_size = Vector2(0, 72)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 26
+text = "+  СОЗДАТЬ КОМНАТУ"
+
+[node name="PollTimer" type="Timer" parent="."]
+wait_time = 4.0

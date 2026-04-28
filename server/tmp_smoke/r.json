@@ -1,0 +1,1 @@
+{"room_code":"RND5T8","room_id":"RND5T8","name":"Dima's room","host_name":"Dima","map_id":"map_1","max_players":8,"current_players":0,"duration_min":5,"state":"WAITING","is_full":false,"created_at":1777214729,"ws_url":"ws://localhost:8080/ws/RND5T8","invite_link":"http://localhost:8060/?join=RND5T8"}

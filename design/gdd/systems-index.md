@@ -8,10 +8,11 @@ last-updated: 2026-04-22
 
 ## Summary
 
-- **Total systems**: 24
+- **Total systems**: 26
 - **MVP**: 16 systems
 - **Alpha**: 4 systems
 - **Beta**: 4 systems
+- **Infrastructure**: 1 system (Rooms System — cross-cutting, not a gameplay layer)
 - **High-risk bottlenecks**: Network Layer (10 dependents), State Machine (6), Health & Damage (6)
 
 ---
@@ -44,6 +45,8 @@ last-updated: 2026-04-22
 | 22 | Analytics (external) | Meta | 5 | Beta | Not Started |
 | 23 | Automated Test Pipeline | QA | 1-5 | MVP | Not Started |
 | 24 | Playtest Protocol | QA | 5 | MVP | Not Started |
+| 25 | Rooms System | Infrastructure | 1 | Post-MVP | Designed (not implemented) |
+| 26 | Lobby UI Redesign | Presentation | 3 | Beta | Designed (not implemented) |
 
 ---
 
@@ -179,13 +182,15 @@ MVP systems first, ordered by dependencies (can't design #9 before #8, etc.)
 | Powerup System | - | - | - | |
 | Match System | Designed | - | - | design/gdd/match-system.md |
 | Lobby | - | Partial | - | No kart select, no match integration |
+| Lobby UI Redesign | Designed (not implemented) | - | - | design/gdd/lobby-ui.md — 5 screens, auth flow, public room list (polling 4s), one-click Create Room, deep link ?join=CODE. No Join-by-Code modal. Depends on Rooms (B1) + Profile (B2). |
 | Map System | - | Partial | - | 1 basic map |
 | HUD | - | Partial | - | Basic HP/weapon/killfeed |
 | Scoreboard UI | - | - | - | |
 | Audio System | - | - | - | |
 | VFX System | - | Broken | - | explosion_rockets.gd is stub |
 | Analytics (in-game) | - | - | - | |
-| Account System | - | - | - | |
+| Account System | Designed (not implemented) | - | - | design/gdd/profile-system.md. SQLite + Node.js Express middleware. Auth-token in localStorage. MVP: register/auth/submit. v2: damage_events, derived stats, duels. v3: leaderboard, ELO. |
 | Analytics (external) | - | - | - | |
 | Automated Test Pipeline | - | - | - | Chrome MCP + headless Godot + pre-commit hooks |
 | Playtest Protocol | - | - | - | AI generates, human clicks Yes/No |
+| Rooms System | Designed (updated 2026-04-26) | - | - | design/gdd/rooms-system.md — Master-server (FastAPI) + per-room Godot headless process. Public room browser is MVP core (not v2). All rooms PUBLIC, no PRIVATE type. is_full state. |

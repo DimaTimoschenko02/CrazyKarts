@@ -4,6 +4,7 @@ extends CanvasLayer
 @onready var hp_bar:       ProgressBar   = $HPBar
 @onready var weapon_label: Label         = $WeaponLabel
 @onready var kill_feed:    VBoxContainer = $KillFeed
+@onready var match_timer_label: Label   = $ThemeRoot/MatchTimer
 var ping_label: Label = null
 
 
@@ -11,6 +12,8 @@ func _ready() -> void:
 	GameManager.player_died.connect(_on_player_died)
 	StateManager.weapon_state_changed.connect(_on_weapon_state_changed)
 	GameManager.scores_updated.connect(_on_scores_updated)
+	GameManager.match_timer_tick.connect(_on_match_timer_tick)
+	GameManager.match_finished.connect(_on_match_finished)
 	NetworkManager.ping_updated.connect(_on_ping_updated)
 	_try_connect_local_health.call_deferred()
 
@@ -39,11 +42,37 @@ func _exit_tree() -> void:
 		GameManager.player_died.disconnect(_on_player_died)
 	if GameManager.scores_updated.is_connected(_on_scores_updated):
 		GameManager.scores_updated.disconnect(_on_scores_updated)
+	if GameManager.match_timer_tick.is_connected(_on_match_timer_tick):
+		GameManager.match_timer_tick.disconnect(_on_match_timer_tick)
+	if GameManager.match_finished.is_connected(_on_match_finished):
+		GameManager.match_finished.disconnect(_on_match_finished)
 	if NetworkManager.ping_updated.is_connected(_on_ping_updated):
 		NetworkManager.ping_updated.disconnect(_on_ping_updated)
 	var health := _get_local_health()
 	if health and health.hp_changed.is_connected(_on_hp_changed):
 		health.hp_changed.disconnect(_on_hp_changed)
+
+
+func _on_match_timer_tick(seconds_remaining: int, _duration_total: int) -> void:
+	if not match_timer_label:
+		return
+	seconds_remaining = maxi(0, seconds_remaining)
+	var mm: int = seconds_remaining / 60
+	var ss: int = seconds_remaining % 60
+	match_timer_label.text = "%d:%02d" % [mm, ss]
+	# Last 30s — switch to red.
+	var col := Color(1, 0.85, 0.2)
+	if seconds_remaining <= 10:
+		col = Color(1, 0.30, 0.36)
+	elif seconds_remaining <= 30:
+		col = Color(1, 0.55, 0.30)
+	match_timer_label.add_theme_color_override("font_color", col)
+
+
+func _on_match_finished(_results: Dictionary) -> void:
+	if match_timer_label:
+		match_timer_label.text = "0:00"
+		match_timer_label.add_theme_color_override("font_color", Color(1, 0.30, 0.36))
 
 
 func _on_scores_updated(_scores: Dictionary) -> void:

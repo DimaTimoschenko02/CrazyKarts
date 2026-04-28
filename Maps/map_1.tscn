@@ -3,14 +3,14 @@
 [ext_resource type="Script" uid="uid://lu3j6mchxl4w" path="res://addons/ScatterTool/scatter_tool.gd" id="1_xrgew"]
 [ext_resource type="Script" uid="uid://dvjc76fgfypjk" path="res://addons/ScatterTool/foliage_data.gd" id="2_4wta3"]
 [ext_resource type="Script" uid="uid://r5q687xqgsau" path="res://addons/ScatterTool/object_data.gd" id="3_jdx1u"]
-[ext_resource type="ArrayMesh" uid="uid://dwgncv2yh2t7e" path="res://Map materials/tree_tree.res" id="4_j64lt"]
+[ext_resource type="ArrayMesh" uid="uid://dwgncv2yh2t7e" path="res://assets/map_materials/tree_tree.res" id="4_j64lt"]
 [ext_resource type="Script" uid="uid://bt125wxdjk1ip" path="res://addons/ScatterTool/scene_data.gd" id="5_1vh13"]
-[ext_resource type="ArrayMesh" uid="uid://b1s1pvyif5jht" path="res://Map materials/tree-log-small_tree-log-small.res" id="5_jcyk4"]
+[ext_resource type="ArrayMesh" uid="uid://b1s1pvyif5jht" path="res://assets/map_materials/tree-log-small_tree-log-small.res" id="5_jcyk4"]
 [ext_resource type="Script" uid="uid://pltge4dfo656" path="res://addons/ScatterTool/scatter_data.gd" id="6_jcyk4"]
-[ext_resource type="ArrayMesh" uid="uid://bw57r4gf8tsax" path="res://Map materials/rock-flat_rock-flat.res" id="6_okle1"]
-[ext_resource type="ArrayMesh" uid="uid://cqw4tsxr57ced" path="res://Map materials/grass-large_grass-large.res" id="7_5ii72"]
-[ext_resource type="PackedScene" uid="uid://cysgg7a874lku" path="res://Map materials/fence-doorway.glb" id="10_q0xse"]
-[ext_resource type="PackedScene" uid="uid://c2a87as3afd00" path="res://Map materials/fence-fortified.glb" id="11_jitdt"]
+[ext_resource type="ArrayMesh" uid="uid://bw57r4gf8tsax" path="res://assets/map_materials/rock-flat_rock-flat.res" id="6_okle1"]
+[ext_resource type="ArrayMesh" uid="uid://cqw4tsxr57ced" path="res://assets/map_materials/grass-large_grass-large.res" id="7_5ii72"]
+[ext_resource type="PackedScene" uid="uid://cysgg7a874lku" path="res://assets/map_materials/fence-doorway.glb" id="10_q0xse"]
+[ext_resource type="PackedScene" uid="uid://c2a87as3afd00" path="res://assets/map_materials/fence-fortified.glb" id="11_jitdt"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_nn8iy"]
 albedo_color = Color(0.047058824, 0.32941177, 0.078431375, 1)
@@ -26,8 +26,6 @@ data = PackedVector3Array(50, 0, 50, 49.0099, 0, 50, 50, 0, 49.0099, 49.0099, 0,
 
 [sub_resource type="CapsuleShape3D" id="ConvexPolygonShape3D_okle1"]
 radius = 0.35
-height = 2.0
-
 
 [sub_resource type="Resource" id="Resource_5ii72"]
 script = ExtResource("3_jdx1u")
@@ -40,7 +38,6 @@ metadata/_custom_type_script = "uid://r5q687xqgsau"
 [sub_resource type="BoxShape3D" id="ConvexPolygonShape3D_gp48h"]
 size = Vector3(0.8, 0.4, 0.8)
 
-
 [sub_resource type="Resource" id="Resource_306g4"]
 script = ExtResource("3_jdx1u")
 object_name = "Tree log"
@@ -51,7 +48,6 @@ metadata/_custom_type_script = "uid://r5q687xqgsau"
 
 [sub_resource type="BoxShape3D" id="ConvexPolygonShape3D_e8hu3"]
 size = Vector3(0.8, 0.25, 0.8)
-
 
 [sub_resource type="Resource" id="Resource_18xna"]
 script = ExtResource("3_jdx1u")
@@ -122,22 +118,17 @@ albedo_color = Color(0.16862746, 0.46666667, 0.2, 1)
 [sub_resource type="BoxShape3D" id="ConvexPolygonShape3D_5ii72"]
 size = Vector3(0.6, 0.6, 0.6)
 
-
 [sub_resource type="BoxShape3D" id="ConvexPolygonShape3D_q0xse"]
-size = Vector3(1.0, 1.5, 0.15)
-
+size = Vector3(1, 1.5, 0.15)
 
 [sub_resource type="BoxShape3D" id="ConvexPolygonShape3D_jitdt"]
-size = Vector3(1.0, 1.5, 0.15)
-
+size = Vector3(1, 1.5, 0.15)
 
 [sub_resource type="BoxShape3D" id="ConvexPolygonShape3D_306g4"]
 size = Vector3(0.8, 0.4, 0.8)
 
-
 [sub_resource type="BoxShape3D" id="ConvexPolygonShape3D_18xna"]
 size = Vector3(0.8, 0.25, 0.8)
-
 
 [node name="Map 1" type="Node3D" unique_id=1489571796]
 transform = Transform3D(2.7, 0, 0, 0, 2.7, 0, 0, 0, 2.7, 0, 0, 0)
@@ -474,37 +465,29 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.1049027, 0, -9.160672)
 shape = SubResource("ConvexPolygonShape3D_18xna")
 debug_fill = false
 
-[node name="SpawnPoint1" type="Marker3D" parent="."]
+[node name="SpawnPoint1" type="Marker3D" parent="." unique_id=1422420225]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 3.5, 0)
-groups = ["kart_spawn"]
 
-[node name="SpawnPoint2" type="Marker3D" parent="."]
+[node name="SpawnPoint2" type="Marker3D" parent="." unique_id=2038026974]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 3.5, 0)
-groups = ["kart_spawn"]
 
-[node name="SpawnPoint3" type="Marker3D" parent="."]
+[node name="SpawnPoint3" type="Marker3D" parent="." unique_id=1554347664]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 7)
-groups = ["kart_spawn"]
 
-[node name="SpawnPoint4" type="Marker3D" parent="."]
+[node name="SpawnPoint4" type="Marker3D" parent="." unique_id=788944337]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, -7)
-groups = ["kart_spawn"]
 
-[node name="SpawnPoint5" type="Marker3D" parent="."]
+[node name="SpawnPoint5" type="Marker3D" parent="." unique_id=1583440335]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 3.5, 5)
-groups = ["kart_spawn"]
 
-[node name="SpawnPoint6" type="Marker3D" parent="."]
+[node name="SpawnPoint6" type="Marker3D" parent="." unique_id=1550750733]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 3.5, -5)
-groups = ["kart_spawn"]
 
-[node name="SpawnPoint7" type="Marker3D" parent="."]
+[node name="SpawnPoint7" type="Marker3D" parent="." unique_id=744750319]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 3.5, -5)
-groups = ["kart_spawn"]
 
-[node name="SpawnPoint8" type="Marker3D" parent="."]
+[node name="SpawnPoint8" type="Marker3D" parent="." unique_id=1970332244]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 3.5, 5)
-groups = ["kart_spawn"]
 
 [editable path="fence-doorway2"]
 [editable path="fence-fortified2"]

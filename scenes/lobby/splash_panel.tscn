@@ -1,0 +1,62 @@
+[gd_scene load_steps=2 format=3 uid="uid://splash_panel001"]
+
+[ext_resource type="Script" path="res://scripts/lobby/panels/splash_panel.gd" id="1_splash"]
+
+[node name="SplashPanel" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_splash")
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Center"]
+custom_minimum_size = Vector2(800, 0)
+layout_mode = 2
+theme_override_constants/separation = 36
+
+[node name="Eyebrow" type="Label" parent="Center/VBox"]
+layout_mode = 2
+text = "MULTIPLAYER  ·  ARCADE  ·  KARTS"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.3, 0.92, 1, 1)
+theme_override_constants/outline_size = 0
+
+[node name="Logo" type="Label" parent="Center/VBox"]
+layout_mode = 2
+text = "SMASH KARTS"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 112
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+theme_override_constants/outline_size = 12
+theme_override_colors/font_outline_color = Color(0.04, 0.06, 0.13, 1)
+
+[node name="Tagline" type="Label" parent="Center/VBox"]
+layout_mode = 2
+text = "аркадная гонка для своих"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 26
+theme_override_colors/font_color = Color(0.96, 0.3, 0.78, 1)
+theme_override_constants/outline_size = 4
+theme_override_colors/font_outline_color = Color(0.04, 0.06, 0.13, 1)
+
+[node name="Divider" type="HSeparator" parent="Center/VBox"]
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="Center/VBox"]
+layout_mode = 2
+text = "Загрузка…"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.3, 0.92, 1, 1)

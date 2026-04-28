@@ -5,6 +5,9 @@
 [ext_resource type="Script" uid="uid://tqn806ruiaen" path="res://scripts/hud.gd" id="3_hud"]
 [ext_resource type="PackedScene" uid="uid://pickup001" path="res://scenes/weapon_pickup.tscn" id="4_pickup"]
 [ext_resource type="PackedScene" uid="uid://djhnspgwjeakx" path="res://Maps/map_1.tscn" id="5_map"]
+[ext_resource type="Theme" uid="uid://theme_main_01" path="res://resources/ui/theme_main.tres" id="6_theme"]
+[ext_resource type="PackedScene" uid="uid://final_score_panel001" path="res://scenes/game/final_score_panel.tscn" id="7_final"]
+[ext_resource type="PackedScene" uid="uid://pause_menu001" path="res://scenes/game/pause_menu.tscn" id="8_pause"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -46,6 +49,32 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 0, 0)
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=28972132]
 script = ExtResource("3_hud")
+
+[node name="ThemeRoot" type="Control" parent="HUD"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme = ExtResource("6_theme")
+
+[node name="MatchTimer" type="Label" parent="HUD/ThemeRoot"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -160.0
+offset_top = 18.0
+offset_right = 160.0
+offset_bottom = 96.0
+grow_horizontal = 2
+mouse_filter = 2
+text = "--:--"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 56
+theme_override_colors/font_color = Color(1, 0.84, 0.2, 1)
+theme_override_constants/outline_size = 8
+theme_override_colors/font_outline_color = Color(0.04, 0.06, 0.13, 1)
 
 [node name="ScorePanel" type="PanelContainer" parent="HUD" unique_id=488928596]
 offset_left = 10.0
@@ -101,6 +130,10 @@ theme_override_constants/separation = 4
 
 [node name="SpawnManager" type="Node" parent="." unique_id=1139933838]
 script = ExtResource("1_spawn")
+
+[node name="FinalScorePanel" parent="." instance=ExtResource("7_final")]
+
+[node name="PauseMenu" parent="." instance=ExtResource("8_pause")]
 
 [editable path="Arena/Map"]
 [editable path="Arena/Map/fence-doorway2"]

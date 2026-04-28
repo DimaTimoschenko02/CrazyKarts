@@ -16,13 +16,20 @@ func _ready() -> void:
 	print("[GameWorld] _ready: is_server=", multiplayer.is_server(), " my_id=", multiplayer.get_unique_id())
 
 	if multiplayer.is_server():
-		print("[GameWorld] Server mode - spawning host kart")
-		synced_peers.append(1)
-		_spawn_for_player(1, PlayerData.my_name)
+		# Headless room-server hosts the world but is NOT a player.
+		# Dev autohost (no master) keeps the legacy host-kart behavior so a
+		# single Godot window remains playable.
+		var is_dedicated_server: bool = RoomsReporter and RoomsReporter.is_room_server
+		if is_dedicated_server:
+			print("[GameWorld] Dedicated room-server — no host kart")
+		else:
+			print("[GameWorld] Dev host mode — spawning host kart")
+			synced_peers.append(1)
+			_spawn_for_player(1, ProfileManager.my_nick)
 		NetworkManager.player_disconnected.connect(_on_player_disconnected)
 	else:
 		print("[GameWorld] Client mode - telling server we're ready")
-		_register.rpc_id(1, PlayerData.my_name)
+		_register.rpc_id(1, ProfileManager.my_nick)
 
 	StateManager.kart_state_changed.connect(_on_kart_state_changed)
 

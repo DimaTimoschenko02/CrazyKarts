@@ -22,9 +22,12 @@ config/features=PackedStringArray("4.6", "GL Compatibility")
 
 GameStates="*res://scripts/game_states.gd"
 NetworkManager="*res://scripts/network_manager.gd"
+RoomsReporter="*res://scripts/rooms/rooms_reporter.gd"
+RoomsClient="*res://scripts/rooms/rooms_client.gd"
+MasterClient="*res://scripts/master_client.gd"
 GameManager="*res://scripts/game_manager.gd"
 StateManager="*res://scripts/state_manager.gd"
-PlayerData="*res://scripts/player_data.gd"
+ProfileManager="*res://scripts/profile/profile_manager.gd"
 DebugOverlay="*res://scripts/debug_overlay.gd"
 DevParams="*res://scripts/dev_params.gd"
 McpInteractionServer="*res://scripts/mcp_interaction_server.gd"

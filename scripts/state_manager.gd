@@ -20,6 +20,11 @@ var _kart_states: Dictionary = {}    # { peer_id: GameStates.KartState }
 var _weapon_states: Dictionary = {}  # { peer_id: GameStates.WeaponState }
 var _match_state: GameStates.MatchState = GameStates.MatchState.WAITING
 
+
+func _ready() -> void:
+	# ALWAYS so RPCs are processed even when game is paused.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 # ── Queries ──────────────────────────────────────────────────────────────────
 
 func get_kart_state(peer_id: int) -> GameStates.KartState:

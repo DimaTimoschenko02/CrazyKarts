@@ -1,7 +1,8 @@
 extends CharacterBody3D
 
 # ── Physics resource ──────────────────────────────────────────────────────────
-@export var physics: KartPhysicsResource = KartPhysicsResource.new()
+@export var physics: KartPhysicsResource
+const DEFAULT_PHYSICS_PATH := "res://resources/kart_physics_default.tres"
 
 # ── Drift (v2.4 — Emergent Slip-Angle) ───────────────────────────────────────
 # Implements GDD kart-physics.md v2.4.
@@ -82,6 +83,8 @@ func _ready() -> void:
 		player_id = name.to_int()
 	print("[Kart] _ready: player_id=", player_id, " name=", player_name, " my_id=", multiplayer.get_unique_id())
 	_last_known_pos = global_position
+	if not physics:
+		physics = load(DEFAULT_PHYSICS_PATH)
 	if physics:
 		_grip = physics.high_grip_target
 		floor_snap_length = physics.floor_snap_length

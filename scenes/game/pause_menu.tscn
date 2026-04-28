@@ -1,0 +1,134 @@
+[gd_scene load_steps=3 format=3 uid="uid://pause_menu001"]
+
+[ext_resource type="Script" path="res://scripts/game/pause_menu.gd" id="1_pm"]
+[ext_resource type="Theme" uid="uid://theme_main_01" path="res://resources/ui/theme_main.tres" id="2_theme"]
+
+[node name="PauseMenu" type="CanvasLayer"]
+layer = 12
+script = ExtResource("1_pm")
+
+[node name="Dimmer" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.04, 0.06, 0.12, 0.82)
+mouse_filter = 1
+
+[node name="Center" type="CenterContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+theme = ExtResource("2_theme")
+
+[node name="Card" type="PanelContainer" parent="Center"]
+custom_minimum_size = Vector2(580, 0)
+layout_mode = 2
+
+[node name="Views" type="VBoxContainer" parent="Center/Card"]
+layout_mode = 2
+
+[node name="MainView" type="VBoxContainer" parent="Center/Card/Views"]
+layout_mode = 2
+theme_override_constants/separation = 22
+
+[node name="Eyebrow" type="Label" parent="Center/Card/Views/MainView"]
+layout_mode = 2
+text = "ИГРА НА ПАУЗЕ"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.3, 0.92, 1, 1)
+
+[node name="Title" type="Label" parent="Center/Card/Views/MainView"]
+layout_mode = 2
+text = "ПАУЗА"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 72
+theme_override_colors/font_color = Color(1, 0.84, 0.2, 1)
+theme_override_constants/outline_size = 8
+theme_override_colors/font_outline_color = Color(0.04, 0.06, 0.13, 1)
+
+[node name="Subtitle" type="Label" parent="Center/Card/Views/MainView"]
+layout_mode = 2
+text = "Матч продолжается на сервере — другие игроки тебя видят"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.7, 0.78, 0.92, 1)
+theme_override_constants/line_spacing = 4
+autowrap_mode = 2
+
+[node name="Divider" type="HSeparator" parent="Center/Card/Views/MainView"]
+layout_mode = 2
+
+[node name="ContinueBtn" type="Button" parent="Center/Card/Views/MainView"]
+custom_minimum_size = Vector2(0, 76)
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "▶  ПРОДОЛЖИТЬ"
+
+[node name="SettingsBtn" type="Button" parent="Center/Card/Views/MainView"]
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "⚙  Настройки"
+
+[node name="LeaveBtn" type="Button" parent="Center/Card/Views/MainView"]
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(1, 0.6, 0.6, 1)
+theme_override_colors/font_hover_color = Color(1, 0.4, 0.4, 1)
+text = "✕  Выйти в лобби"
+
+[node name="HintLabel" type="Label" parent="Center/Card/Views/MainView"]
+layout_mode = 2
+text = "Esc — продолжить"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.48, 0.56, 0.72, 1)
+
+[node name="SettingsView" type="VBoxContainer" parent="Center/Card/Views"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 22
+
+[node name="Eyebrow" type="Label" parent="Center/Card/Views/SettingsView"]
+layout_mode = 2
+text = "НАСТРОЙКИ"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.3, 0.92, 1, 1)
+
+[node name="Title" type="Label" parent="Center/Card/Views/SettingsView"]
+layout_mode = 2
+text = "ПАРАМЕТРЫ"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 56
+theme_override_colors/font_color = Color(1, 0.84, 0.2, 1)
+theme_override_constants/outline_size = 6
+theme_override_colors/font_outline_color = Color(0.04, 0.06, 0.13, 1)
+
+[node name="Divider" type="HSeparator" parent="Center/Card/Views/SettingsView"]
+layout_mode = 2
+
+[node name="ComingSoon" type="Label" parent="Center/Card/Views/SettingsView"]
+layout_mode = 2
+text = "Скоро добавим:
+
+  •  громкость музыки и SFX
+  •  чувствительность мыши
+  •  качество графики
+  •  раскладку клавиш"
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.7, 0.78, 0.92, 1)
+theme_override_constants/line_spacing = 8
+
+[node name="Spacer" type="Control" parent="Center/Card/Views/SettingsView"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+
+[node name="BackBtn" type="Button" parent="Center/Card/Views/SettingsView"]
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "←  Назад"
