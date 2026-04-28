@@ -49,7 +49,7 @@ func _process(delta: float) -> void:
 		return
 
 	# Client: send ping every PING_INTERVAL_S
-	if not multiplayer.is_server() and multiplayer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+	if not multiplayer.is_server() and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
 		_ping_timer += delta
 		if _ping_timer >= PING_INTERVAL_S:
 			_ping_timer = 0.0

@@ -59,9 +59,9 @@ export const config = Object.freeze({
 
 	idleTimeoutS: intEnv("IDLE_TIMEOUT_S", 300),
 
-	publicBaseUrl: process.env.PUBLIC_BASE_URL || "http://localhost:8080",
+	publicBaseUrl: process.env.PUBLIC_BASE_URL || "http://127.0.0.1:8080",
 	publicWsBaseUrl: process.env.PUBLIC_WS_BASE_URL || "",
-	publicClientUrl: process.env.PUBLIC_CLIENT_URL || "http://localhost:8060",
+	publicClientUrl: process.env.PUBLIC_CLIENT_URL || "http://127.0.0.1:8060",
 	godotProjectPath: process.env.GODOT_PROJECT_PATH || "",
 
 	devMode: process.env.DEV_MODE === "1",

@@ -8,7 +8,7 @@ signal room_created(room: Dictionary)
 signal room_resolved(room: Dictionary)
 signal request_failed(endpoint: String, code: int)
 
-var _api_base: String = "http://localhost:8080/api"
+var _api_base: String = "http://127.0.0.1:8080/api"
 var _js_fetch_cb: JavaScriptObject
 var _pending: Dictionary = {}
 var _next_id: int = 1

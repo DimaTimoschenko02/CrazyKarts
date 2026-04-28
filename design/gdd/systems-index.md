@@ -1,7 +1,7 @@
 ---
 status: active
 date: 2026-04-03
-last-updated: 2026-04-22
+last-updated: 2026-04-28
 ---
 
 # Systems Index — SmashKarts Clone
@@ -22,7 +22,7 @@ last-updated: 2026-04-22
 | # | System | Category | Layer | Milestone | Status |
 |---|--------|----------|-------|-----------|--------|
 | 1 | State Machine | Foundation | 1 | MVP | Implemented |
-| 2 | Network Layer | Foundation | 1 | MVP | Implemented |
+| 2 | Network Layer | Foundation | 1 | MVP | Implemented (+ --port=N cmdline, TIMEOUT_MS bug fixed) |
 | 3 | HTML5 Export Pipeline | Infrastructure | 1 | MVP | Broken |
 | 4 | Health & Damage | Core | 2 | MVP | Designed |
 | 5 | Camera System | Core | 2 | MVP | Designed |
@@ -33,20 +33,20 @@ last-updated: 2026-04-22
 | 10 | Projectile System | Core | 3 | MVP | Designed |
 | 11 | Weapon System | Feature | 3 | MVP | Designed |
 | 12 | Powerup System | Feature | 3 | Alpha | Not Started |
-| 13 | Match System | Feature | 3 | MVP | Designed |
-| 14 | Lobby | Feature | 3 | MVP | Partial (no kart select, no match integration) |
+| 13 | Match System | Feature | 3 | MVP | Partial (HUD timer + final score panel + pause menu + state transitions; no stats submit) |
+| 14 | Lobby | Feature | 3 | MVP | Partial (no kart select; match flow via rooms implemented) |
 | 15 | Map System | Content | 3 | MVP | Partial (1 basic map) |
-| 16 | HUD | Presentation | 4 | MVP | Partial (basic exists) |
+| 16 | HUD | Presentation | 4 | MVP | Partial (basic + match timer 56pt) |
 | 17 | Scoreboard UI | Presentation | 4 | Beta | Not Started |
 | 18 | Audio System | Presentation | 4 | Alpha | Not Started |
 | 19 | VFX System | Presentation | 4 | Alpha | Broken (explosion stub) |
 | 20 | Analytics (in-game) | Meta | 5 | Beta | Not Started |
-| 21 | Account System | Meta | 5 | Beta | Not Started |
+| 21 | Account System | Meta | 5 | Beta | Implemented (MVP) — backend ready, frontend profile_manager.gd; v2/v3 not started |
 | 22 | Analytics (external) | Meta | 5 | Beta | Not Started |
 | 23 | Automated Test Pipeline | QA | 1-5 | MVP | Not Started |
 | 24 | Playtest Protocol | QA | 5 | MVP | Not Started |
-| 25 | Rooms System | Infrastructure | 1 | Post-MVP | Designed (not implemented) |
-| 26 | Lobby UI Redesign | Presentation | 3 | Beta | Designed (not implemented) |
+| 25 | Rooms System | Infrastructure | 1 | Post-MVP | Implemented |
+| 26 | Lobby UI Redesign | Presentation | 3 | Beta | Implemented (Neon Stadium aesthetic; no kart select integration) |
 
 ---
 
@@ -169,7 +169,7 @@ MVP systems first, ordered by dependencies (can't design #9 before #8, etc.)
 | System | GDD | Implemented | Tested | Notes |
 |--------|-----|-------------|--------|-------|
 | State Machine | Designed | Implemented | - | design/gdd/state-machine.md, scripts/game_states.gd, scripts/state_manager.gd |
-| Network Layer | Designed | Implemented | - | design/gdd/network-layer.md, scripts/snapshot_buffer.gd, scripts/network_manager.gd |
+| Network Layer | Designed | Implemented | - | design/gdd/network-layer.md, scripts/network_manager.gd; + --port=N cmdline arg (rooms port pool 4445-4545), TIMEOUT_MS=0 bug fixed |
 | HTML5 Export Pipeline | - | Working | ✅ | |
 | Health & Damage | Designed | Implemented | - | design/gdd/health-damage.md, scripts/health_component.gd, scripts/damage_info.gd, scripts/event_bus.gd |
 | Camera System | Designed | Implemented | Not tested | design/gdd/camera-system.md, scripts/camera_rig.gd |
@@ -180,17 +180,17 @@ MVP systems first, ordered by dependencies (can't design #9 before #8, etc.)
 | Projectile System | Designed | Implemented | Not tested | design/gdd/projectile-system.md, scripts/base_projectile.gd, scripts/rocket_projectile.gd |
 | Weapon System | Designed | Partial | - | design/gdd/weapon-system.md |
 | Powerup System | - | - | - | |
-| Match System | Designed | - | - | design/gdd/match-system.md |
-| Lobby | - | Partial | - | No kart select, no match integration |
-| Lobby UI Redesign | Designed (not implemented) | - | - | design/gdd/lobby-ui.md — 5 screens, auth flow, public room list (polling 4s), one-click Create Room, deep link ?join=CODE. No Join-by-Code modal. Depends on Rooms (B1) + Profile (B2). |
+| Match System | Designed | Partial | - | design/gdd/match-system.md; HUD MatchTimer + scenes/game/final_score_panel.tscn + scenes/game/pause_menu.tscn + state transitions COUNTDOWN→IN_MATCH→ENDED in state_manager.gd; missing: stats accumulator + POST /api/internal/match/submit |
+| Lobby | - | Partial | - | No kart select; match flow via rooms implemented (scripts/lobby/lobby_controller.gd) |
+| Lobby UI Redesign | Designed | Implemented | Not tested | design/gdd/lobby-ui.md; scripts/lobby/lobby_controller.gd + 4 panels (splash/first-time/lobby-home/room-lobby); Neon Stadium aesthetic (electric cyan + hot magenta + neon gold); no kart select integration |
 | Map System | - | Partial | - | 1 basic map |
-| HUD | - | Partial | - | Basic HP/weapon/killfeed |
+| HUD | - | Partial | - | Basic HP/weapon/killfeed + MatchTimer 56pt with outline (game.tscn + hud.gd) |
 | Scoreboard UI | - | - | - | |
 | Audio System | - | - | - | |
 | VFX System | - | Broken | - | explosion_rockets.gd is stub |
 | Analytics (in-game) | - | - | - | |
-| Account System | Designed (not implemented) | - | - | design/gdd/profile-system.md. SQLite + Node.js Express middleware. Auth-token in localStorage. MVP: register/auth/submit. v2: damage_events, derived stats, duels. v3: leaderboard, ELO. |
+| Account System | Designed | Implemented (MVP) | Not tested | design/gdd/profile-system.md; server/profiles/ (register/auth/claim/check, SHA-256 token hashing); scripts/profile/profile_manager.gd; v2 (damage_events, derived stats, duels) not started; v3 (leaderboard, ELO) not started |
 | Analytics (external) | - | - | - | |
 | Automated Test Pipeline | - | - | - | Chrome MCP + headless Godot + pre-commit hooks |
 | Playtest Protocol | - | - | - | AI generates, human clicks Yes/No |
-| Rooms System | Designed (updated 2026-04-26) | - | - | design/gdd/rooms-system.md — Master-server (FastAPI) + per-room Godot headless process. Public room browser is MVP core (not v2). All rooms PUBLIC, no PRIVATE type. is_full state. |
+| Rooms System | Designed | Implemented | Not tested | design/gdd/rooms-system.md; server/rooms/ (CRUD, port pool 4445-4545, spawn.js child_process, ws_proxy, healthcheck 5s, idle timeout cleanup); Node.js/Express (not FastAPI) |
