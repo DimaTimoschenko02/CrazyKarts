@@ -2,7 +2,7 @@
 
 > **Status**: In Design
 > **Author**: Dima + game-designer + godot-specialist + ux-designer + systems-designer
-> **Last Updated**: 2026-04-05
+> **Last Updated**: 2026-04-28
 > **Implements Pillar**: Аркадный хаос (feel first — camera communicates speed, impact, chaos)
 
 ## Overview
@@ -17,10 +17,11 @@ Camera System — отдельный CameraRig node в root сцены (не chi
 
 ## Player Fantasy
 
-"Камера не мешает — она помогает. Я чувствую скорость через расширение обзора.
-Чувствую удар через тряску. Когда дрифтую — камера смещается в сторону заноса,
-я вижу куда еду. Когда умираю — вижу откуда прилетело. Камера — мой второй
-геймпад: она считывает ситуацию и показывает мне то, что важно."
+"Камера — жёсткое продолжение карта. Я всегда вижу куда еду, а не куда меня
+кидает. Карт всегда строго сзади — чётко, предсказуемо, без задержки. Камера
+не комментирует мои действия и не добавляет своей 'инерции' — она просто
+следует. Дрифт чувствуется через лёгкий боковой сдвиг взгляда, но не уводит
+камеру в сторону. Удар — через тряску. Смерть — через замирание и отъезд."
 
 ## Detailed Design
 
@@ -32,6 +33,10 @@ Camera System — отдельный CameraRig node в root сцены (не chi
 4. All dynamic effects (FOV, shake, drift offset) have separate lerps — independent
 5. Screen shake applies AFTER look_at() — иначе look_at() перезаписывает rotation
 6. DevParams hot-reload для камерных параметров переезжает в CameraRig
+7. **Camera is rigid-follow**: yaw locked to kart, position lerps fast (~30 rate).
+   Никакой "инерции" камеры — momentum-feel создаёт ощущение тянучки ("резинка"),
+   это намеренно исключено. Обе скорости (lerp_slow и lerp_fast) достаточно высокие
+   чтобы казаться немедленными; разница между ними минорная.
 
 ### Node Structure
 
@@ -83,6 +88,12 @@ cam_pos = cam_pos.lerp(target_pos, lerp_factor * delta)
 look_target = kart.global_position + kart.forward_flat * look_ahead + Vector3.UP * 0.55
 camera.look_at(look_target, Vector3.UP)
 ```
+
+`look_ahead` намеренно мал (0.4). Большой look-ahead смещает точку прицела далеко
+вперёд по yaw карта — камера смотрит "туда куда едем", а не "на карт сзади". При
+повороте это создаёт ощущение что карт виден немного сбоку, а не строго сзади.
+Малый look-ahead = камера смотрит почти на сам карт, всегда есть пространство
+спереди для видимости трассы, карт всегда в центре кадра.
 
 **Dynamic effects active in FOLLOW:**
 - Speed-dependent FOV (wider at high speed)
@@ -138,17 +149,25 @@ cam_offset.z = target_dist
 ```
 lerp_factor = lerp(lerp_slow, lerp_fast, t)
 ```
-Low speed: lazier follow (feels like camera has momentum).
-High speed: tighter follow (keeps kart framed).
+Низкая скорость: всё равно быстрый follow (lerp_slow=22) — низкая скорость не
+оправдывает визуальный lag, тянучка ощущается неприятно в любой ситуации.
+Высокая скорость: чуть быстрее (lerp_fast=30) — для надёжного удержания карта в
+кадре при быстрых поворотах. Разница между slow/fast намеренно минорная: оба
+значения дают ощущение rigid-follow, не lazy-follow.
 
 #### Drift Lateral Offset
 ```
 lateral_vel = kart.velocity.dot(kart.basis.x)
 t_drift = clamp(lateral_vel / max_speed, -1.0, 1.0)
 target_drift_x = t_drift * drift_max_offset
-_cam_drift_x = lerp(_cam_drift_x, target_drift_x, 3.5 * delta)
+_cam_drift_x = lerp(_cam_drift_x, target_drift_x, drift_lerp * delta)
 target_pos += kart.flat_basis.x * _cam_drift_x
 ```
+
+Смещение намеренно малое (drift_max_offset=0.6) — едва заметный hint что мы
+скользим, но не уводит камеру в сторону. Быстрый возврат (drift_lerp=12.0) когда
+дрифт кончается — камера не "болтается" после окончания заноса. Приоритет:
+sensation дрифта без дезориентации.
 
 #### Screen Shake (Trauma System)
 ```
@@ -198,14 +217,17 @@ t = clamp(abs(fwd_speed) / max_speed, 0.0, 1.0)
 
 | Variable | Default | Range |
 |---|---|---|
-| `lerp_slow` | 4.0 | 2.0-6.0 |
-| `lerp_fast` | 9.0 | 6.0-12.0 |
+| `lerp_slow` | 22.0 | 18.0-26.0 |
+| `lerp_fast` | 30.0 | 25.0-35.0 |
 
-| Speed | lerp_factor | Perceived lag |
+Оба значения дают rigid-feel. Perceived lag при delta=1/60:
+`lag ≈ 1 / lerp_factor * 1000ms` (approx, exponential convergence)
+
+| Speed | lerp_factor | Perceived lag (approx) |
 |---|---|---|
-| 0 m/s | 4.0 | ~240ms |
-| 12 m/s | 6.5 | ~100ms |
-| 23 m/s | 9.0 | ~67ms |
+| 0 m/s | 22.0 | ~45ms |
+| 12 m/s | 26.0 | ~38ms |
+| 23 m/s | 30.0 | ~33ms |
 
 ### Dynamic FOV
 ```
@@ -236,8 +258,8 @@ _cam_drift_x = lerp(_cam_drift_x, target_drift_x, drift_lerp * delta)
 
 | Variable | Default | Range |
 |---|---|---|
-| `drift_max_offset` | 1.4 | 0.5-2.5 |
-| `drift_lerp` | 3.5 | 2.0-6.0 |
+| `drift_max_offset` | 0.6 | 0.3-1.2 |
+| `drift_lerp` | 12.0 | 8.0-16.0 |
 
 ### Screen Shake
 ```
@@ -302,11 +324,11 @@ None — Camera is a leaf node in the dependency graph.
 | `dist_max` | 8.6 | 7.0-10.0 | Pullback at speed | No speed feel | Camera detaches |
 | `fov_min` | 65.0 | 55-70 | Base field of view | Tunnel vision | Fisheye distortion |
 | `fov_max` | 85.0 | 75-95 | Max FOV at speed | No speed feel | Nauseating |
-| `lerp_slow` | 4.0 | 2.0-6.0 | Camera lag at low speed | Sluggish, disconnected | Too snappy |
-| `lerp_fast` | 9.0 | 6.0-12.0 | Camera at high speed | Floaty at speed | Zero lag, boring |
-| `look_ahead` | 1.15 | 0.5-3.0 | Look-ahead distance | Can't see ahead | Kart not centered |
-| `drift_max_offset` | 1.4 | 0.5-2.5 | Drift camera shift | No drift communication | Disorienting |
-| `drift_lerp` | 3.5 | 2.0-6.0 | Drift offset speed | Drift offset lags behind | Snappy, jarring |
+| `lerp_slow` | 22.0 | 18.0-26.0 | Camera lag at low speed | Tянучка ("резинка") | Camera never settles |
+| `lerp_fast` | 30.0 | 25.0-35.0 | Camera at high speed | Slightly floaty | Jittery, nervous |
+| `look_ahead` | 0.4 | 0.2-1.0 | Look-ahead distance | Kart off-center, no road view | Kart appears to side, not behind |
+| `drift_max_offset` | 0.6 | 0.3-1.2 | Drift camera shift | No drift sensation | Camera swings away, disorienting |
+| `drift_lerp` | 12.0 | 8.0-16.0 | Drift offset return speed | Camera lingers sideways after drift | Offset snaps, jerky |
 | `shake_max_offset` | 0.15 | 0.05-0.3 | Shake intensity | Unfelt hits | Nausea |
 | `shake_decay_rate` | 2.5 | 1.5-4.0 | Shake duration | Shakes too long | Over too fast |
 | `death_zoom_speed` | 0.5 | 0.2-1.0 | Death cam zoom rate | Too static | Too fast |
@@ -360,6 +382,11 @@ Death overlay ("Killed by [name]") is owned by HUD, triggered by the same `died`
 - [ ] Death camera gives clear "I died" moment
 - [ ] Camera never clips through geometry on current maps
 - [ ] Overall: camera feels responsive and communicative, never fights the player
+- [ ] **Rigid-follow**: при резком повороте + отпуске руля карт визуально не
+      перекошен на экране более 50ms; за исключением активного дрифта карт
+      всегда виден строго сзади в центре кадра
+- [ ] **Нет тянучки**: при смене направления на низкой скорости камера не
+      "плывёт" с заметным отставанием
 
 ## Open Questions
 

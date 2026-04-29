@@ -30,7 +30,8 @@
       "mcp__godot__get_debug_output",
       "mcp__godot__stop_project",
       "mcp__godot__get_project_info",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m 'Browser multiplayer \\(M0-M11\\) + UI Neon Stadium + match management *)"
     ]
   }
 }

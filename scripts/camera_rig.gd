@@ -29,17 +29,17 @@ var _shake_trauma: float = 0.0
 @export var cam_height: float   = 4.1
 @export var dist_base: float    = 6.8
 @export var dist_max: float     = 8.6
-@export var look_ahead: float   = 1.15
-@export var lerp_slow: float    = 4.0
-@export var lerp_fast: float    = 9.0
+@export var look_ahead: float   = 0.4
+@export var lerp_slow: float    = 22.0
+@export var lerp_fast: float    = 30.0
 
 @export_group("FOV")
 @export var fov_min: float = 65.0
 @export var fov_max: float = 85.0
 
 @export_group("Drift Offset")
-@export var drift_max_offset: float = 1.4
-@export var drift_lerp: float       = 3.5
+@export var drift_max_offset: float = 0.0
+@export var drift_lerp: float       = 12.0
 
 @export_group("Shake")
 @export var shake_max_offset: float = 0.15

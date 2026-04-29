@@ -1,92 +1,4 @@
-[gd_resource type="Theme" load_steps=22 format=3 uid="uid://theme_main_01"]
-
-; Neon Stadium theme. Base font_size=18; buttons 22 (~68px tall); thick 2-3px
-; saturated borders; dramatic 32px shadows. RoomCard variation gives compact rows.
-
-[sub_resource type="StyleBoxFlat" id="SB_Card"]
-content_margin_left = 40.0
-content_margin_top = 36.0
-content_margin_right = 40.0
-content_margin_bottom = 36.0
-bg_color = Color(0.115, 0.13, 0.245, 0.96)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.3, 0.86, 1.0, 0.55)
-corner_radius_top_left = 18
-corner_radius_top_right = 18
-corner_radius_bottom_right = 18
-corner_radius_bottom_left = 18
-shadow_color = Color(0.05, 0.6, 1.0, 0.22)
-shadow_size = 36
-shadow_offset = Vector2(0, 12)
-
-[sub_resource type="StyleBoxFlat" id="SB_RoomCard"]
-content_margin_left = 22.0
-content_margin_top = 18.0
-content_margin_right = 22.0
-content_margin_bottom = 18.0
-bg_color = Color(0.165, 0.195, 0.34, 0.92)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.32, 0.45, 0.78, 0.85)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-
-[sub_resource type="StyleBoxFlat" id="SB_Button_Normal"]
-content_margin_left = 28.0
-content_margin_top = 18.0
-content_margin_right = 28.0
-content_margin_bottom = 18.0
-bg_color = Color(0.16, 0.22, 0.4, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.3, 0.86, 1.0, 0.7)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-
-[sub_resource type="StyleBoxFlat" id="SB_Button_Hover"]
-content_margin_left = 28.0
-content_margin_top = 18.0
-content_margin_right = 28.0
-content_margin_bottom = 18.0
-bg_color = Color(0.24, 0.34, 0.62, 1)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.3, 0.92, 1.0, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-shadow_color = Color(0.3, 0.92, 1.0, 0.5)
-shadow_size = 22
-
-[sub_resource type="StyleBoxFlat" id="SB_Button_Pressed"]
-content_margin_left = 28.0
-content_margin_top = 18.0
-content_margin_right = 28.0
-content_margin_bottom = 18.0
-bg_color = Color(0.1, 0.14, 0.27, 1)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(1, 0.84, 0.2, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
+[gd_resource type="Theme" format=3 uid="uid://wmefhrojayb8"]
 
 [sub_resource type="StyleBoxFlat" id="SB_Button_Disabled"]
 content_margin_left = 28.0
@@ -122,21 +34,81 @@ corner_radius_bottom_left = 10
 shadow_color = Color(1, 0.84, 0.2, 0.45)
 shadow_size = 14
 
-[sub_resource type="StyleBoxFlat" id="SB_LineEdit_Normal"]
-content_margin_left = 22.0
-content_margin_top = 16.0
-content_margin_right = 22.0
-content_margin_bottom = 16.0
-bg_color = Color(0.05, 0.07, 0.13, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.3, 0.86, 1.0, 0.5)
+[sub_resource type="StyleBoxFlat" id="SB_Button_Hover"]
+content_margin_left = 28.0
+content_margin_top = 18.0
+content_margin_right = 28.0
+content_margin_bottom = 18.0
+bg_color = Color(0.24, 0.34, 0.62, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.3, 0.92, 1, 1)
 corner_radius_top_left = 10
 corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
+shadow_color = Color(0.3, 0.92, 1, 0.5)
+shadow_size = 22
+
+[sub_resource type="StyleBoxFlat" id="SB_Button_Normal"]
+content_margin_left = 28.0
+content_margin_top = 18.0
+content_margin_right = 28.0
+content_margin_bottom = 18.0
+bg_color = Color(0.16, 0.22, 0.4, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.86, 1, 0.7)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="SB_Button_Pressed"]
+content_margin_left = 28.0
+content_margin_top = 18.0
+content_margin_right = 28.0
+content_margin_bottom = 18.0
+bg_color = Color(0.1, 0.14, 0.27, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 0.84, 0.2, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="SB_Scroll_Grabber"]
+bg_color = Color(0.3, 0.5, 0.85, 0.85)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="SB_Scroll_Grabber_Hover"]
+bg_color = Color(0.3, 0.92, 1, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="SB_Scroll_Bg"]
+bg_color = Color(0.045, 0.06, 0.12, 0.6)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="SB_Separator"]
+content_margin_top = 1.0
+content_margin_bottom = 1.0
+bg_color = Color(0.3, 0.86, 1, 0.35)
 
 [sub_resource type="StyleBoxFlat" id="SB_LineEdit_Focus"]
 content_margin_left = 22.0
@@ -156,6 +128,22 @@ corner_radius_bottom_left = 10
 shadow_color = Color(1, 0.84, 0.2, 0.45)
 shadow_size = 14
 
+[sub_resource type="StyleBoxFlat" id="SB_LineEdit_Normal"]
+content_margin_left = 22.0
+content_margin_top = 16.0
+content_margin_right = 22.0
+content_margin_bottom = 16.0
+bg_color = Color(0.05, 0.07, 0.13, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.86, 1, 0.5)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
 [sub_resource type="StyleBoxFlat" id="SB_LineEdit_ReadOnly"]
 content_margin_left = 22.0
 content_margin_top = 16.0
@@ -172,6 +160,36 @@ corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 
+[sub_resource type="StyleBoxFlat" id="SB_Card"]
+content_margin_left = 40.0
+content_margin_top = 36.0
+content_margin_right = 40.0
+content_margin_bottom = 36.0
+bg_color = Color(0.115, 0.13, 0.245, 0.96)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.86, 1, 0.55)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+shadow_color = Color(0.05, 0.6, 1, 0.22)
+shadow_size = 36
+shadow_offset = Vector2(0, 12)
+
+[sub_resource type="StyleBoxFlat" id="SB_PopupItem_Hover"]
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
+bg_color = Color(0.18, 0.27, 0.5, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
 [sub_resource type="StyleBoxFlat" id="SB_PopupPanel"]
 content_margin_left = 12.0
 content_margin_top = 12.0
@@ -182,7 +200,7 @@ border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.3, 0.86, 1.0, 0.7)
+border_color = Color(0.3, 0.86, 1, 0.7)
 corner_radius_top_left = 12
 corner_radius_top_right = 12
 corner_radius_bottom_right = 12
@@ -190,73 +208,13 @@ corner_radius_bottom_left = 12
 shadow_color = Color(0, 0, 0, 0.55)
 shadow_size = 18
 
-[sub_resource type="StyleBoxFlat" id="SB_PopupItem_Hover"]
-content_margin_left = 12.0
-content_margin_top = 8.0
-content_margin_right = 12.0
-content_margin_bottom = 8.0
-bg_color = Color(0.18, 0.27, 0.5, 1)
-border_width_left = 0
-border_width_top = 0
-border_width_right = 0
-border_width_bottom = 0
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-
-[sub_resource type="StyleBoxFlat" id="SB_Separator"]
-content_margin_top = 1.0
-content_margin_bottom = 1.0
-bg_color = Color(0.3, 0.86, 1.0, 0.35)
-
-[sub_resource type="StyleBoxFlat" id="SB_Scroll_Bg"]
-bg_color = Color(0.045, 0.06, 0.12, 0.6)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="SB_Scroll_Grabber"]
-bg_color = Color(0.3, 0.5, 0.85, 0.85)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="SB_Scroll_Grabber_Hover"]
-bg_color = Color(0.3, 0.92, 1.0, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="SB_Tooltip"]
-content_margin_left = 12.0
-content_margin_top = 8.0
-content_margin_right = 12.0
-content_margin_bottom = 8.0
-bg_color = Color(0.06, 0.08, 0.15, 0.97)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.3, 0.86, 1.0, 0.7)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="SB_PanelEmpty"]
-bg_color = Color(0, 0, 0, 0)
-
 [sub_resource type="StyleBoxFlat" id="SB_ProgressBg"]
 bg_color = Color(0.05, 0.07, 0.14, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.3, 0.86, 1.0, 0.4)
+border_color = Color(0.3, 0.86, 1, 0.4)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
@@ -268,6 +226,41 @@ corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="SB_RoomCard"]
+content_margin_left = 22.0
+content_margin_top = 18.0
+content_margin_right = 22.0
+content_margin_bottom = 18.0
+bg_color = Color(0.165, 0.195, 0.34, 0.92)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.32, 0.45, 0.78, 0.85)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="SB_PanelEmpty"]
+bg_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="SB_Tooltip"]
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
+bg_color = Color(0.06, 0.08, 0.15, 0.97)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.86, 1, 0.7)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [resource]
 default_font_size = 18
@@ -282,6 +275,10 @@ Button/styles/focus = SubResource("SB_Button_Focus")
 Button/styles/hover = SubResource("SB_Button_Hover")
 Button/styles/normal = SubResource("SB_Button_Normal")
 Button/styles/pressed = SubResource("SB_Button_Pressed")
+HScrollBar/styles/grabber = SubResource("SB_Scroll_Grabber")
+HScrollBar/styles/grabber_highlight = SubResource("SB_Scroll_Grabber_Hover")
+HScrollBar/styles/grabber_pressed = SubResource("SB_Scroll_Grabber_Hover")
+HScrollBar/styles/scroll = SubResource("SB_Scroll_Bg")
 HSeparator/constants/separation = 12
 HSeparator/styles/separator = SubResource("SB_Separator")
 ItemList/colors/font_color = Color(0.95, 0.97, 1, 1)
@@ -306,26 +303,22 @@ OptionButton/styles/focus = SubResource("SB_Button_Focus")
 OptionButton/styles/hover = SubResource("SB_Button_Hover")
 OptionButton/styles/normal = SubResource("SB_Button_Normal")
 OptionButton/styles/pressed = SubResource("SB_Button_Pressed")
-PanelContainer/styles/panel = SubResource("SB_Card")
 Panel/styles/panel = SubResource("SB_Card")
-RoomCard/base_type = &"PanelContainer"
-RoomCard/styles/panel = SubResource("SB_RoomCard")
+PanelContainer/styles/panel = SubResource("SB_Card")
 PauseDimmer/base_type = &"ColorRect"
 PopupMenu/colors/font_color = Color(0.95, 0.97, 1, 1)
 PopupMenu/colors/font_hover_color = Color(1, 0.84, 0.2, 1)
 PopupMenu/font_sizes/font_size = 18
-PopupMenu/styles/panel = SubResource("SB_PopupPanel")
 PopupMenu/styles/hover = SubResource("SB_PopupItem_Hover")
+PopupMenu/styles/panel = SubResource("SB_PopupPanel")
+ProgressBar/colors/font_color = Color(0.95, 0.97, 1, 1)
+ProgressBar/styles/background = SubResource("SB_ProgressBg")
+ProgressBar/styles/fill = SubResource("SB_ProgressFill")
+RoomCard/base_type = &"PanelContainer"
+RoomCard/styles/panel = SubResource("SB_RoomCard")
 ScrollContainer/styles/panel = SubResource("SB_PanelEmpty")
 TooltipPanel/styles/panel = SubResource("SB_Tooltip")
 VScrollBar/styles/grabber = SubResource("SB_Scroll_Grabber")
 VScrollBar/styles/grabber_highlight = SubResource("SB_Scroll_Grabber_Hover")
 VScrollBar/styles/grabber_pressed = SubResource("SB_Scroll_Grabber_Hover")
 VScrollBar/styles/scroll = SubResource("SB_Scroll_Bg")
-HScrollBar/styles/grabber = SubResource("SB_Scroll_Grabber")
-HScrollBar/styles/grabber_highlight = SubResource("SB_Scroll_Grabber_Hover")
-HScrollBar/styles/grabber_pressed = SubResource("SB_Scroll_Grabber_Hover")
-HScrollBar/styles/scroll = SubResource("SB_Scroll_Bg")
-ProgressBar/styles/background = SubResource("SB_ProgressBg")
-ProgressBar/styles/fill = SubResource("SB_ProgressFill")
-ProgressBar/colors/font_color = Color(0.95, 0.97, 1, 1)
