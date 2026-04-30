@@ -26,7 +26,7 @@ last-updated: 2026-04-28
 | 3 | HTML5 Export Pipeline | Infrastructure | 1 | MVP | Broken |
 | 4 | Health & Damage | Core | 2 | MVP | Designed |
 | 5 | Camera System | Core | 2 | MVP | Designed |
-| 6 | Kart Physics | Core | 2 | MVP | v2.4 Implementation in progress (emergent slip-angle) |
+| 6 | Kart Physics | Core | 2 | MVP | v3.1 Implemented (bicycle + auto-drift state machine). v3.2 Thermal Fade redesign in design phase |
 | 7 | Kart Classes | Feature | 3 | Alpha | Not Started |
 | 8 | Spawn System | Core | 3 | MVP | Designed |
 | 9 | Pickup System | Core | 3 | MVP | Designed |
@@ -173,7 +173,7 @@ MVP systems first, ordered by dependencies (can't design #9 before #8, etc.)
 | HTML5 Export Pipeline | - | Working | ✅ | |
 | Health & Damage | Designed | Implemented | - | design/gdd/health-damage.md, scripts/health_component.gd, scripts/damage_info.gd, scripts/event_bus.gd |
 | Camera System | Designed | Implemented | Not tested | design/gdd/camera-system.md, scripts/camera_rig.gd |
-| Kart Physics | v2.4 Designed (v2.1, v2.2, v2.3 archived) | v2.4 Implementation in progress | - | design/gdd/kart-physics.md (v2.4 emergent slip-angle), design/gdd/kart-physics-v2.3-archive.md, v2.2-archive.md, v2.1-archive.md, scripts/kart_physics_resource.gd, resources/kart_physics_default.tres |
+| Kart Physics | v3.1 Designed (v2.x archived) | v3.1 Implemented (bicycle + auto-drift SM); v3.2 Thermal Fade in design | - | design/gdd/kart-physics.md (v3.0/3.1 active), design/notes/v3-2-drift-shape-brief.md (v3.2 proposal), design/gdd/kart-physics-v2.4-archive.md (+ v2.3, v2.2, v2.1), scripts/physics/{bicycle_physics,drift_state_machine,physics_input,physics_state}.gd, scripts/kart_physics_resource.gd, resources/kart_physics_default.tres |
 | Kart Classes | - | - | - | |
 | Spawn System | Designed | Implemented | Not tested | design/gdd/spawn-system.md, scripts/spawn_manager.gd |
 | Pickup System | Designed | Partial | - | design/gdd/pickup-system.md |
