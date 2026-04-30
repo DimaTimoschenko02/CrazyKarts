@@ -1,64 +1,63 @@
 extends CharacterBody3D
 
+# Orchestrator: input → BicyclePhysics.step() → apply to body → VFX/network/visual.
+# Physics math lives in scripts/physics/bicycle_physics.gd (pure RefCounted module).
+# v3.0: two-axle bicycle model with saturating tire forces. See design/gdd/kart-physics.md.
+
 # ── Physics resource ──────────────────────────────────────────────────────────
 @export var physics: KartPhysicsResource
 const DEFAULT_PHYSICS_PATH := "res://resources/kart_physics_default.tres"
 
-# ── Drift (v2.4 — Emergent Slip-Angle) ───────────────────────────────────────
-# Implements GDD kart-physics.md v2.4.
-# _drift_intensity is derived from measured slip_angle (atan2), NOT from steer input.
-# Framerate-independent: side_speed *= exp(-_grip*delta), alpha = 1-exp(-rate*delta).
-# Slip is measured BEFORE move_and_slide() to avoid false spikes from wall contact.
-var _drift_intensity: float = 0.0    # physics master [0..1]
-var _slip_angle_deg: float = 0.0     # debug/telemetry — measured slip angle
-var _slip_ratio: float = 0.0         # debug/telemetry — normalized slip [0..1]
-var _grip: float = 18.0              # initialised in _ready from physics.high_grip_target
-# _is_drifting: bool — mini-hysteresis ±0.02 around drift_active_threshold. VFX/audio/network only.
-var _is_drifting: bool = false
+# ── Bicycle physics module + IO ───────────────────────────────────────────────
+var _bicycle: BicyclePhysics
+var _phys_input: PhysicsInput
+
+# ── Drift state machine (auto-trigger, layered on bicycle) ───────────────────
+var _drift_sm: DriftStateMachine
+var _drift_visual_yaw: float = 0.0   # smoothed visual yaw applied to BaseCar
+var _drift_active: bool = false      # mirror of state machine ACTIVE
+var _drift_direction: int = 0        # -1 / 0 / +1
+var _drift_power: float = 0.0        # 0..1 accumulated power
+
+# ── Public state mirrors (set from PhysicsState each tick — public contract) ──
+var _drift_intensity: float = 0.0    # camera, VFX, audio consume this
+var _is_drifting: bool = false       # VFX/audio on-off trigger
+var _cached_side_speed: float = 0.0  # legacy debug overlays read this
+var _omega: float = 0.0              # for visual lean and debug
+
+# ── Visual state ──────────────────────────────────────────────────────────────
 var _visual_drift_angle: float = 0.0
-var _cached_side_speed: float = 0.0  # stored for VFX threshold check
-var _base_car_rot_y: float = 0.0     # BaseCar initial rotation.y (0 after 180° fix)
-var _wheel_roll_angle: float = 0.0   # accumulated roll for wheel spin animation
-var _steer_visual_angle: float = 0.0 # smoothed visual steer angle (radians)
+var _base_car_rot_y: float = 0.0
+var _wheel_roll_angle: float = 0.0
+var _steer_visual_angle: float = 0.0
+
+# ── Per-rear-wheel slip (drives independent VFX trails) ───────────────────────
+var _rear_l_lat_speed: float = 0.0
+var _rear_r_lat_speed: float = 0.0
 
 # ── Network ──────────────────────────────────────────────────────────────────
 const SYNC_INTERVAL := 0.033
-
-# ── Player identity ─────────────────────────────────────────────────────────
 var player_id: int = 0
 var player_name: String = ""
-
-# ── Snapshot buffer (remote karts only) ──────────────────────────────────────
-var _snapshot_buffer = null  # SnapshotBufferClass instance for remote karts
+var _snapshot_buffer: SnapshotBufferClass = null
 var _sync_timer: float = 0.0
-
-# ── VFX ──────────────────────────────────────────────────────────────────────
-var _smoke_timer: float = 0.0
-var _mark_timer:  float = 0.0
+var _last_known_pos: Vector3 = Vector3.ZERO
 
 # ── Collision (disabled on death) ────────────────────────────────────────────
 var _original_collision_layer: int = 0
 var _original_collision_mask: int = 0
 
-# ── Debug cache ──────────────────────────────────────────────────────────────
-var _dbg_fwd_vel  : float = 0.0
-var _dbg_lat_vel  : float = 0.0
-var _dbg_vert_vel : float = 0.0
-var _dbg_angular  : float = 0.0
-var _dbg_on_floor : bool  = false
-
 # ── Input (smoothed) ─────────────────────────────────────────────────────────
 var _throttle:    float = 0.0
 var _steer_input: float = 0.0
+
+# ── Weapon ───────────────────────────────────────────────────────────────────
 var _launcher_nodes: Array[Node3D] = []
 const LAUNCHER_SCENE := preload("res://scenes/launcher.tscn")
 const ROCKET_SCENE := preload("res://scenes/rocket.tscn")
 const ROCKET_CONFIG := preload("res://resources/rocket_config.tres")
 const SnapshotBufferClass := preload("res://scripts/snapshot_buffer.gd")
 const ROCKET_SPREAD_DEG := 10.0
-
-# ── Server-side tracking ─────────────────────────────────────────────────────
-var _last_known_pos: Vector3 = Vector3.ZERO
 
 @onready var name_label:      Label3D         = $NameLabel
 @onready var _health:         HealthComponent = $HealthComponent
@@ -86,7 +85,6 @@ func _ready() -> void:
 	if not physics:
 		physics = load(DEFAULT_PHYSICS_PATH)
 	if physics:
-		_grip = physics.high_grip_target
 		floor_snap_length = physics.floor_snap_length
 	floor_stop_on_slope = false
 	floor_max_angle = deg_to_rad(50.0)
@@ -95,7 +93,6 @@ func _ready() -> void:
 	var is_local := (player_id == multiplayer.get_unique_id())
 	name_label.text = player_name
 
-	# Remote karts: create snapshot buffer for interpolation
 	if not is_local:
 		_snapshot_buffer = SnapshotBufferClass.new()
 
@@ -121,12 +118,18 @@ func _ready() -> void:
 	StateManager.kart_state_changed.connect(_on_kart_state_changed)
 	StateManager.weapon_state_changed.connect(_on_weapon_state_changed)
 
+	# Bicycle physics module — local kart only (remote karts use snapshot interpolation).
+	if is_local and physics:
+		_bicycle = BicyclePhysics.new(physics)
+		_phys_input = PhysicsInput.new()
+		_drift_sm = DriftStateMachine.new(physics)
+		_setup_axle_geometry()
+
 	if OS.is_debug_build() and not OS.has_feature("web"):
 		DevParams.params_changed.connect(_on_dev_params_changed)
 		if not DevParams.get_data().is_empty():
 			_on_dev_params_changed(DevParams.get_data())
 
-	# Debug vector overlay (local kart only, debug builds only)
 	if OS.is_debug_build() and is_local:
 		var dbg := preload("res://scripts/debug_vectors_3d.gd").new()
 		dbg.target = self
@@ -142,6 +145,26 @@ func _ready() -> void:
 		get_tree().current_scene.add_child.call_deferred(dbg_trails)
 
 
+func _setup_axle_geometry() -> void:
+	if not _bicycle:
+		return
+	var wb: float = physics.wheelbase_override
+	if wb <= 0.0 and _wheel_fl and _wheel_rl:
+		wb = absf(_wheel_fl.global_position.z - _wheel_rl.global_position.z)
+		if wb < 0.1:
+			wb = 1.2
+	elif wb <= 0.0:
+		wb = 1.2
+	var tw: float = physics.track_width_override
+	if tw <= 0.0 and _wheel_rl and _wheel_rr:
+		tw = absf(_wheel_rl.global_position.x - _wheel_rr.global_position.x)
+		if tw < 0.05:
+			tw = 0.9
+	elif tw <= 0.0:
+		tw = 0.9
+	_bicycle.set_axle_geometry(wb, tw)
+
+
 func _exit_tree() -> void:
 	if _health and _health.died.is_connected(_on_health_died):
 		_health.died.disconnect(_on_health_died)
@@ -150,6 +173,11 @@ func _exit_tree() -> void:
 	if StateManager.weapon_state_changed.is_connected(_on_weapon_state_changed):
 		StateManager.weapon_state_changed.disconnect(_on_weapon_state_changed)
 
+
+# ── Dev params hot-reload ────────────────────────────────────────────────────
+# Mutates physics resource fields in-place. BicyclePhysics holds a reference,
+# so changes apply on the next step() call. Deprecated v2.4 keys still read
+# (no-op for physics, but keeps dev_params.json roundtrip stable).
 
 func _on_dev_params_changed(data: Dictionary) -> void:
 	if not physics:
@@ -166,7 +194,7 @@ func _on_dev_params_changed(data: Dictionary) -> void:
 	physics.steer_slew_rate_out   = data.get("STEER_SLEW_OUT",         physics.steer_slew_rate_out)
 	physics.throttle_slew_rate    = data.get("THROTTLE_SLEW",          physics.throttle_slew_rate)
 	physics.steer_visual_rate     = data.get("STEER_VISUAL_RATE",      physics.steer_visual_rate)
-	# Steering
+	# Steering (legacy + still-used scales)
 	physics.steering_speed        = data.get("STEERING_SPEED",         physics.steering_speed)
 	physics.steer_low_speed_mult  = data.get("STEER_LOW_MULT",         physics.steer_low_speed_mult)
 	physics.steer_high_speed_mult = data.get("STEER_HIGH_MULT",        physics.steer_high_speed_mult)
@@ -174,21 +202,30 @@ func _on_dev_params_changed(data: Dictionary) -> void:
 	physics.stationary_steer_threshold = data.get("STATIONARY_STEER_THRESHOLD", physics.stationary_steer_threshold)
 	physics.stationary_steer_scale     = data.get("STATIONARY_STEER_SCALE",     physics.stationary_steer_scale)
 	physics.wheel_radius          = data.get("WHEEL_RADIUS",           physics.wheel_radius)
-	# Drift (v2.4: emergent slip-angle)
-	physics.high_grip_target          = data.get("HIGH_GRIP",                   physics.high_grip_target)
-	physics.low_grip_target           = data.get("LOW_GRIP",                    physics.low_grip_target)
-	physics.grip_loss_rate            = data.get("GRIP_LOSS_RATE",              physics.grip_loss_rate)
-	physics.grip_recovery_rate        = data.get("GRIP_RECOVERY_RATE",          physics.grip_recovery_rate)
+	# v3.0 bicycle params
+	physics.wheelbase_override    = data.get("WHEELBASE_OVERRIDE",     physics.wheelbase_override)
+	physics.track_width_override  = data.get("TRACK_WIDTH_OVERRIDE",   physics.track_width_override)
+	physics.max_steer_angle_deg   = data.get("MAX_STEER_ANGLE_DEG",    physics.max_steer_angle_deg)
+	physics.front_grip_stiffness  = data.get("FRONT_GRIP",             physics.front_grip_stiffness)
+	physics.rear_grip_stiffness   = data.get("REAR_GRIP",              physics.rear_grip_stiffness)
+	physics.tire_saturation_speed = data.get("TIRE_SATURATION",        physics.tire_saturation_speed)
+	physics.inertia_scale         = data.get("INERTIA_SCALE",          physics.inertia_scale)
+	physics.omega_damping         = data.get("OMEGA_DAMPING",          physics.omega_damping)
+	physics.stationary_omega_kick = data.get("STATIONARY_OMEGA_KICK",  physics.stationary_omega_kick)
+	physics.drift_max_slip_speed  = data.get("DRIFT_MAX_SLIP_SPEED",   physics.drift_max_slip_speed)
+	physics.omega_lean_scale      = data.get("OMEGA_LEAN_SCALE",       physics.omega_lean_scale)
+	# Drift signal shaping (still-used + deprecated v2.4 — kept for JSON roundtrip)
 	physics.drift_min_speed           = data.get("DRIFT_MIN_SPEED",             physics.drift_min_speed)
 	physics.drift_max_slip_angle_deg  = data.get("DRIFT_MAX_SLIP_ANGLE_DEG",    physics.drift_max_slip_angle_deg)
 	physics.slip_smoothing            = data.get("SLIP_SMOOTHING",              physics.slip_smoothing)
 	physics.drift_intent_multiplier   = data.get("DRIFT_INTENT_MULTIPLIER",     physics.drift_intent_multiplier)
 	physics.drift_intent_threshold    = data.get("DRIFT_INTENT_THRESHOLD",      physics.drift_intent_threshold)
 	physics.grip_slip_exponent        = data.get("GRIP_SLIP_EXPONENT",          physics.grip_slip_exponent)
+	physics.high_grip_target          = data.get("HIGH_GRIP",                   physics.high_grip_target)
+	physics.low_grip_target           = data.get("LOW_GRIP",                    physics.low_grip_target)
 	physics.drift_yaw_multiplier      = data.get("DRIFT_YAW_MULTIPLIER",        physics.drift_yaw_multiplier)
 	physics.drift_active_threshold    = data.get("DRIFT_ACTIVE_THRESHOLD",      physics.drift_active_threshold)
 	physics.vfx_smoke_speed_threshold = data.get("VFX_SMOKE_THRESHOLD",         physics.vfx_smoke_speed_threshold)
-	# Drift resistance (lerp endpoints at intensity=1.0)
 	physics.drift_drag_multiplier     = data.get("DRIFT_DRAG_MULTIPLIER",       physics.drift_drag_multiplier)
 	physics.drift_rolling_multiplier  = data.get("DRIFT_ROLLING_MULTIPLIER",    physics.drift_rolling_multiplier)
 	physics.cornering_drag_coeff      = data.get("CORNERING_DRAG_COEFF",        physics.cornering_drag_coeff)
@@ -199,6 +236,27 @@ func _on_dev_params_changed(data: Dictionary) -> void:
 	physics.gravity                   = data.get("GRAVITY",                     physics.gravity)
 	physics.floor_align_speed         = data.get("FLOOR_ALIGN_SPEED",           physics.floor_align_speed)
 	physics.slope_speed_influence     = data.get("SLOPE_INFLUENCE",             physics.slope_speed_influence)
+	# v3.1 drift state machine
+	physics.auto_drift_enabled        = bool(data.get("AUTO_DRIFT_ENABLED",     1 if physics.auto_drift_enabled else 0))
+	physics.drift_enter_steer         = data.get("DRIFT_ENTER_STEER",           physics.drift_enter_steer)
+	physics.drift_enter_speed         = data.get("DRIFT_ENTER_SPEED",           physics.drift_enter_speed)
+	physics.drift_enter_debounce      = data.get("DRIFT_ENTER_DEBOUNCE",        physics.drift_enter_debounce)
+	physics.drift_exit_steer          = data.get("DRIFT_EXIT_STEER",            physics.drift_exit_steer)
+	physics.drift_exit_speed          = data.get("DRIFT_EXIT_SPEED",            physics.drift_exit_speed)
+	physics.drift_exit_duration       = data.get("DRIFT_EXIT_DURATION",         physics.drift_exit_duration)
+	physics.drift_visual_offset_deg   = data.get("DRIFT_VISUAL_OFFSET_DEG",     physics.drift_visual_offset_deg)
+	physics.drift_visual_smooth_rate  = data.get("DRIFT_VISUAL_SMOOTH_RATE",    physics.drift_visual_smooth_rate)
+	physics.drift_engage_in_rate      = data.get("DRIFT_ENGAGE_IN_RATE",        physics.drift_engage_in_rate)
+	physics.drift_engage_out_rate     = data.get("DRIFT_ENGAGE_OUT_RATE",       physics.drift_engage_out_rate)
+	physics.drift_recovery_rate       = data.get("DRIFT_RECOVERY_RATE",         physics.drift_recovery_rate)
+	physics.drift_exit_grip_mult      = data.get("DRIFT_EXIT_GRIP_MULT",        physics.drift_exit_grip_mult)
+	physics.drift_rear_grip_mult      = data.get("DRIFT_REAR_GRIP_MULT",        physics.drift_rear_grip_mult)
+	physics.drift_yaw_bonus           = data.get("DRIFT_YAW_BONUS",             physics.drift_yaw_bonus)
+	physics.drift_forward_assist      = data.get("DRIFT_FORWARD_ASSIST",        physics.drift_forward_assist)
+	physics.drift_power_full_time     = data.get("DRIFT_POWER_FULL_TIME",       physics.drift_power_full_time)
+	physics.drift_min_active_for_boost = data.get("DRIFT_MIN_ACTIVE_FOR_BOOST", physics.drift_min_active_for_boost)
+	physics.drift_exit_boost_force    = data.get("DRIFT_EXIT_BOOST_FORCE",      physics.drift_exit_boost_force)
+	physics.drift_exit_boost_duration = data.get("DRIFT_EXIT_BOOST_DURATION",   physics.drift_exit_boost_duration)
 
 
 # ── State change handlers ────────────────────────────────────────────────────
@@ -219,17 +277,28 @@ func _on_enter_dead() -> void:
 	collision_layer = 0
 	collision_mask = 0
 	_clear_launchers()
-	# v2.4: reset intensity and all derived state immediately.
+	_reset_kart_state()
+
+
+# Single source of truth for kart state reset. Called from _on_enter_dead and respawn().
+func _reset_kart_state() -> void:
 	_drift_intensity = 0.0
-	_slip_angle_deg = 0.0
-	_slip_ratio = 0.0
 	_is_drifting = false
+	_omega = 0.0
 	_visual_drift_angle = 0.0
+	_drift_visual_yaw = 0.0
+	_drift_active = false
+	_drift_direction = 0
+	_drift_power = 0.0
 	_cached_side_speed = 0.0
+	_rear_l_lat_speed = 0.0
+	_rear_r_lat_speed = 0.0
 	_wheel_roll_angle = 0.0
 	_steer_visual_angle = 0.0
-	if physics:
-		_grip = physics.high_grip_target
+	if _bicycle:
+		_bicycle.reset()
+	if _drift_sm:
+		_drift_sm.reset()
 	if $BaseCar:
 		$BaseCar.rotation.y = _base_car_rot_y
 	_reset_wheel_rotations()
@@ -239,8 +308,6 @@ func _on_enter_alive() -> void:
 	visible = true
 	collision_layer = _original_collision_layer
 	collision_mask = _original_collision_mask
-	if physics:
-		_grip = physics.high_grip_target
 
 
 func _on_weapon_state_changed(peer_id: int, _from: GameStates.WeaponState, to: GameStates.WeaponState) -> void:
@@ -255,24 +322,105 @@ func _on_weapon_state_changed(peer_id: int, _from: GameStates.WeaponState, to: G
 # ── Main loop (local kart only) ──────────────────────────────────────────────
 
 func _physics_process(delta: float) -> void:
-	# Remote karts: no physics, interpolation happens in _process
+	# Remote karts: no physics — _process handles snapshot interpolation.
 	if multiplayer.get_unique_id() != player_id:
 		return
-
 	if not StateManager.can_move(player_id):
 		return
+	if not _bicycle or not _phys_input or not _drift_sm:
+		return
 
-	# ── 1. Input smoothing ────────────────────────────────────────────────────
+	# 1. Input smoothing (exp-lerp, framerate-independent).
+	_smooth_input(delta)
+
+	# 2. Gravity (vertical only — bicycle module sees y untouched).
+	if not is_on_floor():
+		velocity.y -= physics.gravity * delta
+
+	# 3. Drift state machine: decides ACTIVE/IDLE, returns layered overrides.
+	# Runs BEFORE bicycle so rear_grip_multiplier feeds tire force calc.
+	var fwd_dir: Vector3 = -global_transform.basis.z
+	var planar_speed: float = Vector3(velocity.x, 0.0, velocity.z).length()
+	var fwd_signed: float = velocity.dot(fwd_dir)
+	var drift: Dictionary = _drift_sm.update(
+		planar_speed, _steer_input, is_on_floor(), _throttle, delta
+	)
+	_drift_active = drift["is_active"]
+	_drift_direction = drift["direction"]
+	_drift_visual_yaw = drift["visual_yaw_offset_rad"]
+	_drift_power = drift["power"]
+
+	# 4. Build PhysicsInput snapshot (basis after any prior rotation).
+	_phys_input.velocity = velocity
+	_phys_input.basis = global_transform.basis
+	_phys_input.throttle = _throttle
+	_phys_input.steer_input = _steer_input
+	_phys_input.brake_held = Input.is_action_pressed("move_backward")
+	_phys_input.on_floor = is_on_floor()
+	_phys_input.rear_grip_multiplier = drift["rear_grip_multiplier"]
+
+	# 5. Bicycle physics step.
+	var state: PhysicsState = _bicycle.step(_phys_input, delta)
+
+	# 6. Yaw application: bicycle delta + drift state bonus (extra rotation in ACTIVE).
+	var total_yaw_delta: float = state.yaw_delta + drift["yaw_bonus_rad_per_sec"] * delta
+	if absf(total_yaw_delta) > 0.0:
+		rotate_y(total_yaw_delta)
+
+	# 7. Velocity: keep gravity Y, take bicycle's XZ, then apply drift forward assist + exit boost.
+	velocity = Vector3(state.new_velocity.x, velocity.y, state.new_velocity.z)
+	var assist: float = drift["forward_assist_force"] + drift["exit_boost_force"]
+	if absf(assist) > 0.0 and fwd_signed >= 0.0:
+		var fwd_after: Vector3 = -global_transform.basis.z
+		velocity += fwd_after * assist * delta
+
+	# 6. Cache public mirrors for VFX, debug, network, camera.
+	_drift_intensity = state.drift_intensity
+	_is_drifting = state.is_drifting
+	_omega = state.omega
+	_rear_l_lat_speed = state.rear_left_lat_speed
+	_rear_r_lat_speed = state.rear_right_lat_speed
+	_cached_side_speed = (absf(state.rear_left_lat_speed) + absf(state.rear_right_lat_speed)) * 0.5
+
+	# 7. Move.
+	move_and_slide()
+
+	# 8. Slope speed influence (post-slide).
+	_apply_slope_influence(delta)
+
+	# 9. Floor alignment — pitch/roll only, yaw locked (anti-feedback in circular drift).
+	_apply_floor_align(delta)
+
+	# 10. Kart-to-kart collision response (server-only).
+	_apply_kart_collisions(state.fwd_speed)
+
+	# 11. Visual lean (driven by omega — replaces v2.4 sign(side_speed) heuristic).
+	_update_visual_lean(state, delta)
+
+	# 12. Wheel visual animation.
+	_update_wheel_visuals(state, delta)
+
+	# 13. VFX (per-rear-wheel slip thresholds).
+	_update_vfx()
+
+	# 14. Weapon firing.
+	if Input.is_action_just_pressed("fire") and StateManager.can_fire(player_id):
+		_fire()
+
+	# 15. Web metrics + debug overlay.
+	_update_web_metrics(state)
+	_update_debug_overlay(state)
+
+	# 16. Network sync (30 Hz).
+	_send_network_sync(delta)
+
+
+# ── Per-tick helpers ─────────────────────────────────────────────────────────
+
+func _smooth_input(delta: float) -> void:
 	var raw_throttle := Input.get_axis("move_backward", "move_forward")
 	var raw_steer    := Input.get_axis("steer_right",   "steer_left")
-
-	var steer_slew: float
-	if absf(raw_steer) > absf(_steer_input):
-		steer_slew = physics.steer_slew_rate_in
-	else:
-		steer_slew = physics.steer_slew_rate_out
-	# Fix #3b: exp-lerp for framerate-independent input smoothing.
-	# move_toward was fps-dependent. exp-lerp converges asymptotically — snap at ≈0 prevents micro-creep.
+	var steer_slew: float = physics.steer_slew_rate_in if absf(raw_steer) > absf(_steer_input) else physics.steer_slew_rate_out
 	var steer_alpha: float = 1.0 - exp(-steer_slew * delta)
 	_steer_input = lerp(_steer_input, raw_steer, steer_alpha)
 	if absf(_steer_input) < 0.01 and absf(raw_steer) < 0.01:
@@ -280,303 +428,190 @@ func _physics_process(delta: float) -> void:
 	var throttle_alpha: float = 1.0 - exp(-physics.throttle_slew_rate * delta)
 	_throttle = lerp(_throttle, raw_throttle, throttle_alpha)
 
-	# ── 2. Gravity ────────────────────────────────────────────────────────────
+
+func _apply_slope_influence(delta: float) -> void:
 	if not is_on_floor():
-		velocity.y -= physics.gravity * delta
+		return
+	var slope_factor := -global_transform.basis.z.dot(Vector3.UP)
+	var cur_fwd  := -global_transform.basis.z
+	var cur_side :=  global_transform.basis.x
+	var cur_fwd_speed  := velocity.dot(cur_fwd)
+	var cur_side_speed := velocity.dot(cur_side)
+	cur_fwd_speed += slope_factor * physics.slope_speed_influence * delta
+	velocity = cur_fwd * cur_fwd_speed + cur_side * cur_side_speed + Vector3(0.0, velocity.y, 0.0)
 
-	# ── 3. Decompose velocity ─────────────────────────────────────────────────
-	var fwd_dir  := -global_transform.basis.z
-	var side_dir :=  global_transform.basis.x
-	var fwd_speed  := velocity.dot(fwd_dir)
-	var side_speed := velocity.dot(side_dir)
 
-	# ── 4. Direct rotation (no bicycle model) ────────────────────────────────
-	# GDD §Movement Model: rotate_y() + velocity projection. No wheelbase, no tan(steer_angle).
-	# Yaw multiplier is continuous from _drift_intensity (emergent feedback loop).
-	var speed_ratio: float = clamp(absf(fwd_speed) / maxf(physics.max_speed, 0.01), 0.0, 1.0)
-	var steer_mult: float = lerp(physics.steer_low_speed_mult, physics.steer_high_speed_mult, speed_ratio)
-	# Fix #4: smoothstep replaces binary flip — no discrete yaw-sign jump when reversing.
-	var steer_sign: float = lerp(-1.0, 1.0, smoothstep(-1.0, 0.0, fwd_speed))
+func _apply_floor_align(delta: float) -> void:
+	# Variant C: slerp affects pitch/roll only — yaw saved before, restored after.
+	# Prevents yaw feedback loop that would amplify omega in long circular drifts.
+	if not is_on_floor() or physics.floor_align_speed <= 0.0:
+		return
+	var fwd_dir := -global_transform.basis.z
+	var floor_n := get_floor_normal()
+	var projected_fwd := fwd_dir - floor_n * fwd_dir.dot(floor_n)
+	if projected_fwd.length_squared() <= 0.0001:
+		return
+	var yaw_before: float = global_transform.basis.get_euler().y
+	var target_basis := Basis.looking_at(projected_fwd, floor_n)
+	# exp-form weight: framerate-independent (smooth-values rule)
+	var align_alpha: float = 1.0 - exp(-physics.floor_align_speed * delta)
+	var new_basis: Basis = global_transform.basis.slerp(target_basis, align_alpha).orthonormalized()
+	var euler_after: Vector3 = new_basis.get_euler()
+	euler_after.y = yaw_before
+	global_transform.basis = Basis.from_euler(euler_after).orthonormalized()
 
-	# Stationary steering — smoothstep blend around stationary_steer_threshold
-	var base_scale: float = clamp(absf(fwd_speed) / maxf(physics.steer_speed_threshold, 0.01), 0.0, 1.0)
-	var blend_low: float  = maxf(physics.stationary_steer_threshold - 0.5, 0.0)
-	var blend_high: float = physics.stationary_steer_threshold + 0.5
-	var blend: float = smoothstep(blend_low, blend_high, absf(fwd_speed))
-	var speed_scale: float = lerp(physics.stationary_steer_scale, base_scale, blend)
 
-	# Continuous yaw multiplier from drift intensity
-	var yaw_mult: float = lerp(1.0, physics.drift_yaw_multiplier, _drift_intensity)
+func _apply_kart_collisions(fwd_speed: float) -> void:
+	if not multiplayer.is_server():
+		return
+	for i in get_slide_collision_count():
+		var col := get_slide_collision(i)
+		var other := col.get_collider()
+		if other is CharacterBody3D and other.has_method("get_kart_mass"):
+			var other_kart := other as CharacterBody3D
+			var my_energy := physics.mass * absf(fwd_speed)
+			var other_energy: float = other_kart.call("get_kart_mass") * other_kart.velocity.length()
+			var energy_diff := my_energy - other_energy
+			var push_dir := col.get_normal()
+			var force: float = clamp(absf(energy_diff) * 0.5, physics.bump_min_force, physics.bump_max_force)
+			if energy_diff > 0.0:
+				other.velocity += push_dir * force
+			else:
+				velocity += -push_dir * force
 
-	# GDD §Smoothstep Intent Aid: continuous extra yaw at committed steer, active above drift_min_speed.
-	# smoothstep gives C1-continuous ramp — no binary threshold snap.
-	# drift_intent_curve (optional): shape the speed-based scale of intent. Fallback: flat 1.0.
-	var intent_aid: float = 0.0
-	if fwd_speed > physics.drift_min_speed:
-		var intent_scale: float = smoothstep(physics.drift_intent_threshold, 1.0, absf(_steer_input))
-		var intent_speed_scale: float = 1.0
-		if physics.drift_intent_curve:
-			intent_speed_scale = physics.drift_intent_curve.sample(speed_ratio)
-		intent_aid = physics.drift_intent_multiplier * intent_scale * signf(_steer_input) * intent_speed_scale
 
-	var yaw_rate: float = (_steer_input + intent_aid) * steer_sign * physics.steering_speed * steer_mult * speed_scale * yaw_mult
-	rotate_y(yaw_rate * delta)
-
-	# Recompute dirs after rotation, then re-project BOTH fwd_speed and side_speed onto new basis.
-	# This is the bicycle-model momentum transfer: after rotate_y the kart heading changed but
-	# velocity still points in the old direction, so part of forward momentum becomes lateral.
-	# This is intentional — it is the mechanism that creates drift sliding.
-	# Thrust is applied AFTER re-projection (step 5) so it is not discarded by the dot-product.
-	fwd_dir  = -global_transform.basis.z
-	side_dir =  global_transform.basis.x
-	fwd_speed  = velocity.dot(fwd_dir)
-	side_speed = velocity.dot(side_dir)
-
-	# ── 5. Force-based acceleration ───────────────────────────────────────────
-	# GDD §Movement Model: thrust + quadratic drag + linear rolling + explicit brake.
-	# Applied after re-projection so thrust is not lost to the dot-product reset.
-	var thrust: float = 0.0
-	if _throttle > 0.01:
-		thrust = _throttle * physics.accel_force
-	elif _throttle < -0.01:
-		thrust = _throttle * physics.accel_force * physics.reverse_ratio
-
-	var drag_mult:    float = lerp(1.0, physics.drift_drag_multiplier,    _drift_intensity)
-	var rolling_mult: float = lerp(1.0, physics.drift_rolling_multiplier, _drift_intensity)
-
-	var drag: float = -signf(fwd_speed) * physics.k_drag * drag_mult * fwd_speed * fwd_speed
-	var rolling: float = -physics.k_rolling * rolling_mult * fwd_speed
-
-	# GDD §Force-based acceleration (v2.4): tire scrubbing — extra fwd decel proportional to |side_speed|.
-	# Works at ANY slip magnitude, independent of _drift_intensity. Fills gap where drift_drag_multiplier
-	# doesn't activate in light turns (intensity stays low → negligible drag effect).
-	# sign(fwd_speed) ensures deceleration always opposes forward motion.
-	# Guard at |fwd_speed| < 0.1: sign(≈0) = 0 by design, but explicit guard for clarity.
-	# cornering_drag_curve (optional): shape drag vs |side_speed|. Fallback: flat 1.0 (linear).
-	var cornering_drag: float = 0.0
-	if absf(fwd_speed) >= 0.1:
-		var drag_scale: float = 1.0
-		if physics.cornering_drag_curve:
-			drag_scale = physics.cornering_drag_curve.sample(clamp(absf(side_speed) / 10.0, 0.0, 1.0))
-		cornering_drag = -signf(fwd_speed) * physics.cornering_drag_coeff * absf(side_speed) * drag_scale
-
-	var brake: float = 0.0
-	if Input.is_action_pressed("move_backward") and fwd_speed > 0.5:
-		brake = -physics.brake_force
-
-	fwd_speed += (thrust + drag + rolling + cornering_drag + brake) * delta
-
-	# Snap to zero near standstill when no throttle (avoids infinite float drift).
-	if absf(thrust) < 0.01 and absf(fwd_speed) < 0.1:
-		fwd_speed = 0.0
-
-	# ── 6. Slip angle measurement (BEFORE move_and_slide) ────────────────────
-	# GDD §Drift Model v2.4 Step 1: slip_angle measured here, after velocity decompose from
-	# rotated basis but BEFORE move_and_slide(). Post-slide velocity includes wall-slide
-	# lateral components that would falsely spike intensity on wall contact.
-	# atan2 denominator clamped to 0.5 — prevents phantom slip at near-zero fwd_speed.
-	var slip_angle_rad: float = atan2(absf(side_speed), maxf(absf(fwd_speed), 0.5))
-	_slip_angle_deg = rad_to_deg(slip_angle_rad)
-	_slip_ratio = clamp(_slip_angle_deg / maxf(physics.drift_max_slip_angle_deg, 0.001), 0.0, 1.0)
-
-	# ── 7. Intensity update (framerate-independent exponential lerp) ──────────
-	# GDD §Drift Model v2.4 Step 2.
-	# Hard gate: below drift_min_speed or in reverse, target decays to 0.
-	var target_intensity: float
-	if fwd_speed < physics.drift_min_speed or fwd_speed <= 0.0:
-		target_intensity = 0.0
-	else:
-		target_intensity = _slip_ratio
-
-	# slip_smoothing_curve (optional): vary convergence rate by current intensity. Fallback: flat 1.0.
-	var smoothing_scale: float = 1.0
-	if physics.slip_smoothing_curve:
-		smoothing_scale = physics.slip_smoothing_curve.sample(_slip_ratio)
-	var alpha: float = 1.0 - exp(-physics.slip_smoothing * smoothing_scale * delta)
-	_drift_intensity = lerp(_drift_intensity, target_intensity, alpha)
-	_drift_intensity = clamp(_drift_intensity, 0.0, 1.0)
-
-	# ── 8. Derived _is_drifting: mini-hysteresis ──────────────────────────────
-	# GDD §Drift Model v2.4 Step 3. Band ±0.02 prevents VFX/audio flicker.
-	var hyst_high: float = physics.drift_active_threshold + 0.02
-	var hyst_low: float  = physics.drift_active_threshold - 0.02
-	if _is_drifting:
-		if _drift_intensity < hyst_low:
-			_is_drifting = false
-	else:
-		if _drift_intensity > hyst_high:
-			_is_drifting = true
-
-	# ── 9. Derived grip (non-linear curve) ───────────────────────────────────
-	# GDD §Drift Model v2.4 Step 4.
-	# grip_slip_exponent > 1.0: grip stays near high_grip_target at low intensity,
-	# then drops sharply at high intensity ("tipping point" SmashKarts-style).
-	if physics.grip_loss_rate == 0.0 and physics.grip_recovery_rate == 0.0:
-		var curved_intensity: float = pow(_drift_intensity, physics.grip_slip_exponent)
-		_grip = lerp(physics.high_grip_target, physics.low_grip_target, curved_intensity)
-	else:
-		# [deprecated] Legacy v2.1 path — move_toward with binary _is_drifting target
-		var grip_target: float = physics.low_grip_target  if _is_drifting else physics.high_grip_target
-		var grip_rate: float   = physics.grip_loss_rate   if _is_drifting else physics.grip_recovery_rate
-		_grip = move_toward(_grip, grip_target, grip_rate * delta)
-
-	# ── 10. Framerate-independent side speed damping ──────────────────────────
-	# GDD §Drift Model v2.4 Step 5: exp(-_grip*delta) is framerate-independent.
-	# Equivalent behavior at 30fps and 60fps — critical for HTML5 vs desktop parity.
-	side_speed *= exp(-_grip * delta)
-
-	# Cache for VFX
-	_cached_side_speed = side_speed
-
-	# ── 11. Rebuild velocity ──────────────────────────────────────────────────
-	velocity = fwd_dir * fwd_speed + side_dir * side_speed + Vector3(0.0, velocity.y, 0.0)
-
-	# ── 12. Move (Step 6 in GDD) ──────────────────────────────────────────────
-	# Slip angle was measured before this — wall collision cannot feed back into intensity
-	# until next frame's Step 1 (new velocity decompose after next rotate_y).
-	move_and_slide()
-
-	# ── 12.5. Visual lean (Step 7 in GDD) ────────────────────────────────────
-	# Direction from sign(side_speed) — emergent from physics, not from steer sign.
-	# Prevents body mesh direction mismatch during counter-steer / steer reversal.
-	# Fix #1: smoothstep replaces binary threshold — no discrete lean-dir jump at |side_speed|=0.1.
-	var lean_dir: float = smoothstep(0.05, 0.25, absf(side_speed)) * signf(side_speed)
-	var target_visual_angle: float = deg_to_rad(_drift_intensity * physics.visual_drift_max_deg * lean_dir * -1.0)
-	# Fix #2: exp-lerp replaces move_toward — natural decay (fast at start, smooth near target).
+func _update_visual_lean(state: PhysicsState, delta: float) -> void:
+	# Lean direction comes from omega — when body rotates left, kart leans right (centrifugal feel).
+	# Negated below: positive omega = CCW = left turn, lean should be to the right side.
+	var omega_norm: float = clampf(state.omega / maxf(physics.omega_lean_scale, 0.01), -1.0, 1.0)
+	var lean_dir: float = -omega_norm
+	var target_visual_angle: float = deg_to_rad(state.drift_intensity * physics.visual_drift_max_deg * lean_dir)
 	if physics.visual_lean_recovery_speed > 0.0:
 		var lean_alpha: float = 1.0 - exp(-physics.visual_lean_recovery_speed * delta)
 		_visual_drift_angle = lerp(_visual_drift_angle, target_visual_angle, lean_alpha)
 	else:
 		_visual_drift_angle = target_visual_angle
 	if $BaseCar:
-		$BaseCar.rotation.y = _base_car_rot_y + _visual_drift_angle
+		# Stack emergent lean (bicycle-driven) + drift state machine yaw offset.
+		# Drift offset is signed by direction so it visually "trails" the turn.
+		$BaseCar.rotation.y = _base_car_rot_y + _visual_drift_angle + _drift_visual_yaw
 
-	# ── 12.6. Visual front wheel steering ────────────────────────────────────
+
+func _update_wheel_visuals(state: PhysicsState, delta: float) -> void:
 	if _wheel_fl and _wheel_fr:
-		var max_wheel_steer_rad: float = deg_to_rad(25.0)  # visual only, fixed reasonable angle
+		var max_wheel_steer_rad: float = deg_to_rad(25.0)
 		var target_steer: float = _steer_input * max_wheel_steer_rad
-		# Fix #3a: exp-lerp for framerate-independent wheel visual smoothing.
 		var steer_vis_alpha: float = 1.0 - exp(-physics.steer_visual_rate * delta)
 		_steer_visual_angle = lerp(_steer_visual_angle, target_steer, steer_vis_alpha)
-
-	# ── 12.7. Wheel roll animation ────────────────────────────────────────────
 	if _wheel_fl and _wheel_fr and _wheel_rl and _wheel_rr:
-		_wheel_roll_angle += fwd_speed * delta / maxf(physics.wheel_radius, 0.01)
+		_wheel_roll_angle += state.fwd_speed * delta / maxf(physics.wheel_radius, 0.01)
 		_wheel_roll_angle = fmod(_wheel_roll_angle, TAU)
-		# No rotation flips — Car2 at identity
 		_wheel_rl.rotation.x = _wheel_roll_angle
 		_wheel_rr.rotation.x = _wheel_roll_angle
-		# Front wheels: combine roll + steer
 		_wheel_fl.rotation = Vector3(_wheel_roll_angle, _steer_visual_angle, 0.0)
 		_wheel_fr.rotation = Vector3(_wheel_roll_angle, _steer_visual_angle, 0.0)
 
-	# ── 13. Slope speed influence (post-slide, uses is_on_floor) ─────────────
-	if is_on_floor():
-		var slope_factor := -global_transform.basis.z.dot(Vector3.UP)
-		var cur_fwd  := -global_transform.basis.z
-		var cur_side :=  global_transform.basis.x
-		var cur_fwd_speed  := velocity.dot(cur_fwd)
-		var cur_side_speed := velocity.dot(cur_side)
-		cur_fwd_speed += slope_factor * physics.slope_speed_influence * delta
-		velocity = cur_fwd * cur_fwd_speed + cur_side * cur_side_speed + Vector3(0.0, velocity.y, 0.0)
 
-	# ── 13.5. Floor alignment — yaw-lock variant ──────────────────────────────
-	# GDD floor-align fix (Variant C): slerp only affects pitch/roll, NOT yaw.
-	# Yaw saved before slerp and restored after — prevents yaw feedback loop in circular drift.
-	if is_on_floor() and physics.floor_align_speed > 0.0:
-		var floor_n := get_floor_normal()
-		var projected_fwd := fwd_dir - floor_n * fwd_dir.dot(floor_n)
-		if projected_fwd.length_squared() > 0.0001:
-			var yaw_before: float = global_transform.basis.get_euler().y
-
-			var target_basis := Basis.looking_at(projected_fwd, floor_n)
-			var new_basis: Basis = global_transform.basis.slerp(target_basis, physics.floor_align_speed * delta).orthonormalized()
-
-			var euler_after: Vector3 = new_basis.get_euler()
-			euler_after.y = yaw_before
-			global_transform.basis = Basis.from_euler(euler_after).orthonormalized()
-
-	# ── Kart-to-kart collision (server-only) ──────────────────────────────────
-	if multiplayer.is_server():
-		for i in get_slide_collision_count():
-			var col := get_slide_collision(i)
-			var other := col.get_collider()
-			if other is CharacterBody3D and other.has_method("get_kart_mass"):
-				var other_kart := other as CharacterBody3D
-				var my_energy := physics.mass * absf(fwd_speed)
-				var other_energy: float = other_kart.call("get_kart_mass") * other_kart.velocity.length()
-				var energy_diff := my_energy - other_energy
-				var push_dir := col.get_normal()  # points toward self (away from other)
-				var force: float = clamp(absf(energy_diff) * 0.5, physics.bump_min_force, physics.bump_max_force)
-				if energy_diff > 0.0:
-					other.velocity += push_dir * force   # push other away from self
-				else:
-					velocity += -push_dir * force        # push self away from other
-
-	_update_vfx(delta)
-
-	if Input.is_action_just_pressed("fire") and StateManager.can_fire(player_id):
-		_fire()
-
-	if OS.has_feature("web"):
-		var local_vel := global_transform.basis.inverse() * velocity
-		var kart_state := StateManager.get_kart_state(player_id)
-		var weapon_state := StateManager.get_weapon_state(player_id)
-		var js_code := "window.kartMetrics = {x:%.2f, y:%.2f, z:%.2f, speed:%.2f, fwdSpeed:%.2f, latSpeed:%.2f, rotY:%.2f, hp:%d, weapon:%s, isDead:%s, onFloor:%s, steer:%.2f, throttle:%.2f}" % [
-			global_position.x, global_position.y, global_position.z,
-			velocity.length(),
-			local_vel.z,
-			local_vel.x,
-			rad_to_deg(global_rotation.y),
-			_health.current_hp if _health else 0,
-			"true" if weapon_state == GameStates.WeaponState.ARMED else "false",
-			"true" if kart_state == GameStates.KartState.DEAD else "false",
-			"true" if is_on_floor() else "false",
-			_steer_input,
-			_throttle
-		]
-		JavaScriptBridge.eval(js_code)
-
-	if OS.is_debug_build():
-		var h : float = 0.0
-		var space := get_world_3d().direct_space_state
-		var query := PhysicsRayQueryParameters3D.create(
-			global_position, global_position + Vector3.DOWN * 10.0)
-		query.exclude = [get_rid()]
-		var hit := space.intersect_ray(query)
-		if hit:
-			h = global_position.y - (hit.position as Vector3).y
-		DebugOverlay.update({
-			"fwd":      _dbg_fwd_vel,
-			"lat":      _dbg_lat_vel,
-			"vert":     _dbg_vert_vel,
-			"drift":    rad_to_deg(atan2(absf(_dbg_lat_vel), maxf(absf(_dbg_fwd_vel), 0.1))),
-			"height":   h,
-			"angular":  _dbg_angular,
-			"on_floor": _dbg_on_floor,
-			"hp":       GameManager.players.get(player_id, {}).get("hp", 0),
-			"weapon":   StateManager.get_weapon_state(player_id) == GameStates.WeaponState.ARMED,
-			"peer_id":  player_id,
-			"is_server": multiplayer.is_server(),
-			"pos":      global_position,
-		})
-
-	# Send position sync (skip if DEAD)
-	if StateManager.can_move(player_id):
-		_sync_timer += delta
-		if _sync_timer >= SYNC_INTERVAL:
-			_sync_timer = 0.0
-			var ts := Time.get_ticks_msec()
-			var game_world := get_tree().current_scene
-			if multiplayer.is_server() and game_world and "synced_peers" in game_world:
-				for pid in game_world.synced_peers:
-					if pid != player_id:
-						_rpc_sync.rpc_id(pid, global_position, global_rotation, velocity, ts)
-			else:
-				_rpc_sync.rpc(global_position, global_rotation, velocity, ts)
+# v3.1: smoke driven by the engage envelope (engage_factor ≥ 0.5), not by the
+# raw state flag or instantaneous slip. Reasons:
+#  - Engagement matches when the body is VISUALLY drifting — smoke and the
+#    yaw offset turn on together, no desync.
+#  - Slip-based fallback used a 0.5 m/s threshold which fired on the slightest
+#    cornering noise (false positives). Raised to 1.5 m/s so it only triggers
+#    on a real rear-wheel break, not micro-scrub.
+func _update_vfx() -> void:
+	if not l_smoke or not r_smoke:
+		return
+	var on_floor := is_on_floor()
+	var engaged: bool = _drift_sm and _drift_sm.is_drift_engaged()
+	var smoke_l: bool
+	var smoke_r: bool
+	if engaged:
+		smoke_l = on_floor
+		smoke_r = on_floor
+	else:
+		# Stricter slip threshold — only real rear-wheel breakaway, not
+		# every cornering noise sample.
+		var slip_threshold: float = maxf(physics.vfx_smoke_speed_threshold * 3.0, 1.5)
+		smoke_l = on_floor and absf(_rear_l_lat_speed) > slip_threshold
+		smoke_r = on_floor and absf(_rear_r_lat_speed) > slip_threshold
+	if l_smoke.emitting != smoke_l:
+		l_smoke.emitting = smoke_l
+	if r_smoke.emitting != smoke_r:
+		r_smoke.emitting = smoke_r
+	l_drift.visible = smoke_l
+	r_drift.visible = smoke_r
 
 
-# ── Public helpers ───────────────────────────────────────────────────────────
+func _update_web_metrics(state: PhysicsState) -> void:
+	if not OS.has_feature("web"):
+		return
+	var local_vel := global_transform.basis.inverse() * velocity
+	var kart_state := StateManager.get_kart_state(player_id)
+	var weapon_state := StateManager.get_weapon_state(player_id)
+	var js_code := "window.kartMetrics = {x:%.2f, y:%.2f, z:%.2f, speed:%.2f, fwdSpeed:%.2f, latSpeed:%.2f, rotY:%.2f, hp:%d, weapon:%s, isDead:%s, onFloor:%s, steer:%.2f, throttle:%.2f, omega:%.2f, drift:%.2f}" % [
+		global_position.x, global_position.y, global_position.z,
+		velocity.length(),
+		local_vel.z,
+		local_vel.x,
+		rad_to_deg(global_rotation.y),
+		_health.current_hp if _health else 0,
+		"true" if weapon_state == GameStates.WeaponState.ARMED else "false",
+		"true" if kart_state == GameStates.KartState.DEAD else "false",
+		"true" if is_on_floor() else "false",
+		_steer_input,
+		_throttle,
+		state.omega,
+		state.drift_intensity
+	]
+	JavaScriptBridge.eval(js_code)
+
+
+func _update_debug_overlay(state: PhysicsState) -> void:
+	if not OS.is_debug_build():
+		return
+	var h: float = 0.0
+	var space := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(
+		global_position, global_position + Vector3.DOWN * 10.0)
+	query.exclude = [get_rid()]
+	var hit := space.intersect_ray(query)
+	if hit:
+		h = global_position.y - (hit.position as Vector3).y
+	DebugOverlay.update({
+		"fwd":      state.fwd_speed,
+		"lat":      state.side_speed,
+		"vert":     velocity.y,
+		"drift":    state.slip_angle_rear_deg,
+		"height":   h,
+		"angular":  state.omega,
+		"on_floor": is_on_floor(),
+		"hp":       GameManager.players.get(player_id, {}).get("hp", 0),
+		"weapon":   StateManager.get_weapon_state(player_id) == GameStates.WeaponState.ARMED,
+		"peer_id":  player_id,
+		"is_server": multiplayer.is_server(),
+		"pos":      global_position,
+	})
+
+
+func _send_network_sync(delta: float) -> void:
+	if not StateManager.can_move(player_id):
+		return
+	_sync_timer += delta
+	if _sync_timer < SYNC_INTERVAL:
+		return
+	_sync_timer = 0.0
+	var ts := Time.get_ticks_msec()
+	var game_world := get_tree().current_scene
+	if multiplayer.is_server() and game_world and "synced_peers" in game_world:
+		for pid in game_world.synced_peers:
+			if pid != player_id:
+				_rpc_sync.rpc_id(pid, global_position, global_rotation, velocity, ts)
+	else:
+		_rpc_sync.rpc(global_position, global_rotation, velocity, ts)
+
+
+# ── Utility ──────────────────────────────────────────────────────────────────
 
 func _reset_wheel_rotations() -> void:
 	if _wheel_fl:
@@ -589,18 +624,47 @@ func _reset_wheel_rotations() -> void:
 		_wheel_rr.rotation = Vector3.ZERO
 
 
+# ── Public helpers (stable contract for camera, collision, debug) ────────────
+
 func get_kart_mass() -> float:
 	return physics.mass if physics else 1.0
 
 
-# ── Debug getters (used by DebugVectors3D overlay — stable across refactor phases) ──
-
 func get_grip_debug() -> float:
-	return _grip
+	# Returns omega for v3.0 (kept under same name so legacy DebugVectors3D works).
+	return _omega
 
 
 func get_is_drifting_debug() -> bool:
+	# v3.1: trails and VFX consume the auto-drift state machine engage envelope,
+	# not the raw state flag — this syncs visuals (smoke, trails, body yaw) so
+	# they all appear together when the kart is REALLY drifting visually,
+	# not the instant the SM flips ACTIVE.
+	if _drift_sm:
+		return _drift_sm.is_drift_engaged()
 	return _is_drifting
+
+
+func is_auto_drifting() -> bool:
+	# Engagement-based — see comment on get_is_drifting_debug. Trails and
+	# smoke key off this so they appear in lockstep with the visible body yaw.
+	if _drift_sm:
+		return _drift_sm.is_drift_engaged()
+	return _drift_active
+
+
+func get_drift_engage_factor() -> float:
+	if _drift_sm:
+		return _drift_sm.get_engage_factor()
+	return 0.0
+
+
+func get_drift_direction() -> int:
+	return _drift_direction
+
+
+func get_drift_power() -> float:
+	return _drift_power
 
 
 func get_throttle_debug() -> float:
@@ -615,8 +679,7 @@ func get_steer_input_debug() -> float:
 
 func _process(_delta: float) -> void:
 	if multiplayer.get_unique_id() == player_id:
-		return   # local kart — CameraRig handles camera
-	# Remote kart: snapshot buffer interpolation
+		return
 	if not _snapshot_buffer:
 		return
 	if StateManager.get_kart_state(player_id) == GameStates.KartState.DEAD:
@@ -723,20 +786,6 @@ func _apply_rocket_spread(base_dir: Vector3, index: int, total: int) -> Vector3:
 	return (spread_basis * base_dir).normalized()
 
 
-# ── Drift VFX ────────────────────────────────────────────────────────────────
-
-func _update_vfx(_delta: float) -> void:
-	if not l_smoke or not r_smoke:
-		return
-	var smoke_on: bool = is_on_floor() and absf(_cached_side_speed) > physics.vfx_smoke_speed_threshold
-	if l_smoke.emitting != smoke_on:
-		l_smoke.emitting = smoke_on
-	if r_smoke.emitting != smoke_on:
-		r_smoke.emitting = smoke_on
-	l_drift.visible = smoke_on
-	r_drift.visible = smoke_on
-
-
 # ── Network sync ─────────────────────────────────────────────────────────────
 
 @rpc("any_peer", "unreliable")
@@ -744,8 +793,6 @@ func _rpc_sync(pos: Vector3, rot: Vector3, vel: Vector3, timestamp_ms: int) -> v
 	var sender := multiplayer.get_remote_sender_id()
 	if sender != player_id:
 		return
-
-	# Server-side: teleport validation + timeout tracking
 	if multiplayer.is_server():
 		NetworkManager.update_last_packet(sender)
 		var dist := _last_known_pos.distance_to(pos)
@@ -753,8 +800,6 @@ func _rpc_sync(pos: Vector3, rot: Vector3, vel: Vector3, timestamp_ms: int) -> v
 			push_warning("[Kart] Teleport rejected for peer %d: dist=%.1f" % [sender, dist])
 			return
 		_last_known_pos = pos
-
-	# Remote kart: push to snapshot buffer
 	if _snapshot_buffer:
 		_snapshot_buffer.push(timestamp_ms, pos, rot, vel)
 
@@ -790,7 +835,7 @@ func take_damage(damage: int, attacker_id: int, damage_type: DamageInfo.Type = D
 
 
 func _on_health_died(_killer_id: int) -> void:
-	pass  # VFX hook — placeholder for step 7
+	pass
 
 
 # ── Respawn (visual reset, called via RPC from game_world) ───────────────────
@@ -802,19 +847,7 @@ func respawn(spawn_pos: Vector3, spawn_rot: float = 0.0) -> void:
 	velocity = Vector3.ZERO
 	_throttle = 0.0
 	_steer_input = 0.0
-	_drift_intensity = 0.0
-	_slip_angle_deg = 0.0
-	_slip_ratio = 0.0
-	_is_drifting = false
-	_visual_drift_angle = 0.0
-	_cached_side_speed = 0.0
-	_wheel_roll_angle = 0.0
-	_steer_visual_angle = 0.0
-	if $BaseCar:
-		$BaseCar.rotation.y = _base_car_rot_y
-	_reset_wheel_rotations()
-	if physics:
-		_grip = physics.high_grip_target
+	_reset_kart_state()
 	_last_known_pos = spawn_pos
 	if _snapshot_buffer:
 		_snapshot_buffer.force_teleport()

@@ -1,93 +1,92 @@
 ---
 status: active
-version: "2.4"
-date: 2026-04-22
-last-updated: 2026-04-22
+version: "3.0"
+date: 2026-04-29
+last-updated: 2026-04-29
 ---
 
 # Kart Physics System
 
-> **Status**: Active (v2.4 — emergent slip-angle intensity replacing input-driven pow curve)
+> **Status**: Active (v3.0 — two-axle bicycle model with saturating tire forces)
 > **Author**: Dima + game-designer + systems-designer + godot-specialist + technical-director
-> **Last Updated**: 2026-04-22 (v2.4: slip_angle measurement via atan2; framerate-independent exp decay; smoothstep intent aid)
-> **Previous version archives**: `design/gdd/kart-physics-v2.3-archive.md`, `design/gdd/kart-physics-v2.2-archive.md`, `design/gdd/kart-physics-v2.1-archive.md`
+> **Last Updated**: 2026-04-29 (v3.0: BicyclePhysics module, per-wheel lateral velocity, tanh tire model, omega-driven lean and VFX)
+> **Previous version archives**: `design/gdd/kart-physics-v2.4-archive.md`, `design/gdd/kart-physics-v2.3-archive.md`, `design/gdd/kart-physics-v2.2-archive.md`, `design/gdd/kart-physics-v2.1-archive.md`
 > **Implements Pillar**: Аркадный хаос (arcade feel, не симулятор) + Вариативность (kart classes via physics)
-> **Reference feel**: SmashKarts.io — "heavy + very drifty + very predictable"
+> **Reference feel**: SmashKarts.io — "heavy + drifty + two distinct wheel trails at different curvatures"
 
 ---
 
-## Changes from v2.3
+## Changes from v2.4
 
-### Core model shift: Input-driven → Emergent slip-angle
+### Core model shift: Point-mass → Two-axle bicycle
 
-v2.3 derived `intensity_target` from `steer_input` via a power curve. The kart drifted because you *told* it to. v2.4 measures actual physics: the angle between the kart's heading and its velocity vector. Drift intensity is now a *consequence* of real lateral movement, not a function of button pressure.
+v2.4 computed a single body-center lateral velocity and used `atan2(side_speed, fwd_speed)` as a slip proxy. The point-mass model cannot produce per-wheel velocities — left and right rear wheels always share the same lateral speed. This made it impossible to reproduce the visual observation from original SmashKarts where inner and outer rear wheels trace arcs of clearly different curvature.
+
+v3.0 replaces the steer-rotate-then-decompose loop with a proper bicycle model. The kart has a front axle and a rear axle separated by `wheelbase`. Each rear wheel sits `half_track` offset from center. The body rotates at angular velocity `_omega` (rad/s). Per-wheel velocity = `body_velocity + _omega × wheel_position`, so left and right rear wheels see different lateral speeds whenever `_omega ≠ 0` — the outer wheel moves faster sideways than the inner wheel, producing the divergent arc effect.
 
 **What changes**:
-- `intensity_target` computed from measured `slip_angle` via `atan2(|side_speed|, max(|fwd_speed|, 0.5))`, not from `pow(|steer|, exponent)`
-- `_drift_intensity` smoothed toward `slip_ratio` with `SLIP_SMOOTHING` (exponential lerp), replacing `move_toward` enter/exit rate pair
-- Side speed damping changes from `move_toward(side_speed, 0, _grip * delta)` to **framerate-independent exponential decay**: `side_speed *= exp(-_grip * delta)` — preserves lateral inertia shape, stable at any fps
-- **Slip angle measurement happens BEFORE `move_and_slide()`** — wall collision slide must not feed back into intensity (avoids false drift spikes on wall contact)
-- **Smoothstep intent aid**: `intent_scale = smoothstep(intent_threshold, 1.0, |steer|)` — continuous curve, no binary threshold behavior
-- New `DRIFT_MIN_SPEED` hard gate (m/s, absolute, not ratio) replaces `drift_min_speed_ratio`-based `speed_factor` ramp
+- Physics math extracted to `scripts/physics/bicycle_physics.gd` (pure `RefCounted`, no scene tree access)
+- kart_controller becomes thin orchestrator: builds `PhysicsInput`, calls `BicyclePhysics.step()`, applies `PhysicsState`
+- Yaw is now driven by torque accumulation → `_omega` (angular velocity, rad/s) → `rotate_y(_omega * delta)`, not by direct `rotate_y(steer_rate * delta)`
+- Tire lateral forces computed via saturating `tanh` model: linear at small slip, saturates at ±F_max
+- Per-wheel velocities: front center at `+half_wb`, rear-left at `(-half_wb, 0, -half_track)`, rear-right at `(-half_wb, 0, +half_track)`
+- Drift intensity derived from the faster-sliding rear wheel's lateral speed (outer wheel during turn), normalized by `drift_max_slip_speed`
+- Visual lean driven by `_omega`, not `sign(side_speed)` — leans into turns with centrifugal feel
+- VFX smoke per-rear-wheel: left smoke triggers on `|rear_left_lat_speed| > threshold`, right independently
 
-**What is removed** (v2.3 variables no longer exist):
-- `DRIFT_STEER_EXPONENT` — power curve exponent for input-driven target
-- `DRIFT_INTENSITY_ENTER_RATE` — move_toward rate while climbing
-- `DRIFT_INTENSITY_EXIT_RATE` — move_toward rate while falling
-- `DRIFT_LATERAL_RAMP` — lateral ramp kick tied to target rise
-- `_drift_intensity_target` — per-frame computed input target
-- `_drift_intensity_prev_target` — previous frame target for ramp condition
-- `_steer_sign` — steer sign preservation for ramp/lean direction
-- `drift_min_speed_ratio` — speed_factor ramp fraction
-- `speed_factor` computed variable
+**What is removed** (v2.4 variables replaced):
+- `steering_speed` as primary yaw driver — now `[deprecated v3.0]`; yaw is emergent from tire torques
+- `stationary_steer_scale` — replaced by `stationary_omega_kick`
+- `drift_max_slip_angle_deg` — replaced by `drift_max_slip_speed` (m/s instead of degrees)
+- `drift_intent_multiplier` / `drift_intent_threshold` — smoothstep arcade yaw aid removed; standstill aid is separate
+- `grip_slip_exponent`, `low_grip_target`, `high_grip_target` — grip is now emergent from tire saturation
+- `drift_yaw_multiplier` — yaw boost is emergent from torque feedback
 
-**What is added** (v2.4 variables):
-- `DRIFT_MAX_SLIP_ANGLE_DEG` — slip angle (°) at which `slip_ratio` = 1.0
-- `DRIFT_MIN_SPEED` — hard gate in m/s; below this `_drift_intensity` decays to 0
-- `DRIFT_INTENT_MULTIPLIER` — fractional extra yaw when player steers at speed (arcade aid)
-- `DRIFT_INTENT_THRESHOLD` — `|steer_input|` at which smoothstep begins ramping intent aid
-- `SLIP_SMOOTHING` — rate for `_drift_intensity` exponential tracking toward `slip_ratio`
-- `GRIP_SLIP_EXPONENT` — optional exponent on grip lerp curve (default 2.0)
-- `CORNERING_DRAG_COEFF` — tire scrubbing coefficient: fwd deceleration proportional to `|side_speed|`. Works at any slip, independent of intensity (fills the gap where `drift_drag_multiplier` doesn't activate in light turns)
+**What is added** (v3.0 variables):
+- `wheelbase_override`, `track_width_override` — geometry (0 = auto-measure from wheel nodes)
+- `max_steer_angle_deg` — front wheel lock angle at full steer (replaces `steering_speed`)
+- `front_grip_stiffness`, `rear_grip_stiffness` — tire cornering stiffness per axle
+- `tire_saturation_speed` — lateral speed (m/s) at which tire force saturates near F_max
+- `inertia_scale` — moment-of-inertia multiplier (heavier feel without changing collision mass)
+- `omega_damping` — angular velocity exp decay rate (1/s)
+- `stationary_omega_kick` — direct `_omega` kick at near-zero speed for arcade steerability
+- `drift_max_slip_speed` — rear lateral speed (m/s) that maps to `slip_ratio = 1.0`
+- `omega_lean_scale` — omega (rad/s) at which visual lean reaches maximum
 
-**What stays from v2.3** (unchanged):
-- Force-based inertia (thrust + k_drag·v² + k_rolling·v + brake)
-- Velocity decomposition: `rotate_y` → re-project fwd/side → apply thrust → apply grip
-- Floor-align yaw-lock (pitch/roll only, yaw frozen post-slerp)
-- Visual lean (`_visual_drift_angle` scaled by `_drift_intensity`)
-- Stationary steering hack (stationary_steer_scale below threshold speed)
-- Split low/high speed steer multipliers
-- KartState gating (DEAD/IDLE = no input)
-- Network sync pattern (30 Hz)
-- Kart-to-kart collision energy model
-- `_is_drifting` mini-hysteresis (±0.02 band around `drift_active_threshold`)
-- Derived `_grip = lerp(high_grip_target, low_grip_target, pow(_drift_intensity, GRIP_SLIP_EXPONENT))`
-- `drift_yaw_multiplier` lerp on yaw rate
-- `drift_drag_multiplier` and `drift_rolling_multiplier` lerp on active k_drag/k_rolling
-- deprecated `grip_loss_rate` / `grip_recovery_rate` rollback path (still 0.0 = disabled)
+**What stays from v2.4** (active, unchanged semantics):
+- `accel_force`, `k_drag`, `k_rolling`, `brake_force`, `reverse_ratio`, `max_speed` (longitudinal)
+- `steer_slew_rate_in/out`, `throttle_slew_rate` (input smoothing)
+- `drift_min_speed`, `slip_smoothing`, `drift_active_threshold` (drift signal shaping)
+- `vfx_smoke_speed_threshold`, `drift_drag_multiplier`, `drift_rolling_multiplier` (still active)
+- `cornering_drag_coeff` (v3.0 uses it at 0.5× internally — soft overlay, main drag is emergent)
+- `visual_drift_max_deg`, `visual_lean_recovery_speed`
+- `gravity`, `slope_speed_influence`, `floor_align_speed` (terrain, yaw-lock pattern preserved)
+- `mass`, `bump_min`, `bump_max`, `wheel_radius`
+- Kart-to-kart collision: server-only, energy model unchanged
+- Network sync: position/rotation/velocity at 30 Hz, unchanged
 
 ---
 
 ## Overview
 
 Kart Physics — система движения, дрифта, коллизий и взаимодействия с рельефом.
-CharacterBody3D + move_and_slide() с аркадной моделью физики. Все параметры
-вынесены в KartPhysicsResource (.tres) — смена класса машины = смена ресурса.
+CharacterBody3D + move_and_slide() с аркадной физикой. Все параметры в KartPhysicsResource — смена класса машины = смена ресурса.
 
-**Reference feel**: SmashKarts.io — машина ощущается тяжёлой (momentum visible),
-зад живёт своей жизнью (активный дрифт), но игрок полностью контролирует после практики.
-Это НЕ "сдержанная" машина — это "яркая, но предсказуемая".
+v3.0 вводит два ключевых прорыва:
 
-v2.4 переходит на emergent модель: дрифт — это физическое следствие реального бокового скольжения
-(измеренный `slip_angle`), а не функция кнопки руля. Аркадный отклик сохраняется через
-smoothstep intent aid и framerate-independent экспоненциальный side damping — игрок
-чувствует контроль, но не диктует физике когда дрифтить.
+**Two-axle bicycle model**: машина имеет переднюю и заднюю оси. Каждое заднее колесо
+имеет свою lateral velocity = `body_velocity + _omega × wheel_position`. При повороте
+внешнее колесо движется быстрее боком, чем внутреннее — отсюда два дымовых следа с разной кривизной (как в оригинальном SmashKarts).
+
+**Saturating tire model**: сила поперечного сцепления растёт линейно при малом скольжении и насыщается на ±F_max при большом. Это создаёт "тяжёлую машину" ощущение: при умеренном повороте резина работает в линейной зоне (предсказуемо), при агрессивном — срывается в насыщение (дрифт).
+
+**Reference feel** (Вариант Б — тяжёлая ощутимая машина): при повороте на скорости ощущается инерция корпуса, зад уходит в долгий slide, на полном газу с полным рулём — длинный хвост с двумя отдельными дымами.
 
 ---
 
 ## Player Fantasy
 
-"Машина тяжёлая — у неё есть масса и инерция. Когда я ухожу в поворот, зад начинает тянуть — не потому что я нажал кнопку дрифта, а потому что машина *скользит*. Чем сильнее ухожу, тем больше занос. Опытный игрок знает как войти, держать дугу, и выйти. Новичок — учится. Но при этом машина предсказуема: она не делает ничего неожиданного. Тяжёлая. Дрифтовая. Предсказуемая."
+"Машина тяжёлая — у неё масса и угловая инерция, которые чувствуются. Когда я делаю резкий поворот, корпус продолжает двигаться по старой дуге ещё несколько метров — зад тянет наружу. Два дымовых следа от задних колёс идут по разным дугам: внешнее колесо скользит сильнее, внутреннее — меньше. Это не спецэффект — это реальная физика. Стоя на месте я могу подёргать рулём и почувствовать как машина реагирует. Управляемая, тяжёлая, дрифтовая."
 
 ---
 
@@ -96,323 +95,220 @@ smoothstep intent aid и framerate-independent экспоненциальный 
 ### Core Rules
 
 1. Physics runs at 60 Hz (`_physics_process`), network sync at 30 Hz
-2. Local kart: full physics simulation. Remote karts: snapshot buffer interpolation (Network Layer GDD)
-3. All physics params from KartPhysicsResource (`@export`). No hardcoded values
-4. State Machine gates physics: DEAD = no input, IDLE = frozen
-5. Velocity decomposed into forward (`-basis.z`) and lateral (`basis.x`) components each frame after `rotate_y()`
-6. Gravity = 35.0 m/s² (3.57× Earth — arcade feel)
-7. `move_and_slide()` handles floor/wall collision. **Slip angle is measured BEFORE `move_and_slide()`** — post-slide velocity contains wall-slide components that would falsely spike intensity on wall contact
-8. Kart-to-kart collision: momentum/energy transfer
-9. `max_speed` is a tunable reference value, not a physics hard clamp. Terminal velocity is emergent. Camera and network use `max_speed` for normalization
-10. **`_drift_intensity: float [0..1]` is the physics master.** Derived from measured `slip_angle`, smoothed exponentially by `SLIP_SMOOTHING`. `_is_drifting: bool` is derived (mini-hysteresis, VFX/audio only)
-11. **Drift is emergent**: `_drift_intensity` reflects how much the kart is actually sliding, not how hard the player is steering. Steer input produces yaw → velocity vector lags behind heading → slip_angle grows → intensity grows
-12. **Smoothstep intent aid** preserves arcade agency: at `|steer| > DRIFT_INTENT_THRESHOLD`, a continuous extra yaw fraction (`DRIFT_INTENT_MULTIPLIER`) is added, scaled by `smoothstep(intent_threshold, 1.0, |steer|)`. No binary threshold — smooth ramp-on
-13. **Framerate-independent side damping**: `side_speed *= exp(-_grip * delta)` — exponential decay. At `_grip=29, delta=1/60`: retain ~62% per frame. At `_grip=1, delta=1/60`: retain ~98.3% per frame. Behavior is identical at 30fps and 60fps within floating-point tolerance
-14. **`DRIFT_MIN_SPEED` hard gate**: below this speed (m/s), `_drift_intensity` decays toward 0 regardless of slip_angle. Prevents phantom drift from velocity decompose noise at near-zero speed
-15. Reverse drift explicitly blocked: `fwd_speed <= 0` → intensity decays toward 0
-16. All drift-dependent physics values are `lerp(base, drift_value, intensity)` — no step functions in physics layer
-17. `GRIP_SLIP_EXPONENT` allows non-linear grip curve: exponent > 1.0 keeps grip high at low intensity and drops sharply at high intensity ("car grips normally, then suddenly lets go" — SmashKarts-like)
-18. **Floor-align yaw-lock** (from v2.3): `basis.slerp(floor_normal_basis, ...)` only affects pitch/roll; yaw is saved and restored after slerp to prevent yaw feedback loop in circular drift
+2. Local kart: full physics simulation via `BicyclePhysics.step()`. Remote karts: snapshot buffer interpolation (Network Layer GDD)
+3. All physics params from KartPhysicsResource (`@export`). No hardcoded values in bicycle module
+4. State Machine gates physics: `StateManager.can_move()` → if false, skip `_physics_process` body
+5. `BicyclePhysics` is a pure `RefCounted` module — no scene tree, no nodes. kart_controller owns the scene body and feeds `PhysicsInput` each tick
+6. Gravity = 35.0 m/s² (3.57× Earth — arcade feel). Handled by kart_controller before bicycle step (vertical only)
+7. `move_and_slide()` handles floor/wall collision after bicycle step applies new velocity
+8. **Slip is measured INSIDE `BicyclePhysics.step()`** before body velocity is updated — wall collision cannot feed back into drift intensity within the same tick
+9. `max_speed` is a reference value, not a hard clamp. Terminal velocity is emergent
+10. **`_drift_intensity: float [0..1]` is the physics master** — derived from the faster rear wheel's lateral speed, smoothed exponentially. `_is_drifting: bool` is derived (mini-hysteresis ±0.02, VFX/audio only)
+11. **Yaw is emergent**: front tire lateral force at `+half_wb` and rear tire total at `-half_wb` create a net torque → `dω/dt = torque / MOI`. `_omega` integrates over time, exponentially damped. Direct `rotate_y` is gone from the steering loop
+12. **Per-wheel VFX**: each rear wheel smoke fires independently based on its own lateral speed magnitude. This is the mechanism for divergent arc trails
+13. **Visual lean driven by `_omega`**, not `sign(side_speed)`. Positive omega = CCW turn = lean rightward (centrifugal). Clamped by `omega_lean_scale` before multiplying by `visual_drift_max_deg`
+14. **Standstill steering aid** (`stationary_omega_kick`) is active only below `stationary_steer_threshold` and blends out smoothly via `1 - smoothstep(0, threshold, |fwd_speed|)`. It never fights bicycle math at speed
+15. **Floor-align yaw-lock** (preserved from v2.3): slerp to floor normal affects pitch/roll only; yaw saved before and restored after — prevents yaw feedback loop during long circular drifts
+16. Kart-to-kart collision is server-only, energy-based, unchanged from v2.1+
+17. **Reverse is natural**: negative `fwd_speed` → front slip angle flips sign → torque reverses → kart steers opposite way without any sign hack. `drift_min_speed` gate still prevents intensity in reverse
 
-### KartPhysicsResource
+### Module Architecture
+
+```
+kart_controller.gd  (CharacterBody3D orchestrator)
+  ├── PhysicsInput.new()     — input snapshot, rebuilt each tick
+  ├── BicyclePhysics.new()   — physics module (RefCounted, pure math)
+  │     └── step(PhysicsInput, delta) → PhysicsState
+  └── PhysicsState           — output snapshot, applied to body
+```
+
+**PhysicsInput** (pure data, no nodes):
+```gdscript
+var velocity: Vector3    # current world velocity
+var basis: Basis         # global_transform.basis at tick start
+var throttle: float      # smoothed [-1..+1]
+var steer_input: float   # smoothed [-1..+1]
+var brake_held: bool     # S key held while moving forward
+var on_floor: bool       # CharacterBody3D.is_on_floor()
+```
+
+**PhysicsState** (pure data output):
+```gdscript
+var new_velocity: Vector3          # replace XZ of body velocity
+var yaw_delta: float               # radians to rotate_y this tick (= _omega * delta)
+var omega: float                   # angular velocity (rad/s) — for lean + debug
+var fwd_speed: float               # signed along -basis.z
+var side_speed: float              # signed along basis.x (body center)
+var rear_left_lat_speed: float     # left rear wheel lateral speed (signed)
+var rear_right_lat_speed: float    # right rear wheel lateral speed (signed)
+var slip_angle_front_deg: float    # front axle slip angle (debug)
+var slip_angle_rear_deg: float     # rear axle slip angle (debug)
+var drift_intensity: float         # smoothed [0..1] master
+var is_drifting: bool              # hysteresis flag
+var slip_ratio: float              # raw rear slip ratio before smoothing
+var grip_debug: float              # representative grip for legacy overlays
+```
+
+### Persistent State in BicyclePhysics
+
+These persist between ticks inside the `BicyclePhysics` instance:
 
 ```gdscript
-class_name KartPhysicsResource
-extends Resource
+var _params: KartPhysicsResource
+var _wheelbase: float    # set by set_axle_geometry(), default 1.2 m
+var _half_track: float   # half of track_width, default 0.45 m
 
-@export_group("Speed")
-@export var accel_force: float = 22.0             # thrust (м/с²) — tuned to emergent ~27.5 m/s terminal
-@export var k_drag: float = 0.04                  # quadratic drag
-@export var k_rolling: float = 1.1                # linear rolling resistance
-@export var brake_force: float = 40.0             # м/с² deceleration
-@export var reverse_ratio: float = 0.5            # reverse thrust fraction
-@export var max_speed: float = 27.5               # reference (camera/network normalization)
-
-@export_group("Input Smoothing")
-@export var steer_slew_rate_in: float = 2.0       # steer ramp-up rate (1/s)
-@export var steer_slew_rate_out: float = 1.5      # steer return rate (1/s)
-@export var throttle_slew_rate: float = 2.0       # throttle ramp rate (1/s)
-
-@export_group("Steering")
-@export var steering_speed: float = 2.6           # rad/s base yaw rate
-@export var steer_low_speed_mult: float = 1.0     # multiplier at v=0
-@export var steer_high_speed_mult: float = 0.95   # multiplier at v=max_speed
-@export var steer_speed_threshold: float = 3.0
-@export var stationary_steer_threshold: float = 2.0
-@export var stationary_steer_scale: float = 0.2
-
-@export_group("Drift (Emergent v2.4)")
-@export var drift_min_speed: float = 3.0          # m/s hard gate — below this, intensity decays to 0
-@export var drift_max_slip_angle_deg: float = 35.0  # slip_ratio = 1.0 at this angle
-@export var slip_smoothing: float = 8.0           # exponential lerp rate: intensity toward slip_ratio (1/s)
-@export var drift_intent_multiplier: float = 0.4  # extra yaw fraction at full steer (intent aid endpoint)
-@export var drift_intent_threshold: float = 0.7   # |steer| at which smoothstep begins ramping intent aid
-@export var grip_slip_exponent: float = 2.0       # exponent on grip lerp curve (1.0=linear, 2.0=grip holds then drops)
-@export var low_grip_target: float = 1.0          # side exp decay rate at intensity=1.0 (SmashKarts-range compromise)
-@export var high_grip_target: float = 29.0        # side exp decay rate at intensity=0.0
-@export var drift_active_threshold: float = 0.55  # center of _is_drifting mini-hysteresis (±0.02)
-@export var drift_yaw_multiplier: float = 1.8     # yaw_rate lerp endpoint at intensity=1.0
-@export var visual_drift_max_deg: float = 34.0
-@export var visual_lean_recovery_speed: float = 5.0
-
-@export var drift_drag_multiplier: float = 2.6    # k_drag lerp endpoint at intensity=1.0
-@export var drift_rolling_multiplier: float = 1.45
-@export var cornering_drag_coeff: float = 0.3     # tire scrubbing: extra fwd decel proportional to |side_speed|. Independent from intensity — works at ANY slip
-
-# [deprecated — kept for rollback]
-@export var grip_loss_rate: float = 0.0
-@export var grip_recovery_rate: float = 0.0
-
-@export_group("Collision")
-@export var mass: float = 1.0
-@export var bump_min_force: float = 3.0
-@export var bump_max_force: float = 12.0
-
-@export_group("Terrain")
-@export var gravity: float = 35.0
-@export var slope_speed_influence: float = 8.0
-@export var floor_snap_length: float = 0.3
-@export var floor_align_speed: float = 8.0        # pitch/roll only — yaw frozen post-slerp
-
-@export_group("Visuals")
-@export var wheel_radius: float = 0.18
-@export var vfx_smoke_speed_threshold: float = 0.5
+var _omega: float = 0.0           # yaw angular velocity (rad/s)
+var _drift_intensity: float = 0.0 # smoothed [0..1]
+var _is_drifting: bool = false    # hysteresis flag
 ```
 
-### Movement Model
+Reset on respawn and on entering DEAD state via `_bicycle.reset()`.
 
-**Force-based acceleration** (v2.4 adds cornering_drag):
+---
+
+## Step-by-Step Physics Tick
+
+The following describes `BicyclePhysics.step(inp, delta)` in execution order.
+
+### A. Velocity Decomposition
 
 ```
-thrust   = throttle_input * accel_force
-if throttle_input < 0: thrust *= reverse_ratio
+fwd_dir  = -inp.basis.z
+side_dir =  inp.basis.x
+fwd_speed  = inp.velocity.dot(fwd_dir)
+side_speed = inp.velocity.dot(side_dir)
+```
 
-active_k_drag    = k_drag    * lerp(1.0, drift_drag_multiplier,    _drift_intensity)
-active_k_rolling = k_rolling * lerp(1.0, drift_rolling_multiplier, _drift_intensity)
+Body velocity is decomposed into forward and lateral components in the current kart frame.
 
-drag           = -sign(fwd_speed) * active_k_drag * fwd_speed^2
-rolling        = -active_k_rolling * fwd_speed
-cornering_drag = -sign(fwd_speed) * cornering_drag_coeff * abs(side_speed)   # tire scrubbing
-brake          = -sign(fwd_speed) * brake_force   [only when braking opposes motion and |fwd_speed|>0.5]
+### B. Steer Angle
+
+```
+max_angle_rad = deg_to_rad(max_steer_angle_deg)
+spd_ratio     = clamp(|fwd_speed| / max_speed, 0, 1)
+steer_mult    = lerp(steer_low_speed_mult, steer_high_speed_mult, spd_ratio)
+steer_angle   = steer_input * max_angle_rad * steer_mult
+```
+
+Front wheels turn by `steer_angle` radians. Speed-dependent reduction mirrors real vehicle behavior: full lock at standstill, narrower lock at speed.
+
+### C. Per-Axle / Per-Wheel Lateral Velocities
+
+```
+half_wb = _wheelbase * 0.5
+
+v_lat_front_center = side_speed + _omega * half_wb
+v_lat_rear_center  = side_speed - _omega * half_wb
+v_lat_rear_l       = v_lat_rear_center - _omega * _half_track
+v_lat_rear_r       = v_lat_rear_center + _omega * _half_track
+```
+
+This is the core bicycle identity: velocity at any point on the body = `v_body + ω × r`. Front axle at `+half_wb`, rear at `-half_wb`. Left/right rear offset by `±half_track`.
+
+When `_omega ≠ 0`, `v_lat_rear_l ≠ v_lat_rear_r` — the outer wheel slides faster. This is what produces divergent arc trails.
+
+### D. Slip Angles
+
+```
+fwd_clamp   = max(|fwd_speed|, 0.5)            # prevent divide-by-zero at standstill
+alpha_front = steer_angle - atan2(v_lat_front_center, fwd_clamp)
+alpha_rear  = -atan2(v_lat_rear_center, fwd_clamp)
+```
+
+Slip angle = difference between wheel heading and direction of travel. Front wheel "points" at `steer_angle`; rear wheel points at 0 (fixed). Denominator clamped to 0.5 m/s.
+
+**Physical meaning**: positive `alpha_front` means front is pointing inward relative to travel — generates a restoring force. If rear slip angle builds, it generates a turning torque that amplifies omega.
+
+### E. Saturating Tire Lateral Forces
+
+```
+sat = max(tire_saturation_speed, 0.1)
+
+front_signal = alpha_front * fwd_clamp
+f_front  = -front_grip_stiffness * tanh(front_signal / sat) * sat
+f_rear_l = -rear_grip_stiffness  * tanh(v_lat_rear_l / sat) * sat
+f_rear_r = -rear_grip_stiffness  * tanh(v_lat_rear_r / sat) * sat
+f_rear_total = f_rear_l + f_rear_r
+```
+
+**tanh saturation**: at small signal → `tanh(x) ≈ x` → `F ≈ -grip * v_lat` (linear, high traction). At large signal → `tanh(x) → ±1` → `F → ±grip * sat` (saturated, tire breaking away). The crossover point is `tire_saturation_speed` (m/s of lateral speed).
+
+Lower `rear_grip_stiffness` relative to `front_grip_stiffness` → rear saturates and breaks away before front → natural oversteer (kart-style drift).
+
+### F. Yaw Torque Integration
+
+```
+torque = f_front * half_wb - f_rear_total * half_wb
+moi    = mass * (half_wb^2) * inertia_scale
+omega_accel = torque / moi
+_omega += omega_accel * delta
+
+# Angular damping (framerate-independent):
+_omega *= exp(-omega_damping * delta)
+```
+
+MOI is simplified (point-mass at half_wb from center). `inertia_scale` multiplies it to make the car feel heavier or lighter without changing collision mass. `omega_damping` is the exp decay rate — it prevents `_omega` from growing unbounded in sustained turns.
+
+### G. Standstill Steering Aid
+
+```
+if inp.on_floor and |fwd_speed| < stationary_steer_threshold:
+    blend = 1.0 - smoothstep(0.0, stationary_steer_threshold, |fwd_speed|)
+    kick  = steer_input * stationary_omega_kick * blend
+    _omega += kick * delta
+```
+
+At near-zero speed the bicycle model produces near-zero forces (no tire slip). This direct omega kick lets the player rotate while stationary, blending out smoothly as speed builds so it never interferes with bicycle math in motion.
+
+### H. Apply Lateral Tire Forces to Body Velocity
+
+```
+f_total_lat = f_front + f_rear_total
+side_speed += (f_total_lat / mass) * delta
+```
+
+Total lateral force divided by mass gives lateral acceleration. This is the channel through which tire physics changes body velocity — not a separate grip damper.
+
+### I. Longitudinal Forces
+
+```
+thrust = throttle > 0.01 ? throttle * accel_force
+       : throttle < -0.01 ? throttle * accel_force * reverse_ratio
+       : 0
+
+drag_mult    = lerp(1.0, drift_drag_multiplier,    _drift_intensity)
+rolling_mult = lerp(1.0, drift_rolling_multiplier, _drift_intensity)
+drag    = -sign(fwd_speed) * k_drag * drag_mult * fwd_speed^2
+rolling = -k_rolling * rolling_mult * fwd_speed
+cornering_drag = -sign(fwd_speed) * cornering_drag_coeff * |side_speed| * 0.5
+                 [only if |fwd_speed| >= 0.1 and cornering_drag_coeff > 0]
+brake   = -brake_force   [only if brake_held and fwd_speed > 0.5]
 
 fwd_speed += (thrust + drag + rolling + cornering_drag + brake) * delta
+if |thrust| < 0.01 and |fwd_speed| < 0.1: fwd_speed = 0.0   # snap to stop
 ```
 
-**Why cornering_drag** is separate from `drift_drag_multiplier`: `drift_drag_multiplier` scales `k_drag` via `_drift_intensity` (smoothed physics state). In light turns intensity stays low → negligible drag effect → player complains "no speed loss in turns". `cornering_drag` directly converts lateral motion into fwd deceleration, working at ANY slip magnitude regardless of whether the kart is "officially drifting" (intensity > threshold). Physically it models tire scrubbing: wheels sliding sideways consume kinetic energy as heat.
+`cornering_drag_coeff` is multiplied by 0.5 internally vs v2.4 — the main lateral drag is now emergent through tire forces (H), so the overlay is halved to avoid double-counting.
 
-**Terminal velocity** (emergent):
-```
-v_terminal(intensity) = sqrt(accel_force / (k_drag * lerp(1.0, drift_drag_multiplier, intensity)))
-```
-
-**Speed-dependent steering + smoothstep intent aid**:
-```
-speed_ratio = clamp(abs(fwd_speed) / max_speed, 0.0, 1.0)
-steer_mult  = lerp(steer_low_speed_mult, steer_high_speed_mult, speed_ratio)
-
-speed_scale = stationary_steer_scale  if abs(fwd_speed) < stationary_steer_threshold
-              else speed_ratio
-
-# Drift yaw boost (from measured intensity — emergent feedback)
-yaw_mult = lerp(1.0, drift_yaw_multiplier, _drift_intensity)
-
-# Smoothstep intent aid: continuous ramp from threshold to full steer
-intent_aid = 0.0
-if fwd_speed > drift_min_speed:
-    intent_scale = smoothstep(drift_intent_threshold, 1.0, abs(steer_input))
-    intent_aid   = drift_intent_multiplier * intent_scale * sign(steer_input)
-
-effective_yaw_rate = steering_speed * steer_mult * (steer_input + intent_aid) * speed_scale * yaw_mult
-rotate_y(effective_yaw_rate * delta)
-```
-
-**Velocity projection after rotation** (unchanged):
-```
-new_fwd  = -basis.z
-new_side = basis.x
-fwd_speed  = velocity.dot(new_fwd)
-side_speed = velocity.dot(new_side)
-```
-
-### Drift Model (v2.4 — Emergent Slip-Angle)
-
-**State variables**:
-```gdscript
-var _drift_intensity: float = 0.0    # physics master [0..1]
-var _is_drifting: bool = false       # derived — mini-hysteresis, VFX/audio only
-var _slip_angle_deg: float = 0.0     # debug/telemetry — measured slip angle
-var _slip_ratio: float = 0.0         # debug/telemetry — normalized slip [0..1]
-var _grip: float = high_grip_target  # derived each frame
-var _visual_drift_angle: float = 0.0
-```
-
-**Step 1 — Slip angle measurement** (after velocity decompose from rotated basis, BEFORE `move_and_slide()`):
-```
-slip_angle_rad = atan2(abs(side_speed), max(abs(fwd_speed), 0.5))
-_slip_angle_deg = rad_to_deg(slip_angle_rad)
-_slip_ratio = clamp(_slip_angle_deg / drift_max_slip_angle_deg, 0.0, 1.0)
-```
-
-**Step 2 — Intensity update** (framerate-independent exponential tracking):
-```
-# Hard gate: below drift_min_speed or reverse, decay toward 0
-var target_intensity: float
-if fwd_speed < drift_min_speed or fwd_speed <= 0:
-    target_intensity = 0.0
-else:
-    target_intensity = _slip_ratio
-
-# Framerate-independent exponential smoothing:
-var alpha = 1.0 - exp(-slip_smoothing * delta)
-_drift_intensity = lerp(_drift_intensity, target_intensity, alpha)
-_drift_intensity = clamp(_drift_intensity, 0.0, 1.0)
-```
-
-**Step 3 — Derived `_is_drifting`** (mini-hysteresis):
-```
-var hyst_high = drift_active_threshold + 0.02   # default: 0.57
-var hyst_low  = drift_active_threshold - 0.02   # default: 0.53
-
-if _is_drifting and _drift_intensity < hyst_low:
-    _is_drifting = false
-elif not _is_drifting and _drift_intensity > hyst_high:
-    _is_drifting = true
-```
-
-**Step 4 — Derived `_grip`** (non-linear curve):
-```
-# Default (intensity-based):
-if grip_loss_rate == 0.0 and grip_recovery_rate == 0.0:
-    var curved_intensity = pow(_drift_intensity, grip_slip_exponent)
-    _grip = lerp(high_grip_target, low_grip_target, curved_intensity)
-else:
-    # [deprecated rollback path]
-    target_grip = low_grip_target if _is_drifting else high_grip_target
-    grip_rate   = grip_loss_rate  if _is_drifting else grip_recovery_rate
-    _grip = move_toward(_grip, target_grip, grip_rate * delta)
-```
-
-**Step 5 — Framerate-independent side speed damping**:
-```
-# Exponential decay — identical behavior at any fps
-side_speed *= exp(-_grip * delta)
-
-# Rebuild velocity from decomposed components:
-velocity = new_fwd * fwd_speed + new_side * side_speed + Vector3.UP * vertical_speed
-```
-
-**Step 6** — `move_and_slide()` happens here. Wall collision may modify velocity but will not feed back into `_drift_intensity` until next frame's Step 1 (which operates on NEW fwd/side decompose after rotate_y applied for that frame).
-
-**Step 7 — Visual lean** (direction from `side_speed` sign, emergent):
-```
-var lean_dir = sign(side_speed) if abs(side_speed) > 0.1 else 0.0
-target_visual_angle = _drift_intensity * visual_drift_max_deg * lean_dir * -1.0
-_visual_drift_angle = target_visual_angle
-```
-
-### Kart-to-Kart Collision
-
-Unchanged from v2.1/v2.2/v2.3.
-
-```gdscript
-for i in get_slide_collision_count():
-    var col := get_slide_collision(i)
-    var other := col.get_collider()
-    if other is CharacterBody3D and other.has_method("get_kart_mass"):
-        var my_energy := mass * abs(fwd_speed)
-        var other_energy := other.get_kart_mass() * abs(other.velocity.length())
-        var energy_diff := my_energy - other_energy
-        var push_dir := col.get_normal()
-        var force := clamp(abs(energy_diff) * 0.5, bump_min_force, bump_max_force)
-        if energy_diff > 0:
-            other.velocity += -push_dir * force
-        else:
-            velocity += push_dir * force
-```
-
-### Terrain — Slopes & Ramps
-
-Unchanged from v2.1–v2.3. Key values: gravity=35.0 m/s², `slope_speed_influence`=8.0 m/s², `floor_snap_length`=0.3 m.
-
-**Floor-align yaw-lock** (unchanged from v2.3):
-```
-saved_yaw = global_transform.basis.get_euler().y
-new_basis = global_transform.basis.slerp(floor_normal_basis, floor_align_speed * delta)
-euler = new_basis.get_euler()
-euler.y = saved_yaw
-global_transform.basis = Basis.from_euler(euler)
-```
-
-### Interactions with Other Systems
-
-| System | Direction | Interface |
-|--------|-----------|-----------|
-| **State Machine** | ← reads | KartState gates input: DEAD = no physics, IDLE = frozen |
-| **State Machine** | → triggers | `_drift_intensity`, `_is_drifting` feed VFX signals |
-| **Network Layer** | → sends | Position/rotation/velocity at 30 Hz via `_rpc_sync` |
-| **Network Layer** | ← receives | Remote karts: snapshot buffer, no local physics |
-| **Health & Damage** | ← reads | Collision → contact damage (future: Spikes) |
-| **Kart Classes** | ← reads | KartPhysicsResource swapped per class |
-| **Camera System** | → feeds | `fwd_speed`, `side_speed`, `_drift_intensity` |
-| **VFX System** | → feeds | `_drift_intensity: float` + `_is_drifting: bool` |
-| **Audio System** | → feeds | `fwd_speed` → engine pitch; `_drift_intensity` → screech volume |
-| **HUD** | → feeds | `fwd_speed` → speedometer |
-
----
-
-## Formulas
-
-### 1. Slip Angle Measurement
+### J. Drift Intensity
 
 ```
-slip_angle_rad = atan2(abs(side_speed), max(abs(fwd_speed), 0.5))
-slip_angle_deg = rad_to_deg(slip_angle_rad)
-slip_ratio     = clamp(slip_angle_deg / drift_max_slip_angle_deg, 0.0, 1.0)
-```
+rear_slip_mag = max(|v_lat_rear_l|, |v_lat_rear_r|)
+slip_ratio    = clamp(rear_slip_mag / drift_max_slip_speed, 0, 1)
 
-| Variable | Default | Range | Effect |
-|---|---|---|---|
-| `drift_max_slip_angle_deg` | 35.0° | 20–60° | Angle at which slip_ratio=1.0 (full drift) |
-
-**Curve** (fwd_speed=20 m/s, varying side_speed):
-
-| `side_speed` | `slip_angle_deg` | `slip_ratio` (at 35° max) |
-|---|---|---|
-| 0 m/s | 0.0° | 0.000 |
-| 3 m/s | 8.5° | 0.243 |
-| 7 m/s | 19.3° | 0.551 |
-| 12 m/s | 31.0° | 0.886 |
-| 15+ m/s | ≥35.0° | 1.000 |
-
-**`atan2` minimum denominator** (`max(|fwd_speed|, 0.5)`): prevents division-by-near-zero when kart is nearly stationary. At `fwd_speed=0, side_speed=0` → `slip_angle=0` → no phantom drift.
-
-**Critical positioning**: this measurement happens on `side_speed` computed from velocity decomposition AFTER `rotate_y()` but BEFORE `move_and_slide()`. Post-slide velocity includes wall-slide lateral components from collision response and must not be used.
-
----
-
-### 2. Intensity Update (framerate-independent exponential lerp)
-
-```
-target_intensity = 0.0  if (fwd_speed < drift_min_speed or fwd_speed <= 0)
-                       else slip_ratio
+target_intensity = 0.0
+if fwd_speed >= drift_min_speed:
+    target_intensity = slip_ratio
 
 alpha = 1.0 - exp(-slip_smoothing * delta)
 _drift_intensity = lerp(_drift_intensity, target_intensity, alpha)
-_drift_intensity = clamp(_drift_intensity, 0.0, 1.0)
+_drift_intensity = clamp(_drift_intensity, 0, 1)
 ```
 
-| Variable | Default | Range | Effect |
-|---|---|---|---|
-| `slip_smoothing` | 8.0 /s | 3–20 /s | How fast intensity tracks measured slip; higher = more instant response |
-| `drift_min_speed` | 3.0 m/s | 1–8 m/s | Hard gate below which drift cannot activate |
+Uses the **outer (faster-sliding) rear wheel** as the intensity signal. This means intensity reaches 1.0 when the hardest-working wheel hits `drift_max_slip_speed` m/s of lateral slip — even if the body center is barely moving sideways. More physically correct than v2.4's body-center slip angle.
 
-**Half-life** (time for intensity to halve toward target): `t_½ = ln(2) / slip_smoothing ≈ 0.087s` at default 8.0. At `target=1.0` from 0: reaches ~0.5 in 87ms, ~0.86 in 240ms.
-
-**Framerate independence**: `alpha = 1 - exp(-rate*delta)` is the correct framerate-independent lerp. At 60fps: `alpha = 1-exp(-8/60) ≈ 0.125`. At 30fps: `alpha = 1-exp(-8/30) ≈ 0.234`. Both sum to same cumulative progression over same elapsed time.
-
----
-
-### 3. Derived `_is_drifting` (mini-hysteresis)
+### K. _is_drifting Hysteresis
 
 ```
 hyst_high = drift_active_threshold + 0.02   # default: 0.57
@@ -422,162 +318,232 @@ if _is_drifting and _drift_intensity < hyst_low:   _is_drifting = false
 if not _is_drifting and _drift_intensity > hyst_high: _is_drifting = true
 ```
 
-| Variable | Default | Notes |
-|---|---|---|
-| `drift_active_threshold` | 0.55 | Center of band; `slip_ratio=0.55` corresponds to ~19° slip at 35° max |
+Discrete on/off for VFX/audio event triggers only. ±0.02 band prevents flicker.
+
+### L. Pack Output State
+
+```gdscript
+out.new_velocity = fwd_dir * fwd_speed + side_dir * side_speed + Vector3(0, inp.velocity.y, 0)
+out.yaw_delta    = _omega * delta
+out.omega        = _omega
+out.fwd_speed    = fwd_speed
+out.side_speed   = side_speed
+out.rear_left_lat_speed  = v_lat_rear_l
+out.rear_right_lat_speed = v_lat_rear_r
+out.slip_angle_front_deg = rad_to_deg(alpha_front)
+out.slip_angle_rear_deg  = rad_to_deg(alpha_rear)
+out.drift_intensity      = _drift_intensity
+out.is_drifting          = _is_drifting
+out.slip_ratio           = slip_ratio
+```
+
+### kart_controller application (after step)
+
+```
+rotate_y(state.yaw_delta)
+velocity = Vector3(state.new_velocity.x, velocity.y, state.new_velocity.z)
+move_and_slide()
+_apply_slope_influence(delta)
+_apply_floor_align(delta)         # yaw-lock preserved
+_apply_kart_collisions(state.fwd_speed)
+_update_visual_lean(state, delta)
+_update_wheel_visuals(state, delta)
+_update_vfx()
+```
 
 ---
 
-### 4. Derived `_grip` (non-linear curve)
+## Formulas
+
+### 1. Per-Wheel Lateral Velocity (Bicycle Identity)
 
 ```
-curved_intensity = pow(_drift_intensity, grip_slip_exponent)
-_grip = lerp(high_grip_target, low_grip_target, curved_intensity)
+v_lat_at_point = v_lat_body + _omega * r_longitudinal
 ```
 
-| Variable | Default | Range | Effect |
+Where `r_longitudinal` is the signed distance from the body center along the forward axis.
+
+| Point | r_longitudinal | r_lateral | v_lat |
 |---|---|---|---|
-| `grip_slip_exponent` | 2.0 | 1.0–4.0 | Curve shape: 1.0=linear, 2.0=grip stays high at low intensity, drops at high |
-| `low_grip_target` | 1.0 | 0.5–3.0 | Exp decay rate at full drift (SmashKarts-range compromise: not "ice" 0.5, not "sticky" 2.5) |
-| `high_grip_target` | 29.0 | 15–40 | Exp decay rate at no drift |
+| Front center | +half_wb | 0 | `side_speed + _omega * half_wb` |
+| Rear center | -half_wb | 0 | `side_speed - _omega * half_wb` |
+| Rear left | -half_wb | -half_track | `side_speed - _omega * half_wb - _omega * half_track` |
+| Rear right | -half_wb | +half_track | `side_speed - _omega * half_wb + _omega * half_track` |
 
-With `grip_slip_exponent=2.0` and defaults:
+**Example** at `_omega = 1.5 rad/s` (moderate left turn), `side_speed = 2 m/s`, `half_wb = 0.6 m`, `half_track = 0.45 m`:
+- Rear-left: `2 - 1.5*0.6 - 1.5*0.45 = 2 - 0.9 - 0.675 = 0.425 m/s`
+- Rear-right: `2 - 1.5*0.6 + 1.5*0.45 = 2 - 0.9 + 0.675 = 1.775 m/s`
 
-| `_drift_intensity` | `curved_intensity` | `_grip` |
+Right rear (outer during left turn) slides 4.2× harder than left rear (inner). Both fire separate smoke. Right fires first/more intensely.
+
+---
+
+### 2. Saturating Tire Force (tanh model)
+
+```
+F = -grip_stiffness * tanh(v_lat / sat) * sat
+```
+
+Where `sat = tire_saturation_speed` (m/s).
+
+**Linear region** (|v_lat| << sat): `tanh(x) ≈ x`, so `F ≈ -grip_stiffness * v_lat`. Effective grip = `grip_stiffness`.
+
+**Saturated region** (|v_lat| >> sat): `tanh(x) → ±1`, so `F → ±grip_stiffness * sat`. Maximum force = `grip_stiffness * sat`.
+
+| `v_lat / sat` | `tanh` | F/F_max |
 |---|---|---|
-| 0.0 | 0.00 | 29.0 |
-| 0.3 | 0.09 | 26.5 |
-| 0.5 | 0.25 | 22.0 |
-| 0.7 | 0.49 | 15.3 |
-| 0.85 | 0.72 | 9.1 |
-| 1.0 | 1.00 | 1.0 |
+| 0.0 | 0.00 | 0% (no force) |
+| 0.5 | 0.46 | 46% (linear zone) |
+| 1.0 | 0.76 | 76% (entering saturation) |
+| 1.5 | 0.91 | 91% |
+| 2.0 | 0.96 | 96% |
+| 3.0 | 0.99 | 99% (effectively saturated) |
 
-**Why LOW_GRIP=1.0 (compromise)**: at 0.5 rear slides nearly unchecked (ice feel from v2.3). At 2.5 drift barely visible (sticky). 1.0 is starting point — tune empirically toward 0.7-0.8 (looser) or 1.4 (tighter) based on feel.
+**Defaults** (`rear_grip_stiffness=7`, `tire_saturation_speed=4.5`):
+- F_max_rear = `7 * 4.5 = 31.5` N (normalized by mass for m/s² effect)
+- Rear enters saturation around `v_lat ≈ 4.5 m/s`
+- Below that: predictable linear response
 
----
-
-### 5. Framerate-Independent Side Speed Damping
-
-```
-side_speed *= exp(-_grip * delta)
-```
-
-**Why exp decay (not `*= 1 - grip*delta`)**: linear approximation diverges from true exponential at high delta. At delta=1/30 the linear form overshoots by ~2× the error of delta=1/60 — noticeable in slip tail between desktop 60fps and HTML5 30fps. Exponential form is framerate-independent: `exp(-grip*t)` gives same result for any time-slicing of `t`.
-
-**Per-frame retention at various `_grip` (at 60fps, dt=1/60)**:
-
-| `_grip` | `exp(-grip*dt)` | Half-life | Feel |
-|---|---|---|---|
-| 29.0 (intensity=0.0) | 0.617 | ~0.024s | Near-snap to grip |
-| 22.0 (intensity=0.5, exp=2) | 0.694 | ~0.032s | Quick but not instant |
-| 15.3 (intensity=0.7, exp=2) | 0.775 | ~0.045s | Controlled slide |
-| 9.1 (intensity=0.85) | 0.860 | ~0.076s | Pronounced slide |
-| 1.0 (intensity=1.0) | 0.983 | ~0.693s | Long drift tail |
-
-**Example** — side_speed builds to 8 m/s at full drift (_grip=1.0): after 0.5s → `8 * exp(-1.0 * 0.5) ≈ 8 * 0.607 ≈ 4.85 m/s` still sliding.
+**Why front > rear stiffness** (14 vs 7): front tire resists lateral slide more strongly than rear. Rear breaks away first — kart oversteers into drift. If front were softer, kart would understeer (push wide). This ratio is the fundamental tuning knob for oversteer character.
 
 ---
 
-### 6. Smoothstep Intent Aid
+### 3. Yaw Torque and Angular Inertia
 
 ```
-intent_aid = 0.0
-if fwd_speed > drift_min_speed:
-    intent_scale = smoothstep(drift_intent_threshold, 1.0, abs(steer_input))
-    intent_aid   = drift_intent_multiplier * intent_scale * sign(steer_input)
+torque = f_front * half_wb - f_rear_total * half_wb
+       = (f_front - f_rear_total) * half_wb
 
-effective_yaw_rate = steering_speed * steer_mult * (steer_input + intent_aid) * speed_scale * yaw_mult
+moi = mass * half_wb^2 * inertia_scale
+omega_accel = torque / moi
 ```
 
-| Variable | Default | Range | Effect |
-|---|---|---|---|
-| `drift_intent_multiplier` | 0.4 | 0.0–1.0 | Extra yaw as fraction of steer_input; 0.0 = pure emergent |
-| `drift_intent_threshold` | 0.7 | 0.5–0.9 | Steer at which smoothstep begins; below = 0, at 1.0 = full |
+**Physical intuition**: front force at `+half_wb` arm generates CW torque (nose points into turn). Rear force at `-half_wb` arm generates CCW (stabilizing). If front overcomes rear, kart turns tighter.
 
-**Smoothstep curve values** (`intent_scale` vs `|steer_input|`, threshold=0.7):
+**Angular damping** (exp, framerate-independent):
+```
+_omega *= exp(-omega_damping * delta)
+```
 
-| `|steer|` | `smoothstep(0.7, 1.0, x)` | `intent_aid` (mult=0.4) |
+Half-life of `_omega`: `t_½ = ln(2) / omega_damping ≈ 0.173s` at default 4.0/s.
+
+| `omega_damping` | Half-life | Feel |
 |---|---|---|
-| 0.7 | 0.00 | 0.00 |
-| 0.75 | 0.07 | 0.03 |
-| 0.8 | 0.26 | 0.10 |
-| 0.85 | 0.50 | 0.20 |
-| 0.9 | 0.74 | 0.30 |
-| 0.95 | 0.93 | 0.37 |
-| 1.0 | 1.00 | 0.40 |
-
-**Why smoothstep (not binary threshold)**: binary `if |steer|>0.7` reintroduces threshold feel that v2.4 aims to remove. Smoothstep gives C1-continuous transition — aid gradually ramps over last 30% of steer range, no perceptible "snap".
+| 2.0 | 0.35s | Loose, slow to stabilize |
+| 4.0 | 0.17s | Default — feels heavy but responsive |
+| 8.0 | 0.087s | Tight, snaps back quickly |
+| 15.0 | 0.046s | Very stiff, minimal rotation persistence |
 
 ---
 
-### 7. Force-Based Acceleration
-
-Identical to v2.3. See formula #6 in v2.3 archive.
+### 4. Drift Intensity (per-wheel normalization)
 
 ```
-thrust   = throttle_input * accel_force  (× reverse_ratio when negative)
-active_k_drag    = k_drag    * lerp(1.0, drift_drag_multiplier,    _drift_intensity)
-active_k_rolling = k_rolling * lerp(1.0, drift_rolling_multiplier, _drift_intensity)
-drag    = -sign(fwd_speed) * active_k_drag * fwd_speed^2
-rolling = -active_k_rolling * fwd_speed
-fwd_speed += (thrust + drag + rolling + brake) * delta
+rear_slip_mag = max(|v_lat_rear_l|, |v_lat_rear_r|)
+slip_ratio    = clamp(rear_slip_mag / drift_max_slip_speed, 0, 1)
+
+target_intensity = slip_ratio  if fwd_speed >= drift_min_speed
+                 = 0.0          otherwise
+
+alpha = 1 - exp(-slip_smoothing * delta)
+_drift_intensity = lerp(_drift_intensity, target_intensity, alpha)
 ```
+
+| rear_slip_mag | slip_ratio (at drift_max_slip_speed=8) |
+|---|---|
+| 0 m/s | 0.00 |
+| 2 m/s | 0.25 |
+| 4 m/s | 0.50 |
+| 6 m/s | 0.75 |
+| 8+ m/s | 1.00 |
+
+**Example**: `_omega=2.0, side_speed=1.5, half_wb=0.6, half_track=0.45`:
+- Rear-right (outer): `1.5 - 2*0.6 + 2*0.45 = 1.5 - 1.2 + 0.9 = 1.2 m/s`
+- Rear-left (inner): `1.5 - 2*0.6 - 2*0.45 = 1.5 - 1.2 - 0.9 = -0.6 m/s` (slight reverse slide)
+- `rear_slip_mag = max(1.2, 0.6) = 1.2 m/s` → `slip_ratio = 0.15` (mild intensity)
 
 ---
 
-### 8. Speed-Dependent Steering + Yaw Multiplier
+### 5. Visual Lean (omega-driven)
 
 ```
-yaw_mult = lerp(1.0, drift_yaw_multiplier, _drift_intensity)
-effective_yaw_rate = steering_speed * steer_mult * (steer_input + intent_aid) * speed_scale * yaw_mult
+omega_norm  = clamp(_omega / omega_lean_scale, -1, 1)
+lean_dir    = -omega_norm                   # positive omega = CCW = lean right
+target_angle = drift_intensity * visual_drift_max_deg * lean_dir [in radians]
+
+lean_alpha = 1 - exp(-visual_lean_recovery_speed * delta)
+_visual_drift_angle = lerp(_visual_drift_angle, target_angle, lean_alpha)
+
+$BaseCar.rotation.y = _base_car_rot_y + _visual_drift_angle
 ```
 
-| `_drift_intensity` | `yaw_mult` | effective yaw at v=27.5m/s, steer=1.0 (with full intent aid) |
-|---|---|---|
-| 0.0 | 1.00 | 2.6 * 0.95 * 1.4 * ~1.0 * 1.00 ≈ 3.46 rad/s |
-| 0.5 | 1.40 | ≈ 4.84 rad/s |
-| 1.0 | 1.80 | ≈ 6.22 rad/s |
+**Why omega (not side_speed sign)**: `sign(side_speed)` flips discretely (binary), creating micro-judder on direction reversal. Omega is a continuous, smoothed signal — the body was rotating, it gradually unwinds. Lean follows the actual turning momentum, not the instantaneous lateral direction.
+
+At `_omega = omega_lean_scale` (default 3.0 rad/s), lean reaches full `visual_drift_max_deg`. At `_omega = 0`, lean decays back at `visual_lean_recovery_speed`.
 
 ---
 
-### 9. Terminal Velocity
+### 6. Per-Wheel VFX (Independent Smoke)
 
+```
+threshold = vfx_smoke_speed_threshold   # default 0.5 m/s
+
+smoke_l = on_floor and |rear_left_lat_speed|  > threshold
+smoke_r = on_floor and |rear_right_lat_speed| > threshold
+
+l_smoke.emitting = smoke_l
+r_smoke.emitting = smoke_r
+```
+
+Each side fires independently. During a hard left turn at speed:
+- Right rear (outer) has high lateral slip → right smoke on
+- Left rear (inner) may be below threshold → left smoke off or dimmer
+
+This asymmetry is what produces the visible "inner arc / outer arc" divergence from the original SmashKarts trail reference. If both smokes are always on/off together, the model reduces to a single-axle point-mass (v2.4 behavior).
+
+---
+
+### 7. Terminal Velocity and Force Balance
+
+Unchanged formula from v2.4:
 ```
 v_terminal(intensity) = sqrt(accel_force / (k_drag * lerp(1.0, drift_drag_multiplier, intensity)))
 ```
 
-| `_drift_intensity` | effective k_drag | `v_terminal` (drag-only) | vs normal |
+| `_drift_intensity` | effective k_drag | `v_terminal` | vs normal |
 |---|---|---|---|
 | 0.0 | 0.040 | 23.5 m/s | 100% |
 | 0.5 | 0.072 | 17.5 m/s | 74% |
 | 1.0 | 0.104 | 14.5 m/s | 62% |
 
-Note: `k_rolling=1.1` has small effect compared to v2.3's 12.0. Terminal dominated by k_drag. Empirical tuning: run straight, measure peak, adjust k_drag or accel_force, update `max_speed` reference.
+---
+
+### 8. Kart-to-Kart Collision (server-only, unchanged)
+
+```
+my_energy    = mass * |fwd_speed|
+other_energy = other.get_kart_mass() * other.velocity.length()
+energy_diff  = my_energy - other_energy
+push_force   = clamp(|energy_diff| * 0.5, bump_min_force, bump_max_force)
+
+if energy_diff > 0: other.velocity += push_dir * force
+else:               velocity       += -push_dir * force
+```
 
 ---
 
-### 10. Collision Energy
-
-Identical to v2.3.
-
-```
-energy = mass * speed
-push_force = clamp(abs(energy_diff) * 0.5, bump_min_force, bump_max_force)
-```
-
----
-
-### 11. Floor-Align Yaw-Lock
-
-Identical to v2.3.
+### 9. Floor-Align Yaw-Lock (unchanged from v2.3)
 
 ```
 saved_yaw = global_transform.basis.get_euler().y
-new_basis = global_transform.basis.slerp(floor_normal_basis, floor_align_speed * delta)
+target_basis = Basis.looking_at(project_fwd_on_floor(fwd_dir, floor_normal), floor_normal)
+new_basis = global_transform.basis.slerp(target_basis, floor_align_speed * delta).orthonormalized()
 euler = new_basis.get_euler()
 euler.y = saved_yaw
-global_transform.basis = Basis.from_euler(euler)
+global_transform.basis = Basis.from_euler(euler).orthonormalized()
 ```
+
+Prevents the yaw feedback loop in long circular drifts: slerp toward floor normal would silently rotate yaw → change fwd_dir decomposition → change tire slip angles → change torque → different _omega. Freezing yaw breaks the coupling.
 
 ---
 
@@ -585,20 +551,17 @@ global_transform.basis = Basis.from_euler(euler)
 
 | Scenario | Resolution |
 |---|---|
-| Kart stationary, steer held | `fwd_speed < drift_min_speed` → `target_intensity = 0` → `_drift_intensity` decays to 0. `atan2` denominator clamped to 0.5 — no phantom slip_angle from near-zero velocity noise. |
-| Speed drops below `drift_min_speed` mid-drift | `target_intensity = 0`. `_drift_intensity` decays via exp lerp at `slip_smoothing` rate. At smoothing=8: reaches ~0.0 in ~300ms. Slide tail felt as side_speed decays via exp damping (not forced to zero). |
-| Kart enters drift naturally at moderate speed | Yaw builds side_speed → slip_angle grows → intensity grows → `_grip` drops → side_speed decays less → more slip_angle. Self-reinforcing loop. `drift_max_slip_angle_deg` caps slip_ratio at 1.0, preventing runaway. |
-| Player steers opposite direction mid-drift (counter-steer) | Yaw toward center → `side_speed` starts decaying faster (heading realigns with velocity) → `slip_angle` drops → `slip_ratio` drops → `_drift_intensity` follows. Recovery feels physical and proportional. |
-| Full steer + intent aid at speed | Smoothstep intent_aid → effective steer = 1.4 at `|steer|=1.0` → more yaw → side_speed builds faster → slip_angle grows to 35°+ → intensity reaches 1.0 within ~250ms. Drift initiated "on command" despite emergent model. |
-| Reverse driving (`fwd_speed < 0`) | `target_intensity = 0`. Intent aid blocked (`fwd_speed <= drift_min_speed`). No drift in reverse. |
-| Hard wall collision during drift | `move_and_slide` redirects velocity. On NEXT frame, velocity decomposes afresh from new `-basis.z / basis.x` → `side_speed` reflects new state → `slip_angle` recomputed. No false intensity spike because slip measured BEFORE wall slide in current frame. May spike briefly if player rotates along wall, but resolves within 1-2 frames. |
-| Input jitter (steer oscillating near threshold) | Smoothstep `intent_aid` at `|steer|=0.7` evaluates to 0.0 with zero derivative — no binary flipping. Jitter around threshold produces zero jitter in yaw rate. Below threshold: pure emergent physics unaffected by steer magnitude. |
-| DEAD state | `steer_input = 0`, `throttle_input = 0`. No yaw → no side_speed buildup. Existing `side_speed` decays via exp damping. `_drift_intensity` follows `slip_ratio` down naturally. No special-case code needed. |
-| Circular drift (sustained steer, steady state) | At equilibrium: `side_speed` stable → `slip_angle` stable → `_drift_intensity` stable → `_grip` stable → exp damping = lateral speed produced by yaw. Floor-align yaw-lock prevents orientation oscillation (v2.3 fix retained). Stable from FIRST lap (no feedback loop unlike v2.3). |
-| `_is_drifting` flicker near threshold | Band [0.53, 0.57] absorbs intensity oscillation. `_is_drifting` won't toggle unless intensity exits band cleanly. |
-| `grip_slip_exponent` = 1.0 | Linear grip-vs-intensity (legacy behavior). Use for comparison testing. |
-| HTML5 at 30fps vs desktop 60fps | `alpha = 1 - exp(-rate*delta)` and `exp(-_grip*delta)` are both framerate-independent. Drift tracking and side damping give identical behavior at any fps. Visual smoothness may differ (fewer frames), but feel does not. |
-| Ramp/air state | **[OPEN — deferred to post-MVP]**: no drift intensity update while airborne. `_drift_intensity` holds last value. On landing, resumes tracking slip_ratio. Air control TBD. |
+| Kart stationary, steer held | `|fwd_speed| < drift_min_speed` → `target_intensity = 0` → `_drift_intensity` decays. Standstill aid (`stationary_omega_kick`) rotates kart via direct omega addition. Tire forces are near-zero (small slip angles at low speed). |
+| Speed drops below `drift_min_speed` mid-drift | `target_intensity = 0`. `_drift_intensity` decays via exp lerp at `slip_smoothing` rate. `_omega` decays via `omega_damping`. Kart gradually straightens and stops sliding. |
+| Hard wall collision | `move_and_slide` modifies velocity. Next tick, velocity is decomposed into new `fwd_speed/side_speed` from updated basis. `_omega` is unaffected — rotation state persists (physically correct). Drift intensity recalculates from new per-wheel speeds. |
+| Reverse driving | `fwd_speed < 0` → `target_intensity = 0` (gate prevents drift intensity). Tire forces still act on velocity and omega (reverse steering works naturally — bicycle model handles it). No sign hack needed. |
+| _omega builds too fast (spin-out) | `omega_damping` prevents unbounded growth. At high `_omega`, rear tire saturation limits the destabilizing torque to ±F_max. The system self-limits. Increase `omega_damping` or `rear_grip_stiffness` if spin-out occurs at moderate steer. |
+| Both rear wheels have same lateral speed | Happens only when `_omega = 0` (going straight). `v_lat_rear_l = v_lat_rear_r = side_speed`. Both smokes fire/don't fire together — degenerate to v2.4-like single-axle behavior. As soon as turning, they diverge. |
+| _is_drifting flicker near threshold | Band [0.53, 0.57] absorbs oscillation. Won't toggle unless intensity exits band cleanly. |
+| DEAD state / respawn | `_bicycle.reset()` → `_omega = 0`, `_drift_intensity = 0`, `_is_drifting = false`. kart_controller also resets `_rear_l_lat_speed`, `_rear_r_lat_speed`, `_omega`, `_visual_drift_angle`. |
+| HTML5 at 30fps vs desktop 60fps | All formulas use `delta` with `exp(-rate*delta)` pattern. Drift tracking, angular damping, visual lean — all framerate-independent. |
+| Ramp / air state | `on_floor = false` → standstill aid skipped (step G). Tire forces still compute but wheel-ground contact is lost — no physical meaning. Drift intensity holds last value (fwd_speed gate may cause decay if speed drops). Air control TBD post-MVP. |
+| Circular drift steady state | `_omega` stabilizes at equilibrium where `omega_accel * delta = _omega * (1 - exp(-omega_damping * delta))`. Intensity stabilizes. Floor-align yaw-lock prevents orientation drift. Stable from first lap. |
 
 ---
 
@@ -608,7 +571,7 @@ global_transform.basis = Basis.from_euler(euler)
 
 | System | Dependency | Type |
 |---|---|---|
-| **State Machine** | KartState gates physics (DEAD = no input, IDLE = frozen) | Hard |
+| **State Machine** | `StateManager.can_move(player_id)` gates physics tick | Hard |
 | **Network Layer** | Position/rotation/velocity sync at 30 Hz | Hard |
 
 ### Downstream
@@ -617,21 +580,195 @@ global_transform.basis = Basis.from_euler(euler)
 |---|---|---|
 | **Kart Classes** | KartPhysicsResource defines class identity | resource swap |
 | **Weapon System** | Kart position/velocity for projectile spawn | `position`, `velocity`, `basis` |
-| **Camera System** | Speed + intensity for FOV, lateral offset | `fwd_speed`, `side_speed`, `_drift_intensity` |
-| **VFX System** | Graduated drift smoke | `_drift_intensity: float`, `_is_drifting: bool` |
-| **Audio System** | Engine pitch, tire screech | `fwd_speed`, `_drift_intensity` |
-| **HUD** | Speed display | `fwd_speed` |
+| **Camera System** | Speed + intensity for FOV, lateral offset | `state.fwd_speed`, `_drift_intensity` |
+| **VFX System** | Per-wheel smoke triggers | `_rear_l_lat_speed: float`, `_rear_r_lat_speed: float`, `_is_drifting: bool` |
+| **Audio System** | Engine pitch, tire screech | `state.fwd_speed`, `_drift_intensity` |
+| **HUD** | Speed display | `state.fwd_speed` |
+| **Debug overlays** | All telemetry | `PhysicsState` fields, `_omega` |
 
-### Interface Contract
+### Interface Contract (kart_controller public fields)
 
 ```gdscript
-var _drift_intensity: float       # physics master [0..1]
-var _is_drifting: bool            # derived — mini-hysteresis, VFX/audio/network
-var _slip_angle_deg: float        # debug/telemetry
-var fwd_speed: float
-var side_speed: float
-var velocity: Vector3
+var _drift_intensity: float     # physics master [0..1] — camera, VFX, audio
+var _is_drifting: bool          # VFX/audio on-off trigger (hysteresis)
+var _omega: float               # angular velocity — visual lean, debug
+var _rear_l_lat_speed: float    # per-wheel lateral speed for L smoke
+var _rear_r_lat_speed: float    # per-wheel lateral speed for R smoke
+var _cached_side_speed: float   # average of rear wheel speeds — legacy debug
+var velocity: Vector3           # CharacterBody3D.velocity (contract preserved)
 ```
+
+Network sync (30 Hz): `position`, `rotation`, `velocity` — unchanged. `_drift_intensity` and `_omega` are NOT currently synced (see Network Considerations below).
+
+---
+
+## Parameters (KartPhysicsResource v3.0)
+
+### Speed Group
+
+| Field | dev_params key | Default | Unit | Short description |
+|---|---|---|---|---|
+| `accel_force` | ACCEL_FORCE | 22.0 | m/s² | How aggressively the kart accelerates |
+| `k_drag` | K_DRAG | 0.04 | — | Air resistance at high speed; sets top speed ceiling |
+| `k_rolling` | K_ROLLING | 1.1 | 1/s | Rolling resistance; how fast the kart coasts to a stop |
+| `brake_force` | BRAKE_FORCE | 40.0 | m/s² | Extra deceleration when S is held against forward motion |
+| `reverse_ratio` | REVERSE_RATIO | 0.5 | x | Reverse thrust as fraction of forward power |
+| `max_speed` | MAX_SPEED | 27.5 | m/s | Reference for camera FOV and network normalization only — not a hard clamp |
+
+**`accel_force`** — How energetic the acceleration feels. At 15 the kart feels sluggish and takes 4+ seconds to reach top speed. At 22 it's 2.5 seconds of lively acceleration. At 35 it lunges forward aggressively.
+
+**`k_drag`** — Controls top speed. Lower value = higher top speed. `accel_force / k_drag` = terminal velocity squared, so tune these two together. At k_drag=0.04 and accel=22, emergent terminal is around 23-24 m/s.
+
+**`k_rolling`** — How quickly the kart decelerates when you release throttle at low speed. At 0.5 it rolls a long time. At 2.0 it stops more crisply. Doesn't affect top speed much.
+
+**`brake_force`** — Hard braking deceleration. At 20 the kart needs a bit of distance. At 40 it stops assertively within ~0.7 seconds from top speed. At 60 it's snappy and jarring.
+
+### Input Smoothing Group
+
+| Field | dev_params key | Default | Unit | Short description |
+|---|---|---|---|---|
+| `steer_slew_rate_in` | STEER_SLEW_IN | 2.0 | 1/s | How fast steer ramps up when pressing a key |
+| `steer_slew_rate_out` | STEER_SLEW_OUT | 1.5 | 1/s | How fast steer returns to center on key release |
+| `throttle_slew_rate` | THROTTLE_SLEW | 2.0 | 1/s | How fast throttle builds from 0 to full |
+| `steer_visual_rate` | STEER_VISUAL_RATE | 18.0 | 1/s | How fast the front wheel mesh turns (cosmetic only) |
+
+**`steer_slew_rate_in`** — Smooths keyboard steer from 0 to 1. At 1.0 it takes about 0.7 seconds to reach full steer — noticeably laggy. At 2.0 it's around 0.4 seconds, feels responsive. At 5.0 it's nearly instant — twitchy.
+
+**`steer_slew_rate_out`** — Slightly slower than slew_in gives a natural "unwinding" feel when releasing the wheel. Match both at 3.0 for responsive input; set out lower (1.0-1.5) for a lazy return.
+
+### Steering Group
+
+| Field | dev_params key | Default | Unit | Short description |
+|---|---|---|---|---|
+| `steer_low_speed_mult` | STEER_LOW_MULT | 1.0 | x | Steer angle scale factor at very low speed |
+| `steer_high_speed_mult` | STEER_HIGH_MULT | 0.95 | x | Steer angle scale factor at top speed |
+| `stationary_steer_threshold` | STATIONARY_STEER_THRESHOLD | 2.0 | m/s | Speed below which standstill aid is active |
+
+**`steer_low_speed_mult` / `steer_high_speed_mult`** — These scale the physical front wheel lock angle at different speeds. At default (1.0 / 0.95) there's minimal speed-dependent reduction — nearly the same lock at any speed. Decrease `steer_high_speed_mult` to 0.6-0.7 if the kart feels too twitchy at top speed.
+
+### Bicycle v3.0 Group
+
+| Field | dev_params key | Default | Unit | Short description |
+|---|---|---|---|---|
+| `wheelbase_override` | WHEELBASE_OVERRIDE | 0.0 | m | 0 = auto-measure from wheel nodes |
+| `track_width_override` | TRACK_WIDTH_OVERRIDE | 0.0 | m | 0 = auto-measure from rear wheel nodes |
+| `max_steer_angle_deg` | MAX_STEER_ANGLE_DEG | 32.0 | deg | Front wheel lock angle at full steer input |
+| `front_grip_stiffness` | FRONT_GRIP | 14.0 | — | How strongly front tires resist lateral slide |
+| `rear_grip_stiffness` | REAR_GRIP | 7.0 | — | How strongly rear tires resist lateral slide — lower = more drift |
+| `tire_saturation_speed` | TIRE_SATURATION | 4.5 | m/s | Lateral speed where tire force stops growing |
+| `inertia_scale` | INERTIA_SCALE | 1.2 | x | How heavy the rotation feels |
+| `omega_damping` | OMEGA_DAMPING | 4.0 | 1/s | How quickly rotation decays when not actively turning |
+| `stationary_omega_kick` | STATIONARY_OMEGA_KICK | 2.5 | rad/s² | How aggressively the kart rotates while stationary |
+| `drift_max_slip_speed` | DRIFT_MAX_SLIP_SPEED | 8.0 | m/s | Rear wheel lateral speed that gives intensity=1.0 |
+| `omega_lean_scale` | OMEGA_LEAN_SCALE | 3.0 | rad/s | Rotation rate that gives maximum visual body lean |
+
+**`max_steer_angle_deg`** — How tightly the front wheels can turn. At 20° the kart has wide, gradual turns. At 32° default it can make tight arcs. At 45° it turns very sharply and may feel unstable. This is the primary knob for turn radius — affects how quickly you can build omega.
+
+**`front_grip_stiffness`** — How strongly the front pushes the nose into a turn. At 8 front feels vague and slow to respond. At 14 it's assertive. At 20 the nose bites hard and can produce sudden snap oversteer. Should always be higher than rear_grip_stiffness.
+
+**`rear_grip_stiffness`** — The single most important drift knob. At 3 the rear breaks away very easily — lots of drift, potentially uncontrollable. At 7 default the rear slides nicely in committed turns. At 12 the rear barely slides. **Ratio of front/rear stiffness determines oversteer character** — higher ratio = more aggressive drift tendency.
+
+**`tire_saturation_speed`** — At which lateral speed the tire stops generating more force. At 2.0 the tire saturates very quickly — feels like ice, very little progression. At 4.5 you get a generous linear region before breakaway. At 8.0+ the tire almost never saturates — very grippy.
+
+**`inertia_scale`** — Makes the rotation feel heavier or lighter without changing how much the kart gets pushed in collisions. At 0.8 the kart rotates easily and responsively. At 1.2 it feels weighty, like a real vehicle. At 2.0 it's very sluggish to turn and oversteer is dangerous.
+
+**`omega_damping`** — How quickly angular velocity fades when you straighten the wheel. At 2.0 the kart continues rotating for a long time after releasing steer — loose, drifty feel. At 4.0 it calms down in about 0.2 seconds. At 10.0 it stops almost immediately — very stable but less dynamic.
+
+**`stationary_omega_kick`** — How aggressively you can rotate while stationary. At 1.0 it barely moves. At 2.5 you can make a reasonable pivot turn. At 5.0 it spins noticeably. Blends to zero as speed builds, so it never interferes with normal driving.
+
+**`drift_max_slip_speed`** — The rear wheel lateral speed at which drift intensity reaches 1.0 (maximum). At 4.0 intensity hits max quickly — smoke appears early, reactive feel. At 8.0 you need a proper hard slide to get full intensity. At 12.0 it takes a very aggressive maneuver to see heavy smoke.
+
+**`omega_lean_scale`** — The rotation rate (rad/s) that produces maximum visual body lean. At 2.0, even moderate turns produce a pronounced lean. At 3.0 default only committed turns lean heavily. At 5.0 the car looks almost upright even in hard turns.
+
+### Drift Signal Shaping Group
+
+| Field | dev_params key | Default | Unit | Active? | Short description |
+|---|---|---|---|---|---|
+| `drift_min_speed` | DRIFT_MIN_SPEED | 3.0 | m/s | YES | Below this speed, drift intensity cannot build up |
+| `slip_smoothing` | SLIP_SMOOTHING | 8.0 | 1/s | YES | How fast drift intensity tracks the actual slip |
+| `drift_active_threshold` | DRIFT_ACTIVE_THRESHOLD | 0.55 | [0..1] | YES | Intensity level where smoke/screech triggers |
+| `vfx_smoke_speed_threshold` | VFX_SMOKE_THRESHOLD | 0.5 | m/s | YES | Per-wheel lateral speed to trigger smoke |
+| `drift_drag_multiplier` | DRIFT_DRAG_MULTIPLIER | 2.6 | x | YES | Speed penalty at full drift intensity |
+| `drift_rolling_multiplier` | DRIFT_ROLLING_MULTIPLIER | 1.45 | x | YES | Low-speed rolling resistance at full intensity |
+| `cornering_drag_coeff` | CORNERING_DRAG_COEFF | 0.3 | — | YES (×0.5) | Soft fwd-drag overlay during any cornering |
+| `drift_max_slip_angle_deg` | DRIFT_MAX_SLIP_ANGLE_DEG | 35.0 | deg | deprecated v3.0 | Replaced by drift_max_slip_speed |
+| `drift_intent_multiplier` | DRIFT_INTENT_MULTIPLIER | 0.4 | — | deprecated v3.0 | Arcade yaw aid removed in v3.0 |
+| `drift_intent_threshold` | DRIFT_INTENT_THRESHOLD | 0.7 | — | deprecated v3.0 | Arcade yaw aid removed in v3.0 |
+| `grip_slip_exponent` | GRIP_SLIP_EXPONENT | 2.0 | — | deprecated v3.0 | Grip is now emergent from tanh model |
+| `low_grip_target` | LOW_GRIP | 1.0 | — | deprecated v3.0 | Replaced by tire_saturation_speed |
+| `high_grip_target` | HIGH_GRIP | 29.0 | — | deprecated v3.0 | Replaced by front/rear_grip_stiffness |
+| `drift_yaw_multiplier` | DRIFT_YAW_MULTIPLIER | 1.8 | x | deprecated v3.0 | Yaw now emergent from torque |
+
+**`drift_min_speed`** — Hard minimum: below this speed (m/s) drift intensity immediately decays to zero no matter how much lateral slip there is. Prevents phantom drift smoke when the kart is nearly stopped. At 1.0 drift can appear at very slow speeds. At 5.0 you need to be moving briskly before any drift activates.
+
+**`slip_smoothing`** — How quickly the drift intensity number catches up to the actual wheel slip. At 4.0 it's slower to react — intensity builds and falls gradually, mushy feel. At 8.0 it tracks slip closely. At 15.0 it's nearly instant — intensity mirrors wheel behavior frame-by-frame, reactive and precise.
+
+**`drift_active_threshold`** — The intensity level (0-1) at which smoke and screech audio actually trigger. At 0.3 even casual turns produce smoke. At 0.55 default you need a real committed slide. At 0.75 smoke only appears in extreme situations.
+
+**`vfx_smoke_speed_threshold`** — Each rear wheel fires smoke independently when its lateral speed exceeds this. At 0.2 both wheels smoke at the slightest turn. At 0.5 only meaningful slides trigger smoke. Asymmetric trails (one wheel smoking, not the other) become visible only when this is tuned to let the inner wheel sometimes fall below threshold.
+
+**`drift_drag_multiplier`** — How much extra drag the kart experiences at full drift intensity. At 1.5 there's a small speed cost. At 2.6 the kart slows noticeably in a tight drift. At 4.0 the kart nearly stops in a sustained drift. Works through k_drag scaling — affects top speed in corners, not raw deceleration.
+
+**`cornering_drag_coeff`** — Soft forward deceleration proportional to how much the rear is sliding sideways. Produces a "digging in" feel in corners at any intensity level (not just full drift). At 0.0 no extra cornering drag. At 0.3 there's a slight but noticeable slow-down. Note: v3.0 applies this at half the v2.4 value internally — the main drag is now emergent through tire forces.
+
+### Visuals Group
+
+| Field | dev_params key | Default | Unit | Short description |
+|---|---|---|---|---|
+| `visual_drift_max_deg` | VISUAL_DRIFT_MAX_DEG | 34.0 | deg | Max body lean angle at drift_intensity=1.0 and omega=omega_lean_scale |
+| `visual_lean_recovery_speed` | VISUAL_LEAN_RECOVERY_SPEED | 5.0 | 1/s | How quickly lean smooths toward its target |
+| `wheel_radius` | WHEEL_RADIUS | 0.18 | m | Wheel size for rolling animation |
+| `omega_lean_scale` | OMEGA_LEAN_SCALE | 3.0 | rad/s | (see Bicycle group above) |
+
+**`visual_drift_max_deg`** — Maximum visual body tilt at full drift and full turn. At 20° the lean is subtle. At 34° it's dramatic but believable. At 50° the kart looks like it's about to tip over.
+
+**`visual_lean_recovery_speed`** — How smoothly the lean follows the current omega*intensity signal. At 2.0 the lean lags nicely behind the actual physics — satisfying camera-like feel. At 10.0 it snaps immediately. At 0.0 lean is instant with no smoothing.
+
+### Collision Group
+
+| Field | Default | Notes |
+|---|---|---|
+| `mass` | 1.0 | Relative collision weight. Heavy kart (2.0) pushes lighter (0.6) further. |
+| `bump_min_force` | 3.0 | Minimum push on any collision |
+| `bump_max_force` | 12.0 | Maximum push cap |
+
+### Terrain Group
+
+| Field | Default | Notes |
+|---|---|---|
+| `gravity` | 35.0 m/s² | 3.57× Earth — arcade feel. Applied by kart_controller, not bicycle module |
+| `slope_speed_influence` | 8.0 m/s² | Extra speed bonus/penalty on slopes |
+| `floor_snap_length` | 0.3 m | CharacterBody3D snap-to-floor distance |
+| `floor_align_speed` | 8.0 1/s | Pitch/roll alignment to floor normal; yaw frozen post-slerp |
+
+---
+
+## Migration Notes (v2.4 → v3.0)
+
+### What was replaced
+
+| v2.4 mechanism | v3.0 replacement | Reason |
+|---|---|---|
+| `rotate_y(steer_rate * delta)` direct yaw | `_omega` via torque accumulation | Emergent rotation from tire forces |
+| Single `side_speed` for whole body | Per-wheel velocities via bicycle identity | Divergent arc trails require per-wheel |
+| `atan2(side_speed, fwd_speed)` slip proxy | Rear wheel lateral speed vs `drift_max_slip_speed` | More physically meaningful normalization |
+| `_grip = lerp(high, low, pow(intensity, exp))` | Saturating `tanh` tire model | Continuous saturation, no separate grip state |
+| `side_speed *= exp(-_grip * delta)` damping | Tire forces directly modify `side_speed` | Physics causality: forces cause velocity change |
+| `smoothstep intent aid` on yaw | `stationary_omega_kick` (standstill only) | Removed input-to-yaw shortcut; yaw is fully emergent |
+| `sign(side_speed)` for lean direction | `-omega_norm = -clamp(_omega / omega_lean_scale, -1, 1)` | Continuous, no discrete sign flip |
+| Single smoke on `_is_drifting` | Per-wheel smoke on `|rear_l/r_lat_speed| > threshold` | Asymmetric trail divergence |
+
+### Deprecated but preserved (JSON roundtrip stability)
+
+These fields exist in KartPhysicsResource and are still hot-reloaded from dev_params.json, but **the bicycle physics module does not read them**. They are kept so:
+1. dev_params.json files from v2.4 don't crash with unknown key errors
+2. Rollback to v2.4 code would immediately use them again
+
+`drift_max_slip_angle_deg`, `drift_intent_multiplier`, `drift_intent_threshold`, `grip_slip_exponent`, `low_grip_target`, `high_grip_target`, `drift_yaw_multiplier`, `grip_loss_rate`, `grip_recovery_rate`, `steering_speed`, `stationary_steer_scale`
+
+### Preserved with identical semantics
+
+These survive v3.0 completely unchanged in behavior: `accel_force`, `k_drag`, `k_rolling`, `brake_force`, `reverse_ratio`, `max_speed`, `steer_slew_rate_in/out`, `throttle_slew_rate`, `drift_min_speed`, `slip_smoothing`, `drift_active_threshold`, `vfx_smoke_speed_threshold`, `drift_drag_multiplier`, `drift_rolling_multiplier`, `cornering_drag_coeff` (×0.5 internal adjustment), `visual_drift_max_deg`, `visual_lean_recovery_speed`, `gravity`, `slope_speed_influence`, `floor_align_speed`, `mass`, `bump_min/max_force`, `wheel_radius`.
 
 ---
 
@@ -639,42 +776,64 @@ var velocity: Vector3
 
 | Knob | Default | Safe Range | Affects | Too Low | Too High |
 |---|---|---|---|---|---|
-| `accel_force` | 22.0 | 15–40 | Acceleration punch + terminal velocity | Sluggish | Twitchy, overshoots |
+| `max_steer_angle_deg` | 32.0° | 15–50° | Turn radius at speed | Wide arcs only | Very tight / unstable |
+| `front_grip_stiffness` | 14.0 | 6–25 | Front tire cornering force | Understeer, nose won't bite | Snap oversteer |
+| `rear_grip_stiffness` | 7.0 | 2–15 | Rear breakaway threshold | Too easy to slide | Barely drifts |
+| front/rear ratio | 2.0× | 1.5–4× | Oversteer character | Understeer | Uncontrollable oversteer |
+| `tire_saturation_speed` | 4.5 m/s | 1.5–10 m/s | Progression before breakaway | Ice feel (no linear zone) | Always grippy (no saturation) |
+| `inertia_scale` | 1.2 | 0.5–3.0 | Rotation feel (independent of collision) | Spins easily | Sluggish yaw |
+| `omega_damping` | 4.0 | 1–15 | Rotation persistence | Loose/drifty rotation | Snaps back instantly |
+| `stationary_omega_kick` | 2.5 | 0.5–6.0 | Pivoting while stopped | Barely rotates | Spins in place |
+| `drift_max_slip_speed` | 8.0 m/s | 3–15 m/s | When intensity hits 1.0 | Smoke at light turns | Smoke only extreme |
+| `omega_lean_scale` | 3.0 rad/s | 1–6 | Visual lean sensitivity | Leans even casually | Barely leans |
+| `slip_smoothing` | 8.0 /s | 3–20 | Intensity tracking speed | Mushy, lags behind | Twitchy, instant |
+| `drift_min_speed` | 3.0 m/s | 1–8 | Drift activation gate | Phantom drift when slow | Drift only at speed |
+| `drift_active_threshold` | 0.55 | 0.3–0.8 | Smoke/screech onset | Smoke at casual turns | VFX only at extremes |
+| `accel_force` | 22.0 | 15–40 | Acceleration punch | Sluggish | Twitchy, overshoots |
 | `k_drag` | 0.04 | 0.02–0.15 | Top speed ceiling | Very high terminal | Very low terminal |
-| `k_rolling` | 1.1 | 0.5–5.0 | Coast-stop feel | Rolls forever | Stops sticky |
-| `brake_force` | 40.0 | 20–60 | Brake responsiveness | Can't stop | Jarring stop |
-| `reverse_ratio` | 0.5 | 0.2–0.7 | Reverse speed cap | Barely reverses | Full-speed reverse |
-| `steering_speed` | 2.6 | 1.5–3.5 rad/s | Turn tightness | Can't corner | Spins out |
-| `steer_high_speed_mult` | 0.95 | 0.5–1.0 | High-speed handling | Impossible | No penalty |
-| `stationary_steer_scale` | 0.2 | 0.1–0.6 | Rotation when stopped | Barely rotates | Instant spin |
-| **`drift_max_slip_angle_deg`** ★ | 35.0° | 20–55° | At what slip angle intensity reaches 1.0 | Intense drift from tiny slide | Need massive slide |
-| **`slip_smoothing`** ★ | 8.0 /s | 3–20 /s | How fast intensity tracks slip_ratio | Intensity lags — mushy | Twitchy |
-| **`drift_min_speed`** ★ | 3.0 m/s | 1–8 m/s | Hard gate for drift activation | Phantom drift at stop | Drift only high speed |
-| **`drift_intent_multiplier`** ★ | 0.4 | 0.0–1.0 | Extra yaw at committed steer; 0.0 = pure emergent | Drift hard to initiate | Steer dominates (v2.3 feel) |
-| **`drift_intent_threshold`** ★ | 0.7 | 0.5–0.9 | Steer where smoothstep begins | Aid at casual turn | Only extreme gets aid |
-| **`grip_slip_exponent`** ★ | 2.0 | 1.0–4.0 | Grip curve shape | Drops too early | Stays near max until extreme |
-| **`low_grip_target`** ★ | 1.0 | 0.5–3.0 | Slide at full intensity (compromise) | Unchecked slide (ice) | Barely drifts |
-| `high_grip_target` | 29.0 | 15–40 | Snap-back at intensity=0 | Always sliding | No slide ever |
-| `drift_active_threshold` | 0.55 | 0.3–0.8 | `_is_drifting` band center | Smoke at casual turns | VFX only at extreme |
-| `drift_yaw_multiplier` | 1.8 | 1.2–2.5 | Extra rotation during drift | Drift arc same as normal | Spin-out |
-| `drift_drag_multiplier` | 2.6 | 1.2–3.5 | Terminal velocity penalty in drift | No speed cost | Crawls in any turn |
-| `drift_rolling_multiplier` | 1.45 | 1.0–2.0 | Low-speed scrubbing | No tactile scrubbing | Abrupt stop |
-| **`cornering_drag_coeff`** ★ | 0.3 | 0.0–1.5 | Tire scrubbing: extra fwd decel × \|side_speed\|. Works at ANY slip (not just full drift) | No speed loss in light turns | Kart "digs in" aggressively in any turn |
-| `visual_drift_max_deg` | 34.0 | 20–50° | Body lean at intensity=1.0 | Unnoticeable | Body sideways |
-| `mass` | 1.0 | 0.4–3.0 | Collision weight | Pushed easily | Immovable |
-| `floor_align_speed` | 8.0 | 3–20 /s | Pitch/roll slope snap (yaw frozen) | Stays flat | Jittery pitch |
-| `max_speed` (reference) | 27.5 | — | Camera + network normalization | — | — |
-
-★ = new in v2.4
+| `drift_drag_multiplier` | 2.6 | 1.2–4.0 | Speed cost in drift | No speed penalty | Crawls in turns |
+| `cornering_drag_coeff` | 0.3 | 0–1.5 | Tire scrubbing overlay | No decel in light turns | Aggressive dig-in |
+| `visual_drift_max_deg` | 34.0° | 15–50° | Body lean drama | Unnoticeable | Body sideways |
+| `floor_align_speed` | 8.0 | 3–20 | Pitch/roll slope snap | Stays flat on slopes | Jittery pitch |
+| `mass` | 1.0 | 0.4–3.0 | Collision weight | Gets pushed easily | Immovable |
 
 ### Knob Interactions
 
-- `accel_force` ÷ `k_drag` = terminal velocity squared — tune together
-- `drift_max_slip_angle_deg` + `slip_smoothing`: angle sets sensitivity, smoothing sets responsiveness
-- `drift_intent_multiplier` + `drift_max_slip_angle_deg`: higher intent aid compensates for high angle requirement
-- `low_grip_target` + `drift_max_slip_angle_deg`: equilibrium between slip produced by yaw and slip damped by `_grip`. Lower `low_grip_target` → deeper drift naturally
-- `grip_slip_exponent` changes inflection: at exp=2 grip stays near `high_grip_target` until ~70% intensity then drops sharply — "tipping point" SmashKarts-style
-- `drift_yaw_multiplier` × `steering_speed` = effective yaw at full drift — drift circle tightness
+- `front_grip_stiffness / rear_grip_stiffness` ratio is the primary drift character knob — tune ratio first, then individual values
+- `tire_saturation_speed` changes the feel of the linear→saturation transition: lower = earlier breakaway at same stiffness
+- `inertia_scale` and `omega_damping` interact: high inertia + low damping = slow to spin up, slow to stop (boat-like). Low inertia + high damping = quick response, snappy.
+- `drift_max_slip_speed` and `vfx_smoke_speed_threshold` should be tuned together: if threshold > drift_max_slip_speed/2, smoke can appear before intensity reaches 0.5
+- `omega_lean_scale` × `visual_drift_max_deg` = max lean. Reduce omega_lean_scale if the lean looks extreme even in light turns
+- `accel_force / k_drag` = terminal velocity squared — always tune together
+- `wheelbase` (auto-measured from wheel nodes) affects MOI directly. Longer car = more angular inertia at same `inertia_scale`
+
+### Tuning Recipes
+
+**Want more pronounced divergent trail effect** (outer/inner wheel asymmetry):
+1. Lower `vfx_smoke_speed_threshold` to 0.2–0.3
+2. Increase `omega_lean_scale` to 2.0–2.5 (more rotation for same turn = more asymmetry)
+3. Lower `drift_max_slip_speed` to 5.0 so intensity builds with less slip
+
+**Want heavier, harder-to-spin feel** (Variant Б → heavier):
+1. Increase `inertia_scale` to 1.5–2.0
+2. Decrease `omega_damping` to 3.0 (more persistent rotation, harder to correct)
+3. Decrease `rear_grip_stiffness` slightly (6.0) so rear breaks away even at higher inertia
+
+**Want more arcade, less vehicle feel** (Variant Б → С: lighter):
+1. Decrease `inertia_scale` to 0.8
+2. Increase `omega_damping` to 6.0–8.0
+3. Increase `stationary_omega_kick` to 4.0 (more responsive stationary turn)
+4. Increase `front_grip_stiffness` relative to rear (more neutral handling, less natural oversteer)
+
+**Drift initiates too suddenly / snap oversteer**:
+1. Lower `front_grip_stiffness` slightly (toward 10–12)
+2. Increase `tire_saturation_speed` (5–6 m/s) — wider linear zone before breakaway
+3. Increase `inertia_scale` to slow omega buildup
+
+**Drift doesn't happen enough / feels grippy**:
+1. Lower `rear_grip_stiffness` (5–6)
+2. Lower `tire_saturation_speed` (3–3.5 m/s) — earlier breakaway
+3. Increase `max_steer_angle_deg` (36–40°) — more wheel angle → more front torque → more omega
 
 ---
 
@@ -683,19 +842,39 @@ var velocity: Vector3
 | Event | Visual | Audio |
 |-------|--------|-------|
 | Driving | — | Engine hum, pitch scales with `fwd_speed` |
-| `_drift_intensity` rising | Graduated tire smoke scaled by intensity | Screech onset, volume scales |
-| `_is_drifting = true` (>0.57) | Full tire smoke, tire marks | Full tire screech |
-| Drift release | Smoke fades with intensity decay | Screech fades |
+| `|rear_l/r_lat_speed| > threshold` | Per-wheel smoke fires independently | Screech onset, volume scales with `_drift_intensity` |
+| `_is_drifting = true` (>0.57) | Full bilateral smoke, two distinct trail arcs | Full tire screech |
+| Outer wheel > threshold, inner < threshold | Asymmetric smoke — only outer fires | One-sided screech |
+| Drift release | Smoke fades per-wheel as lat_speed drops | Screech fades |
+| Visual body lean | BaseCar.rotation.y driven by omega × intensity | — |
 | High speed (>80% max_speed) | Speed lines, camera FOV widens | High-rev, wind noise |
 | Collision | Spark VFX | Metal clang |
-| Wall collision | Dust puff | Thud |
 | Landing | Camera shake, dust puff | Thump |
 
 ---
 
 ## UI Requirements
 
-Debug overlay (dev builds only): `_drift_intensity` float bar, `_slip_angle_deg` float, `_slip_ratio` float, `side_speed`, `fwd_speed`, `_is_drifting` bool, `intent_aid` value. Essential for v2.4 tuning: `slip_angle` reveals whether drift is coming from physics or driven by intent aid.
+Debug overlay (dev builds): `fwd_speed`, `side_speed`, `omega`, `drift_intensity`, `slip_ratio`, `rear_l_lat_speed`, `rear_r_lat_speed`, `slip_angle_front_deg`, `slip_angle_rear_deg`, `is_drifting`, `on_floor`. Key v3.0 tuning insight: `rear_l/r_lat_speed` asymmetry reveals the per-wheel divergence; if both are always equal, check that `omega ≠ 0` during turns.
+
+---
+
+## Network Considerations
+
+**Current state (v3.0 release)**: only `position`, `rotation`, `velocity` are synced at 30 Hz. `_omega` and `_drift_intensity` are NOT synced.
+
+**Consequence**: remote karts (peers) will show no visual lean (lean is driven by `_omega` which is zero on remote). Smoke will not appear on remote karts (smoke is driven by per-wheel lat speeds, which require local physics).
+
+**This is acceptable for MVP** because:
+- The game is designed for a small group of friends in a shared session
+- Remote kart appearance is secondary to local kart feel
+- Adding omega/drift to sync requires careful interpolation to avoid pop artifacts
+
+**Fix is trivial when needed** (estimated 15 minutes):
+1. Add `_omega` and `_drift_intensity` to `_rpc_sync` payload (2 floats)
+2. On receive: apply `_omega` → drive `_update_visual_lean` on remote
+3. Apply `_drift_intensity` + compute synthetic rear wheel speeds for smoke
+4. See `memory/project_v3_known_followups.md` for tracking
 
 ---
 
@@ -706,62 +885,57 @@ Debug overlay (dev builds only): `_drift_intensity` float bar, `_slip_angle_deg`
 - [ ] Kart accelerates to ~90% emergent terminal velocity within 2.5s from rest
 - [ ] Terminal velocity is emergent — `fwd_speed` stabilizes without hard clamp
 - [ ] Braking from 27 m/s stops kart within 1.0s
-- [ ] Coasting from 27 m/s: `fwd_speed` drops to <10 m/s within 2.5s
-- [ ] `slip_angle_deg = 0` when `side_speed = 0` regardless of `fwd_speed`
-- [ ] `atan2` minimum denominator: `slip_angle` stays 0 when stationary
-- [ ] `slip_ratio = 0` when `fwd_speed < drift_min_speed`; `_drift_intensity` decays toward 0
-- [ ] At `fwd_speed=20, side_speed=12`: `slip_angle_deg ≈ 31°`, `slip_ratio ≈ 0.886`
-- [ ] `_drift_intensity` uses framerate-independent `1-exp(-rate*delta)` alpha
-- [ ] Side damping uses `side_speed *= exp(-_grip*delta)` — not linear approximation
-- [ ] **Slip measured from `side_speed` BEFORE `move_and_slide()`** — no false spike on wall collision
-- [ ] `_is_drifting = true` when `_drift_intensity > 0.57`, `false` when `< 0.53`
-- [ ] `grip_slip_exponent=2.0`: `_grip ≈ 22.0` at `_drift_intensity=0.5`
-- [ ] Smoothstep intent aid: at `|steer|=0.7` → aid=0.0; at `|steer|=1.0` → aid=0.4; at `|steer|=0.85` → aid≈0.2
-- [ ] Intent aid = 0 when `fwd_speed <= drift_min_speed`
-- [ ] Reverse drift blocked: `fwd_speed <= 0` → `target_intensity = 0`
-- [ ] DEAD state: `steer_input = 0` → no side_speed growth → intensity decays without special case
-- [ ] `_drift_intensity` clamped [0, 1] at all times
-- [ ] `drift_yaw_multiplier` lerp: yaw_rate continuous function of intensity
-- [ ] `active_k_drag`, `active_k_rolling` continuous functions of intensity
-- [ ] Kart-to-kart: heavier/faster pushes lighter/slower; force clamped to [bump_min, bump_max]
-- [ ] KartPhysicsResource swap changes all behavior — no hardcoded values
+- [ ] `BicyclePhysics.reset()` → `_omega = 0`, `_drift_intensity = 0`, `_is_drifting = false`
+- [ ] At `_omega = 0`: `v_lat_rear_l == v_lat_rear_r == side_speed` (no divergence when not rotating)
+- [ ] At `_omega = 1.5, side_speed = 0`: `v_lat_rear_l = -1.5 * (half_wb + half_track)`, `v_lat_rear_r = -1.5 * (half_wb - half_track)` (or equivalent per formula)
+- [ ] `f_rear_l ≠ f_rear_r` when `_omega ≠ 0` (per-wheel force asymmetry confirmed)
+- [ ] `tanh(0) = 0`, `tanh(±20) = ±1.0` (overflow guard working)
+- [ ] `drift_intensity = 0` when `fwd_speed < drift_min_speed`
+- [ ] `drift_intensity = 1.0` when `max(|v_lat_rear_l|, |v_lat_rear_r|) >= drift_max_slip_speed` at speed
+- [ ] `_is_drifting = true` when `drift_intensity > 0.57`, `false` when `< 0.53`
+- [ ] Standstill aid: `_omega` increases when `|fwd_speed| < stationary_steer_threshold` and `steer_input ≠ 0`
+- [ ] Standstill aid: zero contribution when `|fwd_speed| >= stationary_steer_threshold`
+- [ ] `omega_damping` exp decay: `_omega` halves in `ln(2)/omega_damping` seconds without torque input
+- [ ] Visual lean sign: positive `_omega` (CCW, left turn) → negative `lean_dir` → kart leans right
+- [ ] VFX smoke: `l_smoke.emitting = (|rear_left_lat_speed| > threshold)` independently of r_smoke
+- [ ] `cornering_drag` applied at 0.5× `cornering_drag_coeff` internally
 - [ ] Floor-align yaw-lock: sustained circular steer — yaw stable ±0.5 rad/s over 3s
-- [ ] Remote karts: no local physics, only interpolation
-- [ ] Network sync includes `_drift_intensity` at 30 Hz
+- [ ] Remote karts: `_bicycle` is null, no physics runs, snapshot buffer only
+- [ ] DEAD state: `_bicycle.reset()` called, all public state mirrors zeroed
+- [ ] KartPhysicsResource swap changes all behavior — no hardcoded values in bicycle module
 
 ### Network Tests (automated)
 
 - [ ] Position sync at 30 Hz includes `velocity` for interpolation
 - [ ] Remote kart positions smooth (no jitter)
-- [ ] `_drift_intensity` transmitted for remote VFX
 - [ ] Server teleport check uses `max_speed` reference
+- [ ] `_omega` and `_drift_intensity` NOT in sync payload (confirmed acceptable)
 
 ### Playtest Criteria (human) — CRITICAL
 
-- [ ] **Machine feels heavy: momentum visible when changing direction, no instant-snap**
-- [ ] **Rear actively slides: at committed steer, rear clearly swings outward — not just tighter arc**
-- [ ] **Drift is predictable: player can anticipate rear trajectory after 3–5 practice laps**
-- [ ] Drift initiates within ~0.3s of committed full steer at speed
-- [ ] **Circular drift stable from first full lap: holds arc without spiraling inward/outward**
-- [ ] **Entry feels earned: casual turns don't drift, committed turns do — clear threshold in feel**
-- [ ] Drift exit: side_speed decays over ~0.4–0.7s (visible tail)
-- [ ] Counter-steering visibly corrects rear — controllable
-- [ ] At low steer (casual): no drift, no VFX, slight body lean only
-- [ ] At mid steer (~0.6): mild intensity build, slight smoke, controllable arc
-- [ ] At full steer + speed: full drift, heavy smoke, tight arc, satisfying
-- [ ] **"Heavy + drifty + predictable" — matches player first-session description**
-- [ ] No jarring body-mesh snap during steer reversal (A→D or D→A)
-- [ ] Drift VFX do not flicker when player holds steer near threshold
+- [ ] **Two distinct rear wheel trails visible at different curvature during hard turn at speed**
+- [ ] **Machine feels heavy: momentum visible when changing direction, rotation takes time to build and decay**
+- [ ] **Long slide hail at sharp turn on speed: rear swings out and takes 0.4-0.8s to settle after releasing steer**
+- [ ] **Drift is predictable: player can anticipate rear trajectory after 3-5 practice laps**
+- [ ] Reverse steers naturally (no sign hack visible — just steer the other way)
+- [ ] Standing still: wiggling steer visibly rotates kart (stationary_omega_kick working)
+- [ ] Circular drift stable from first full lap: holds arc without spiraling
+- [ ] Body leans smoothly into turns, recovers smoothly — no snap or jitter on direction reversal
 - [ ] Speed visibly decreases in tight drift (drag multiplier effect)
-- [ ] After DEAD state, kart resumes physics cleanly without jump
-- [ ] **Compare to v2.3: rear swing is more "physical" — builds from slide, not button press timing**
-- [ ] **HTML5 export: feel identical to desktop (framerate-independent decay working)**
-- [ ] **Raceline spiral at corner entry: first arc wider than subsequent, natural tightening as speed bleeds off**
+- [ ] After DEAD state, kart resumes physics cleanly without jump or spin
+- [ ] **HTML5 export: feel identical to desktop (exp decay formulas are framerate-independent)**
+- [ ] At light steer: little or no smoke. At full steer + speed: both wheels smoking with visible asymmetry
+- [ ] Outer wheel smoke starts before inner wheel smoke on hard turn entry
+- [ ] **"The car has mass and feels like it" — player first-session description should confirm heaviness**
 
 ---
 
-## Open Questions
+## Open Questions / Known Followups
 
-1. **[OPEN — deferred to post-MVP] Air control**: No drift intensity update while airborne. `_drift_intensity` holds last value on ramp launch, resumes on landing.
-2. **[OPEN] LOW_GRIP tuning target**: Start at 1.0 (compromise). If rear doesn't swing enough → 0.7-0.8. If can't recover → 1.4-1.8.
-3. **[OPEN] Intent aid necessity**: if pure emergent feel achieves goals without aid, set `drift_intent_multiplier=0.0`. Testing will determine.
+See `memory/project_v3_known_followups.md` for tracked items. Current list:
+
+1. **Network sync of `_omega` and `_drift_intensity`** — remote karts show no lean or smoke. Fix estimated 15 minutes when visual fidelity of remote karts becomes priority (see Network Considerations above)
+2. **Decal-based skid marks** — per-wheel trail rendering. Requires a decal emitter at each rear wheel position, feeding on `rear_l/r_lat_speed` magnitude
+3. **Debug overlay `_dbg_*` fields** — some legacy debug variable names from v2.4 may still be referenced by DebugOverlay. Needs audit after v3.0 stabilizes
+4. **Audio integration** — engine pitch and drift screech volume use `fwd_speed` and `_drift_intensity`. No changes needed from v2.4. Screech could be made per-wheel (left/right channel) using `rear_l/r_lat_speed` for spatial effect
+5. **Ramp/air state** — `on_floor = false` → standstill aid correctly skipped, tire forces still compute but have no ground contact. Drift intensity may decay if speed gate triggers. Air control is deferred to post-MVP

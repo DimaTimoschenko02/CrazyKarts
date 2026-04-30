@@ -45,8 +45,13 @@ func _ready() -> void:
 
 func auth_check_async() -> void:
 	var token := _load_token()
-	print("[ProfileManager] auth_check_async: token_present=", token != "")
+	var is_desktop_debug: bool = OS.is_debug_build() and not OS.has_feature("web")
+	print("[ProfileManager] auth_check_async: token_present=", token != "", " desktop_debug=", is_desktop_debug)
 	if token == "":
+		if is_desktop_debug:
+			# Desktop debug: skip the FirstTime panel entirely. Auto-register/claim "Desktop".
+			_desktop_auto_login()
+			return
 		profile_load_failed.emit("no_token")
 		return
 	_request("POST", "/profile/auth", {"auth_token": token},
@@ -54,9 +59,35 @@ func auth_check_async() -> void:
 			if ok and body is Dictionary and body.has("profile"):
 				_apply_profile(body["nickname"], token, body["profile"])
 				profile_loaded.emit(profile)
-			else:
-				_clear_token_on_unauth(code)
-				profile_load_failed.emit("auth_failed:%d" % code)
+				return
+			_clear_token_on_unauth(code)
+			# Desktop debug: fall back to auto-register on stale/invalid token instead of FirstTime panel.
+			if is_desktop_debug:
+				_desktop_auto_login()
+				return
+			profile_load_failed.emit("auth_failed:%d" % code)
+	)
+
+
+# Desktop debug shortcut: always log in as "Desktop". Tries register first;
+# on 409 (already exists) re-claims the nickname (re-issues a fresh token).
+# This matches the intent that desktop builds shouldn't pester the dev with
+# FirstTime panels every time the master DB is wiped or token expires.
+func _desktop_auto_login() -> void:
+	const DESKTOP_NICK := "Desktop"
+	print("[ProfileManager] desktop auto-login as '", DESKTOP_NICK, "'")
+	_request("POST", "/profile/register", {"nickname": DESKTOP_NICK},
+		func(ok: bool, code: int, body: Variant):
+			if ok and body is Dictionary and body.has("auth_token"):
+				_apply_profile(body["nickname"], body["auth_token"], body["profile"])
+				_save_token(body["auth_token"])
+				profile_loaded.emit(profile)
+				return
+			if code == 409:
+				# Profile exists from previous run — claim it for a fresh token.
+				claim_async(DESKTOP_NICK)
+				return
+			profile_load_failed.emit("desktop_auto_login_failed:%d" % code)
 	)
 
 

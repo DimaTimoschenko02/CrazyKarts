@@ -49,7 +49,31 @@ var steer_sign: float = lerp(-1.0, 1.0, smoothstep(-0.5, 0.5, fwd_speed))
 
 **Исключение:** state machine flips для логики (`_is_drifting` для VFX триггера) — они должны быть дискретными, но с гистерезисом (±0.02 band). Эти flips влияют только на ON/OFF события (VFX/audio start), не на continuous physics values.
 
-### 5. Snap-to-zero без деградации
+### 5. Lerp в сторону БИНАРНО прыгающего target
+
+```gdscript
+# ❌ ПЛОХО — target сам прыгает 0→1 на флипе state, lerp даёт C0-кривую с изломом производной
+var target: float = 1.0 if state == ACTIVE else 0.0
+_value = lerp(_value, target, 1.0 - exp(-rate * delta))
+
+# ✅ ХОРОШО — сначала плавим target отдельным фильтром, потом используем напрямую
+_smooth_factor = lerp(_smooth_factor, target, 1.0 - exp(-rate * delta))  # один фильтр
+_value = max_value * _smooth_factor                                       # прямое умножение
+```
+
+Lerp в сторону прыгающего target даёт **экспоненциальный подход** — сама траектория C0-непрерывна (нет скачка), но производная (slope) меняется ступенчато в момент прыжка. Игрок видит это как лёгкий "толчок" в начале/конце эффекта.
+
+**Признаки этого паттерна:**
+- `target = X if condition else Y` или `condition ? X : Y` где condition — bool state
+- `lerp(_value, ...binary_target..., alpha)` — даже с smooth alpha
+- Двойное сглаживание (target плавится через lerp, потом этот плавный target снова используется в lerp)
+
+**Правильно:**
+- Если есть state-binary `engage_target` (0/1) — плави его ОДИН раз через `lerp` или `1-exp(-rate*delta)`, получи `engage_factor`
+- Затем используй `engage_factor` ПРЯМО как множитель: `value = max * engage_factor`
+- Не строй второй каскад фильтра поверх
+
+### 6. Snap-to-zero без деградации
 ```gdscript
 # ❌ ПОДОЗРИТЕЛЬНО — snap на пороге 0.1 создаёт micro-jitter
 if absf(fwd_speed) < 0.1:
@@ -109,3 +133,17 @@ var target_angle: float = lean_shape * MAX_ANGLE * lean_dir
 - Collision responses (instant push force on contact) — по природе дискретны
 - Input button events (`is_action_just_pressed`) — по природе дискретны
 - Snap-to-zero velocity в узкой окрестности (≤0.02 м/с) с подтверждённым отсутствием thrust
+
+## Когда нужны 2 разные скорости (вход и выход)
+
+Часто одной `rate` мало — для входа в эффект хочется одну плавность, для выхода другую. Делай **два exp-фильтра** с условием:
+
+```gdscript
+var rate: float = enter_rate if target > current else exit_rate
+current = lerp(current, target, 1.0 - exp(-rate * delta))
+```
+
+Используй когда:
+- Дрифт: вход медленный (нарастание), выход чуть быстрее
+- Газ/тормоз: реакция на нажатие быстрая, отпускание плавное (или наоборот для "тяжёлой педали")
+- Камера FOV: расширение быстрое (адреналин), сжатие плавное

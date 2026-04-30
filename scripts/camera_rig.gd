@@ -133,8 +133,10 @@ func _process_follow(delta: float) -> void:
 		_cam_pos  = target_pos
 		_cam_init = true
 
-	# Speed-dependent follow lerp
-	var lerp_factor: float = lerp(lerp_slow, lerp_fast, t)
+	# Speed-dependent follow lerp. Use t_eased (smoothstep'd) so the rate
+	# itself transitions smoothly across the speed range — using raw t
+	# produced a slight slope discontinuity at t=0 and t=1.
+	var lerp_factor: float = lerp(lerp_slow, lerp_fast, t_eased)
 	_cam_pos = _cam_pos.lerp(target_pos, 1.0 - exp(-lerp_factor * delta))
 	global_position = _cam_pos
 

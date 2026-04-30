@@ -1,9 +1,6 @@
-[gd_resource type="Resource" script_class="KartPhysicsResource" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="KartPhysicsResource" load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://scripts/kart_physics_resource.gd" id="1_kphys"]
-[ext_resource type="Curve" path="res://resources/curves/cornering_drag_default.tres" id="2_cdrag"]
-[ext_resource type="Curve" path="res://resources/curves/drift_intent_default.tres" id="3_intent"]
-[ext_resource type="Curve" path="res://resources/curves/slip_smoothing_default.tres" id="4_slip"]
 
 [resource]
 script = ExtResource("1_kphys")
@@ -11,10 +8,10 @@ accel_force = 20.0
 k_drag = 0.07
 k_rolling = 1.1
 brake_force = 40.0
-reverse_ratio = 0.5
+reverse_ratio = 0.7
 max_speed = 24.5
 steer_slew_rate_in = 3.0
-steer_slew_rate_out = 2.5
+steer_slew_rate_out = 11.0
 throttle_slew_rate = 2.0
 steer_visual_rate = 18.0
 steering_speed = 2.7
@@ -23,6 +20,17 @@ steer_high_speed_mult = 0.85
 steer_speed_threshold = 3.0
 stationary_steer_threshold = 2.0
 stationary_steer_scale = 0.2
+wheelbase_override = 0.0
+track_width_override = 0.0
+max_steer_angle_deg = 35.0
+front_grip_stiffness = 17.5
+rear_grip_stiffness = 2.5
+tire_saturation_speed = 5.0
+inertia_scale = 2.0
+omega_damping = 5.0
+stationary_omega_kick = 1.5
+drift_max_slip_speed = 8.0
+omega_lean_scale = 2.0
 drift_min_speed = 2.5
 drift_max_slip_angle_deg = 31.0
 slip_smoothing = 5.0
@@ -34,15 +42,32 @@ high_grip_target = 28.0
 drift_active_threshold = 0.55
 drift_yaw_multiplier = 1.8
 visual_drift_max_deg = 60.0
-visual_lean_recovery_speed = 8.0
-drift_drag_multiplier = 2.6
-drift_rolling_multiplier = 1.45
-cornering_drag_coeff = 0.7
-cornering_drag_curve = ExtResource("2_cdrag")
-drift_intent_curve = ExtResource("3_intent")
-slip_smoothing_curve = ExtResource("4_slip")
+visual_lean_recovery_speed = 2.5
+drift_drag_multiplier = 1.0
+drift_rolling_multiplier = 5.0
+cornering_drag_coeff = 16.0
 grip_loss_rate = 0.0
 grip_recovery_rate = 0.0
+auto_drift_enabled = true
+drift_enter_steer = 0.65
+drift_enter_speed = 7.0
+drift_enter_debounce = 0.12
+drift_exit_steer = 0.35
+drift_exit_speed = 4.0
+drift_exit_duration = 0.3
+drift_visual_offset_deg = 22.0
+drift_visual_smooth_rate = 4.5
+drift_engage_in_rate = 3.5
+drift_engage_out_rate = 2.5
+drift_recovery_rate = 4.0
+drift_exit_grip_mult = 1.8
+drift_rear_grip_mult = 0.35
+drift_yaw_bonus = 1.4
+drift_forward_assist = 3.0
+drift_power_full_time = 1.5
+drift_min_active_for_boost = 0.7
+drift_exit_boost_force = 14.0
+drift_exit_boost_duration = 0.5
 wheel_radius = 0.18
 vfx_smoke_speed_threshold = 0.5
 mass = 1.0

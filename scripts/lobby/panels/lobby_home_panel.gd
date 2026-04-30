@@ -40,6 +40,10 @@ func _ready() -> void:
 
 func refresh() -> void:
 	print("[LobbyHome] refresh visible=", visible, " logged_in=", ProfileManager.is_logged_in)
+	# Reset transient interactive state so a previous failed attempt can't leave
+	# the create button stuck disabled across navigation / re-login.
+	create_btn.disabled = false
+	_pending_room_code = ""
 	if not ProfileManager.is_logged_in:
 		greeting_label.text = "Привет, гость"
 		stats_label.text = ""
@@ -183,8 +187,13 @@ func _on_room_created(room: Dictionary) -> void:
 
 
 func _on_request_failed(endpoint: String, code: int) -> void:
+	# Always re-enable the button — even if the panel got hidden by then —
+	# so a later refresh() or back-nav doesn't leave Create stuck disabled.
 	create_btn.disabled = false
-	status_label.text = "Ошибка %s (HTTP %d)" % [endpoint, code]
+	if visible:
+		status_label.text = "Ошибка %s (HTTP %d)" % [endpoint, code]
+	else:
+		print("[LobbyHome] request failed while hidden: %s (HTTP %d)" % [endpoint, code])
 
 
 func _join_via_ws(ws_url: String, _room_name: String) -> void:
@@ -205,10 +214,13 @@ func _on_joined_server() -> void:
 
 
 func _on_connection_failed() -> void:
-	if not visible:
-		return
-	status_label.text = "Не удалось подключиться к комнате"
+	# Re-enable unconditionally so navigating away mid-attempt doesn't strand
+	# the button in a disabled state.
 	create_btn.disabled = false
+	if visible:
+		status_label.text = "Не удалось подключиться к комнате"
+	else:
+		print("[LobbyHome] ws connection failed while hidden")
 
 
 func _on_logout() -> void:
