@@ -29,8 +29,14 @@ const MAP_ASSETS = ASSET_NAMES;
 
 // ── Scene ──────────────────────────────────────────────────────────────
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0a1a);
-scene.fog = new THREE.Fog(0x0a0a1a, 60, 140);
+// Cosmic-indigo daylight, not near-black: background/fog/backdrop (below)
+// and the sky dome's ZENITH/HORIZON (fx/sky.ts) share one coordinated,
+// slightly-brightened palette so the horizon reads as one continuous
+// gradient rather than a visible seam between "flat clear color" and
+// "sky dome shader". Still indigo/violet, not a daytime blue — this is a
+// stylized Mars/cosmic backdrop, just no longer almost-black.
+scene.background = new THREE.Color(0x23264a);
+scene.fog = new THREE.Fog(0x4a3562, 60, 140);
 createSpaceSky(scene);
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 300);
@@ -43,16 +49,33 @@ addEventListener("resize", () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-sun.position.set(20, 40, 10);
+// HemisphereLight (sky/ground) instead of a flat AmbientLight: it splits
+// the fill into a "sky" tint from above and a warm "ground bounce" tint
+// from below, so a wall facing away from the sun still reads its shape
+// instead of going pure black — a plain AmbientLight is uniform in every
+// direction and can't do that. (It also wasn't the fix for the actual
+// black-wall bug — see map/assetLoader.ts neutralizeMetalness() for the
+// real root cause: a metallic-material bug that ate the sun's diffuse
+// contribution entirely regardless of ambient level.)
+scene.add(new THREE.HemisphereLight(0x8892cf, 0x6b4a35, 0.9));
+// Sun raised to ~70° elevation (was ~61°: atan(40/√(20²+10²))) per owner's
+// "выше" ask — steep enough to still rake across vertical walls (a fully
+// overhead sun would leave every wall face in its own shadow), shallow
+// enough to keep a readable shadow direction on the ground.
+// Intensity trimmed 1.2 → 1.0: now that materials aren't force-metallic
+// anymore (assetLoader.ts fix), diffuse actually responds to the sun again,
+// and 1.2 blew out highlights during review.
+const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+sun.position.set(25, 80, 15); // elevation = atan(80/√(25²+15²)) ≈ 70°
 scene.add(sun);
 
 // Backdrop plane far below the map so the void outside the arena reads as
 // "space", not as a glitch. The actual driveable ground is the tile map.
+// Darker/warmer than the sky background so the void still reads as
+// "ground", not "more sky" — but no longer near-black like the old 0x0d0d24.
 const backdrop = new THREE.Mesh(
   new THREE.PlaneGeometry(400, 400),
-  new THREE.MeshStandardMaterial({ color: 0x0d0d24 })
+  new THREE.MeshStandardMaterial({ color: 0x241c33 })
 );
 backdrop.rotation.x = -Math.PI / 2;
 backdrop.position.y = -2;

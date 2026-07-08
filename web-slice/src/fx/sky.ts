@@ -3,8 +3,12 @@
 // this just fills the far distance so the horizon isn't a flat color wall.
 import * as THREE from "three";
 
-const ZENITH = new THREE.Color(0x07071c); // straight up — near-black blue/violet
-const HORIZON = new THREE.Color(0x251342); // low angle — dark violet
+// Brightened from the original near-black (0x07071c / 0x251342) per owner's
+// "не хочу тёмное небо" ask — still a stylized cosmic indigo/violet dusk,
+// not a daytime blue. Coordinated with main.ts's scene.background/fog and
+// the backdrop plane so the horizon reads as one continuous gradient.
+const ZENITH = new THREE.Color(0x2b2f5c); // straight up — cosmic indigo
+const HORIZON = new THREE.Color(0x6b3f7a); // low angle — warm violet
 
 // One-shot generation only (Math.random with no per-frame dependency) —
 // the sky and stars never change after createSpaceSky() runs.

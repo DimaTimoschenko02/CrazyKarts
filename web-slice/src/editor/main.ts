@@ -45,11 +45,14 @@ const btnCenterMap = document.getElementById("btnCenterMap") as HTMLButtonElemen
 const mapNameLabel = document.getElementById("mapNameLabel")!;
 
 // ── Scene ──────────────────────────────────────────────────────────────
+// Lighting/background kept consistent with the game (src/main.ts) so a map
+// built here looks the same once driven — see that file for the numeric
+// reasoning (HemisphereLight fill, sun elevation/intensity, palette).
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x12122a);
-scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+scene.background = new THREE.Color(0x23264a);
+scene.add(new THREE.HemisphereLight(0x8892cf, 0x6b4a35, 0.9));
 const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-sun.position.set(20, 40, 15);
+sun.position.set(25, 80, 15);
 scene.add(sun);
 
 const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 500);

@@ -220,6 +220,49 @@ function recenterXZ(root: THREE.Object3D): void {
   }
 }
 
+// ROOT CAUSE of the "mirrored wall renders black" bug (and a big chunk of
+// the overall scene darkness): every material in this Kenney space-kit glTF
+// export has metallicFactor:1, including materials plainly named "rock",
+// "bone", "skin" (verified by reading the raw .glb JSON chunk) — clearly an
+// unintentional blanket export default, not an authored PBR choice. A fully
+// metallic MeshStandardMaterial has ZERO diffuse response (diffuseColor is
+// scaled by 1-metalness in the shader) and depends entirely on specular
+// reflections from an environment map for anything to show at all — this
+// scene has no scene.environment/PMREM, so any face not aimed almost
+// exactly at the directional light's reflection angle renders pure black
+// regardless of AmbientLight/HemisphereLight intensity.
+//
+// This is NOT a mirror/winding/normal bug: three.js already auto-corrects
+// triangle winding for negative-determinant transforms
+// (WebGLRenderer checks `object.matrixWorld.determinantAffine() < 0` and
+// flips gl.frontFace accordingly) and normals transform correctly through
+// the standard inverse-transpose normal matrix (for a pure X-mirror that's
+// exactly diag(-1,1,1) — verified directly against wall_block_round's
+// merged BufferGeometry: every normal is non-zero and transforms as
+// expected). Two adjacent wall pieces (mirrored or just differently
+// rotated) simply face different world directions, so one happens to catch
+// the narrow metallic specular glint and the other doesn't — that's what
+// read as "the mirrored one is black".
+//
+// Fix: force metalness to 0 on every space-kit material at load time. Their
+// roughnessFactor is already 1 (matte), which is exactly right for this
+// low-poly flat-color style — so this makes every asset a normal Lambertian
+// diffuse surface that responds to all three scene lights regardless of
+// which way it's facing, instead of a black chrome statue except at one
+// specific glancing angle. The separate car pack (assets/cars/*) already
+// ships metalness:0 (verified) and isn't touched by this.
+function neutralizeMetalness(root: THREE.Object3D): void {
+  root.traverse(obj => {
+    const mesh = obj as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const m of mats) {
+      const std = m as THREE.MeshStandardMaterial;
+      if (typeof std.metalness === "number") std.metalness = 0;
+    }
+  });
+}
+
 // Loads the named GLBs (without extension) in parallel and returns templates
 // keyed by name. Instances are made with template.clone() — clones share
 // geometry and materials, so per-tile cost is one Object3D, not one mesh copy.
@@ -230,6 +273,7 @@ export async function loadAssetLibrary(names: readonly string[]): Promise<AssetL
     names.filter(name => !PROCEDURAL_ASSETS.has(name)).map(async name => {
       const gltf = await loader.loadAsync(ASSET_BASE + name + ".glb");
       recenterXZ(gltf.scene);
+      neutralizeMetalness(gltf.scene); // see doc comment above — fixes the "black wall" bug
       lib.set(name, gltf.scene);
     })
   );
