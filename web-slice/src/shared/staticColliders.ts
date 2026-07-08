@@ -60,6 +60,17 @@ export interface ObbShapeEntry {
   type: "obb";
   halfX: number; // unscaled local half-extent along the template's own X
   halfZ: number; // unscaled local half-extent along the template's own Z
+  // Local offset of the box's own center from the placement point (unscaled,
+  // rotates WITH the piece — same convention as the halfX/halfZ axes). Almost
+  // every structural asset is recentered symmetric about its placement point
+  // (offset 0,0, so these fields are omitted/undefined in the baked table).
+  // A few assets (see assetLoader.ts's PIVOT_RECENTER_ASSETS — currently just
+  // corridor_wall) are authored flush against ONE edge of their Kenney
+  // "staging cell" rather than centered on it; bake-collision-shapes.mjs
+  // computes this offset the same way assetLoader.ts's recenterOnStagedPivot
+  // does, so the baked collider stays aligned with the rendered mesh.
+  centerX?: number;
+  centerZ?: number;
 }
 export interface HullShapeEntry {
   type: "hull";
@@ -120,11 +131,13 @@ function buildPropCollider(
 
   const rotRad = degToRad(rotDeg);
   if (shape.type === "obb") {
+    const cx = (shape.centerX ?? 0) * scale;
+    const cz = (shape.centerZ ?? 0) * scale;
     const localVerts = [
-      { x: -shape.halfX * scale, z: -shape.halfZ * scale },
-      { x: shape.halfX * scale, z: -shape.halfZ * scale },
-      { x: shape.halfX * scale, z: shape.halfZ * scale },
-      { x: -shape.halfX * scale, z: shape.halfZ * scale },
+      { x: cx - shape.halfX * scale, z: cz - shape.halfZ * scale },
+      { x: cx + shape.halfX * scale, z: cz - shape.halfZ * scale },
+      { x: cx + shape.halfX * scale, z: cz + shape.halfZ * scale },
+      { x: cx - shape.halfX * scale, z: cz + shape.halfZ * scale },
     ];
     return transformLocalPoly(localVerts, rotRad, x, z);
   }

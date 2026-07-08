@@ -224,6 +224,79 @@ function recenterXZ(root: THREE.Object3D): void {
   }
 }
 
+// ROOT CAUSE of "corridor_wall doesn't stitch to corridor_wallCorner / floor
+// tiles" (map_v2.json, reported as thin tall wall panels not meeting at the
+// joint): recenterXZ() above APPROXIMATES the pack's shared authoring pivot
+// by recomputing each asset's own AABB center. That only reproduces the true
+// pivot when an asset's visible geometry happens to be symmetric about it —
+// true for full square tiles (terrain, corridor, wall_block*), false for a
+// piece deliberately mounted flush against ONE edge of its staging cell.
+// Read every Space Kit .glb's raw node graph directly (see
+// tools/ scratch analysis, not committed — re-derivable with the same glTF
+// node-walk bake-collision-shapes.mjs already uses) and every one of the
+// 153 assets shares an identical node chain: sceneRoot -> "tmpParent" ->
+// <assetName> node, and that innermost node's local translation is (2, 0,
+// 1.5) in EVERY file, no exceptions — the whole pack was built in one
+// shared Blender "staging cell" and exported piece by piece without ever
+// moving that cell. That translation IS the intended pivot; reading it
+// directly is exact even when the visible mesh isn't centered on it.
+//
+// corridor_wall's raw AABB is X∈[2.4,2.5] (a 0.1m-thick panel flush against
+// the +X edge of its staging cell), Z∈[1.0,2.0] (full height, symmetric).
+// AABB-center recenter computes center=(2.45,1.5) — only 0.05m off the true
+// pivot in X, but that's still enough to visually "unmount" the wall from
+// the cell edge; after subtracting pivot(2,1.5) instead the panel sits at
+// local X∈[0.4,0.5] (flush on the edge, as authored) instead of
+// X∈[-0.05,0.05] (floating near the cell's dead center). Confirmed against
+// map_v2.json's 8 corridor_wall placements + 2 corridor_wallCorner corners:
+// corridor_wallCorner's own AABB is already symmetric about (2,1.5) (0 delta)
+// so it needs no change — only corridor_wall itself was off.
+//
+// NOT applied pack-wide: most other Space Kit assets ALSO have an AABB
+// center that differs from this same (2,1.5) pivot (e.g. terrain_sideCorner,
+// terrain_roadCorner, terrain_sideCliff, rail*, pipe_corner*, stairs*,
+// monorail_trackCorner*) — but those are the exact assets
+// .claude/rules/map-building.md documents as empirically verified/calibrated
+// (rot→direction tables built and screenshot-checked against the CURRENT
+// AABB-center placement) and are already placed across every shipped map
+// (arena_slice, mars_base, map_v1/v2, current-map_v1). Switching their
+// recenter method would silently shift every one of those already-tuned
+// placements. This fix is intentionally scoped to the one asset that is
+// both provably mis-centered AND actually in use (map_v2.json) — anything
+// else needing the same fix later should go through the same diagnose-first
+// workflow the map-building rules already mandate, not get swept in here.
+const PIVOT_RECENTER_ASSETS = new Set<string>(["corridor_wall"]);
+
+// Walks down through single-child wrapper nodes (mirrors every Space Kit
+// .glb's sceneRoot -> tmpParent -> <assetName> chain) and returns the local
+// x/z of the first node that either carries a mesh or has more than one
+// child of its own (the point where the shared "tmpParent" wrapping ends
+// and the pack's per-asset staging-pivot node begins). Returns null if the
+// hierarchy doesn't match that shape — callers fall back to recenterXZ in
+// that case rather than mis-centering on some unrelated node's position.
+function findStagedPivot(root: THREE.Object3D): { x: number; z: number } | null {
+  let node: THREE.Object3D = root;
+  while (node.children.length === 1) {
+    const child = node.children[0];
+    const isMeshNode = (child as THREE.Mesh).isMesh === true;
+    if (isMeshNode || child.children.length !== 1) return { x: child.position.x, z: child.position.z };
+    node = child;
+  }
+  return null;
+}
+
+function recenterOnStagedPivot(root: THREE.Object3D): void {
+  const pivot = findStagedPivot(root);
+  if (!pivot) {
+    recenterXZ(root); // shape didn't match — safe fallback, not expected to trigger (see doc comment above)
+    return;
+  }
+  for (const child of root.children) {
+    child.position.x -= pivot.x;
+    child.position.z -= pivot.z;
+  }
+}
+
 // ROOT CAUSE of the "mirrored wall renders black" bug (and a big chunk of
 // the overall scene darkness): every material in this Kenney space-kit glTF
 // export has metallicFactor:1, including materials plainly named "rock",
@@ -276,7 +349,8 @@ export async function loadAssetLibrary(names: readonly string[]): Promise<AssetL
   await Promise.all(
     names.filter(name => !PROCEDURAL_ASSETS.has(name)).map(async name => {
       const gltf = await loader.loadAsync(ASSET_BASE + name + ".glb");
-      recenterXZ(gltf.scene);
+      if (PIVOT_RECENTER_ASSETS.has(name)) recenterOnStagedPivot(gltf.scene);
+      else recenterXZ(gltf.scene);
       neutralizeMetalness(gltf.scene); // see doc comment above — fixes the "black wall" bug
       lib.set(name, gltf.scene);
     })

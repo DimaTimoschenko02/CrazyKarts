@@ -52,7 +52,9 @@
   "corridor_wall": {
     "type": "obb",
     "halfX": 0.04999999701976776,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "centerX": 0.45,
+    "centerZ": 0
   },
   "corridor_wallCorner": {
     "type": "obb",

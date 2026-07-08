@@ -60,6 +60,20 @@ const NATURAL_DECOR_ASSETS = [
 // до ≤8 вершин").
 const MAX_HULL_VERTS = 8;
 
+// Mirrors src/map/assetLoader.ts's PIVOT_RECENTER_ASSETS + the pack's shared
+// staging-pivot node translation (verified identical — (2, 0, 1.5) — across
+// all 153 Kenney Space Kit .glb files by walking each file's raw node graph;
+// see assetLoader.ts's doc comment on findStagedPivot for the full story).
+// Everything EXCEPT this allowlist keeps the original AABB-center recenter
+// below (unchanged, still correct for symmetric tiles) — corridor_wall is a
+// thin panel authored flush against one edge of its staging cell, so its own
+// AABB center is NOT the pack's true pivot, and using it (as every other
+// asset safely can) shifts the wall ~0.45m off the edge it's meant to hug.
+// If you add another asset to assetLoader.ts's PIVOT_RECENTER_ASSETS, add it
+// here too and rerun this script (`node tools/bake-collision-shapes.mjs`).
+const PIVOT_RECENTER_ASSETS = new Set(["corridor_wall"]);
+const STAGED_PIVOT = { x: 2, z: 1.5 };
+
 // ─── Minimal glTF-binary (.glb) reader ──────────────────────────────────────
 
 function readGlb(filePath) {
@@ -270,11 +284,20 @@ function bakeAsset(name, kind) {
   const heightY = maxY - minY;
 
   if (kind === "obb") {
-    return {
+    const shape = {
       type: "obb",
       halfX: (maxX - minX) / 2,
       halfZ: (maxZ - minZ) / 2,
     };
+    // See PIVOT_RECENTER_ASSETS doc comment above — for these few assets the
+    // box's own center sits away from the pack's shared pivot (where
+    // assetLoader.ts actually recenters the rendered mesh), so the baked
+    // collider needs an explicit local offset to stay aligned with it.
+    if (PIVOT_RECENTER_ASSETS.has(name)) {
+      shape.centerX = round4(centerX - STAGED_PIVOT.x);
+      shape.centerZ = round4(centerZ - STAGED_PIVOT.z);
+    }
+    return shape;
   }
 
   // Natural decor: XZ convex hull of the recentered points.
