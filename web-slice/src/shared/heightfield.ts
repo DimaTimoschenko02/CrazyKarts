@@ -217,6 +217,36 @@ export function longAxis(rot: number): [number, number] {
 // exceeds the kart's MAX_STEP. Rockets fly over a block when above its top
 // (rocketSim.isBlockedByTerrain compares heights) — also physically right.
 
+// ── Kenney 3D Road Tiles (roadTile_NNN) — data-driven physics ─────────────
+// Per-tile geometry facts baked offline by tools/bake-road-tiles.mjs (column
+// sampling over the raw triangles — the "read the vertices, don't trust a
+// screenshot" doctrine). Heights in the catalog are in the tile's own local
+// meters ABOVE ITS PIVOT (the road deck sits ~0.55m above y=0 — these tiles
+// are thick slabs), independent of the map's level_height:
+//   physics "exact"  — flat (one height: topMedian) or a straight axis slope
+//                      (base + rise + unit ascent, rotated/mirrored below).
+//   physics "approx" — bridges / curved slopes / water / misc render fully
+//                      but the heightfield treats them as FLAT at topMedian.
+//                      Bridges can't be driven UNDER yet: this column model
+//                      stores one surface per layer and callers take the MAX,
+//                      so a drive-under needs a real multi-layer query — see
+//                      docs/roads-catalog.md; deferred until bridge tiles
+//                      actually land in a map.
+import roadTilesCatalog from "./roadTilesCatalog.json";
+
+interface RoadTileCatalogEntry {
+  kind: string;
+  physics: "exact" | "approx";
+  topMedian: number;
+  slope?: { ax: number; az: number; base: number; rise: number };
+}
+
+const ROAD_TILES = roadTilesCatalog as unknown as Record<string, RoadTileCatalogEntry>;
+
+export function isRoadTileAsset(asset: string): boolean {
+  return asset.startsWith("roadTile_");
+}
+
 export function heightCellFor(
   asset: string,
   yLevel: number,
@@ -225,6 +255,18 @@ export function heightCellFor(
   mirror?: boolean
 ): HeightCell {
   const lh = levelHeight;
+  if (isRoadTileAsset(asset)) {
+    const entry = ROAD_TILES[asset];
+    // Unknown tile (catalog out of date): flat at the cell base — visible
+    // sink is a louder bug signal than a silent throw during map load.
+    if (!entry) return { base: yLevel * lh, rise: 0, ax: 0, az: 0 };
+    if (entry.slope) {
+      const base0: [number, number] = [entry.slope.ax, entry.slope.az];
+      const [ax, az] = mirror ? mirroredVec(base0, rot) : rotateVec(base0[0], base0[1], rot);
+      return { base: yLevel * lh + entry.slope.base, rise: entry.slope.rise, ax, az };
+    }
+    return { base: yLevel * lh + entry.topMedian, rise: 0, ax: 0, az: 0 };
+  }
   if (asset.startsWith("terrain_ramp")) {
     const [ax, az] = RAMP_ASCENT[rot] ?? [0, 0]; // mirror: no-op, base vector has ax0=0 — see CellDef.mirror doc
     return { base: yLevel * lh, rise: lh, ax, az }; // y_level = LOW edge

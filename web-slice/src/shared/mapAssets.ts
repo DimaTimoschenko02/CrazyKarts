@@ -16,7 +16,39 @@
 export interface PaletteItem { asset: string; label: string }
 export interface PaletteCategory { category: string; isProp: boolean; items: PaletteItem[] }
 
-export const PALETTE: PaletteCategory[] = [
+// ── Kenney "3D Road Tiles" — the current map-building pack ────────────────
+// (owner decision 2026-07-08: space-kit's hand-stitched side/corner edges
+// kept breaking collision; road tiles bake slopes/curves INTO each 3×3m
+// tile). All 302 tiles are offered — the owner wants to browse everything —
+// grouped by the AUTO-classification from tools/bake-road-tiles.mjs (see
+// docs/roads-catalog.md). Labels are generated from geometry (slope
+// direction/rise, road edge connectivity), not hand-written; refine per-tile
+// as real usage reveals what matters. Tiles are 3m per cell with a ~1.1m
+// level height — maps built from them use meta tile_size=3/level_height=1.1
+// (the editor has a grid preset for this), NOT space-kit's 1/0.5.
+import roadTilesCatalog from "./roadTilesCatalog.json";
+
+interface RoadTileEntry { category: string; label: string }
+
+const ROAD_CATEGORY_ORDER = [
+  "Roads: Straight", "Roads: Corner", "Roads: Cross & T", "Roads: End & Detail",
+  "Slopes", "Slopes: Curved & Corner", "Bridges", "Water", "Ground", "Misc",
+];
+
+const ROAD_CATEGORIES: PaletteCategory[] = ROAD_CATEGORY_ORDER.map(category => ({
+  category,
+  isProp: false,
+  items: Object.entries(roadTilesCatalog as Record<string, RoadTileEntry>)
+    .filter(([, e]) => e.category === category)
+    .map(([asset, e]) => ({ asset, label: e.label })),
+})).filter(cat => cat.items.length > 0);
+
+// ── Legacy: Kenney Space Kit ───────────────────────────────────────────────
+// Superseded for terrain/roads by the road-tiles pack above but NOT removed:
+// every shipped map (arena_slice, mars_base, map_v1/v2…) is built from these,
+// and the space-kit PROPS (rocks, buildings, rockets…) remain the only decor
+// set — they place at float coords in any grid, road-tile maps included.
+const LEGACY_PALETTE: PaletteCategory[] = [
   { category: "Terrain", isProp: false, items: [
     { asset: "terrain", label: "Terrain" },
     { asset: "terrain_ramp", label: "Ramp" },
@@ -206,6 +238,14 @@ export const PALETTE: PaletteCategory[] = [
   ] },
 ];
 
+// Road-tile categories first (current pack), then the legacy space-kit set
+// under "Legacy: …" labels. Category names are pure UI grouping — maps store
+// asset names only, so renaming categories can't break saved maps.
+export const PALETTE: PaletteCategory[] = [
+  ...ROAD_CATEGORIES,
+  ...LEGACY_PALETTE.map(cat => ({ ...cat, category: `Legacy: ${cat.category}` })),
+];
+
 export const ASSET_NAMES = PALETTE.flatMap(cat => cat.items.map(i => i.asset));
 export const PROP_ASSETS = new Set(
   PALETTE.filter(cat => cat.isProp).flatMap(cat => cat.items.map(i => i.asset))
@@ -214,8 +254,13 @@ export function isPropAsset(asset: string): boolean {
   return PROP_ASSETS.has(asset);
 }
 
-// Categories collapsed by default in the editor sidebar — the newly-added
-// bulk-decor categories are big enough (24-47 items) to want collapsing on
-// first load, so the sidebar isn't a giant scroll of buttons the owner has
-// to hunt through for the terrain/road pieces they actually use most.
-export const DEFAULT_COLLAPSED_CATEGORIES = new Set(["Buildings", "Structures", "Tech / Track"]);
+// Categories collapsed by default in the editor sidebar. With 302 road tiles
+// + the full legacy set the sidebar would be an endless scroll, so default
+// to: road categories OPEN only for the core flat-road groups the owner
+// reaches for first, everything else (big road groups + ALL legacy) closed.
+// The Recent section (MRU) is the primary navigation tool at this scale.
+export const DEFAULT_COLLAPSED_CATEGORIES = new Set([
+  "Roads: Cross & T", "Roads: End & Detail", "Slopes: Curved & Corner",
+  "Bridges", "Water", "Ground", "Misc",
+  ...LEGACY_PALETTE.map(cat => `Legacy: ${cat.category}`),
+]);

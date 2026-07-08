@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "tile_size": 3,
+    "level_height": 1.1,
+    "origin_offset": [-9, 0, -9],
+    "_": "Kenney 3D Road Tiles diagnostic ladder (map-building rule: new asset family => diag scene first). Row z=1: flat road -> slope up (154 rot180, ascent +X) -> elevated flat (y1) -> slope down -> flat. Row z=3: corner rotation sanity. Row z=5: water/bridge/water (bridge = physics approx, flat at deck)."
+  },
+  "cells": [
+    {"asset": "roadTile_031", "x": 0, "z": 1, "y_level": 0, "rot": 0},
+    {"asset": "roadTile_031", "x": 1, "z": 1, "y_level": 0, "rot": 0},
+    {"asset": "roadTile_154", "x": 2, "z": 1, "y_level": 0, "rot": 180, "_": "authored ascent -X, rot 180 => ascends +X"},
+    {"asset": "roadTile_031", "x": 3, "z": 1, "y_level": 1, "rot": 0},
+    {"asset": "roadTile_031", "x": 4, "z": 1, "y_level": 1, "rot": 0},
+    {"asset": "roadTile_154", "x": 5, "z": 1, "y_level": 0, "rot": 0, "_": "ascent -X => descends toward +X"},
+    {"asset": "roadTile_031", "x": 6, "z": 1, "y_level": 0, "rot": 0},
+
+    {"asset": "roadTile_035", "x": 0, "z": 3, "y_level": 0, "rot": 0, "_": "corner +X-Z as authored"},
+    {"asset": "roadTile_048", "x": 0, "z": 4, "y_level": 0, "rot": 0, "_": "straight +Z-Z meets corner's -Z? corner is at z=3 opening -Z (towards z=2)... visual check"},
+    {"asset": "roadTile_031", "x": 1, "z": 3, "y_level": 0, "rot": 0},
+    {"asset": "roadTile_035", "x": 2, "z": 3, "y_level": 0, "rot": 90, "_": "rotation sanity: same corner rotated"},
+
+    {"asset": "roadTile_001", "x": 4, "z": 3, "y_level": 0, "rot": 0},
+    {"asset": "roadTile_045", "x": 5, "z": 3, "y_level": 0, "rot": 0, "_": "bridge: drive OVER ok, physics approx"},
+    {"asset": "roadTile_001", "x": 6, "z": 3, "y_level": 0, "rot": 0},
+
+    {"asset": "roadTile_002", "x": 0, "z": 0, "y_level": 0, "rot": 0},
+    {"asset": "roadTile_002", "x": 1, "z": 0, "y_level": 0, "rot": 0},
+    {"asset": "roadTile_002", "x": 2, "z": 0, "y_level": 0, "rot": 0}
+  ],
+  "props": []
+}

@@ -24,9 +24,24 @@ const MIN_GRID_SIZE = 16;
 const MAX_GRID_SIZE = 96;
 const GRID_SIZE_STEP = 16;
 let GRID_SIZE = 32; // cells per side — mutable, see setGridSize()
-const TILE_SIZE = 1;
-const LEVEL_HEIGHT = 0.5;
-let HALF = (GRID_SIZE - 1) / 2; // world offset: world = cell - HALF, kept in sync with GRID_SIZE
+// Grid metrics are PER MAP since the road-tiles pack arrived: space-kit maps
+// are 1m cells / 0.5m levels, road-tile maps are 3m cells / ~1.1m levels
+// (measured from the pack's own slope rise by tools/bake-road-tiles.mjs).
+// Mutable — driven by the grid-preset select and by loaded map meta; world
+// position everywhere below is (cell - HALF) * TILE_SIZE. A fresh editor
+// starts on the roads preset (the current pack); loading any map adopts that
+// map's own meta, so legacy maps still edit on their 1m grid.
+let TILE_SIZE = 3;
+let LEVEL_HEIGHT = 1.1;
+let HALF = (GRID_SIZE - 1) / 2; // world offset: world = (cell - HALF) * TILE_SIZE, kept in sync with GRID_SIZE
+
+// The two known packs' grid presets. "roads" level height = the slope tiles'
+// uniform full rise (1.1m) so one Q/E level step matches one slope tile.
+const GRID_PRESETS = {
+  roads: { tile: 3, level: 1.1 },
+  "space-kit": { tile: 1, level: 0.5 },
+} as const;
+type GridPresetName = keyof typeof GRID_PRESETS;
 const MAX_Y_LEVEL = 6;
 const ROT_CYCLE = [0, 90, 180, -90] as const;
 const PROP_STEP = 0.25;
@@ -37,6 +52,7 @@ const sidebar = document.getElementById("sidebar")!;
 const statusMain = document.getElementById("statusMain")!;
 const statusHint = document.getElementById("statusHint")!;
 const gridSizeInput = document.getElementById("gridSizeInput") as HTMLInputElement;
+const gridPresetSelect = document.getElementById("gridPresetSelect") as HTMLSelectElement | null;
 const btnMapsMenu = document.getElementById("btnMapsMenu") as HTMLButtonElement;
 const mapsMenuPanel = document.getElementById("mapsMenuPanel") as HTMLDivElement;
 const serverStatus = document.getElementById("serverStatus")!;
@@ -97,7 +113,12 @@ function resizeRenderer(): void {
 resizeRenderer();
 addEventListener("resize", resizeRenderer);
 
-let grid = new THREE.GridHelper(GRID_SIZE, GRID_SIZE, 0x00ffee, 0x333366);
+function makeGridHelper(): THREE.GridHelper {
+  // World size = cells × tile size, but always GRID_SIZE divisions — one grid
+  // line per cell regardless of the active pack's tile size.
+  return new THREE.GridHelper(GRID_SIZE * TILE_SIZE, GRID_SIZE, 0x00ffee, 0x333366);
+}
+let grid = makeGridHelper();
 scene.add(grid);
 
 // OrbitControls: LEFT/RIGHT mouse are reserved for place/delete, so orbiting
@@ -213,11 +234,11 @@ function cellKeyToDelete(x: number, z: number, activeY: number): string | null {
 // never drift apart — the resize path used to reset position without the
 // 2-cell offset or the mirror, silently misplacing ramps on grid change.
 function applyCellTransform(inst: THREE.Object3D, rec: CellRecord): void {
-  inst.position.set(rec.x - HALF, rec.y_level * LEVEL_HEIGHT, rec.z - HALF);
+  inst.position.set((rec.x - HALF) * TILE_SIZE, rec.y_level * LEVEL_HEIGHT, (rec.z - HALF) * TILE_SIZE);
   if (TWO_CELL_ASSETS.has(rec.asset)) {
     const [dx, dz] = longAxis(rec.rot);
-    inst.position.x += dx * 0.5;
-    inst.position.z += dz * 0.5; // sit on 2 whole cells, not straddling — matches mapLoader
+    inst.position.x += dx * 0.5 * TILE_SIZE;
+    inst.position.z += dz * 0.5 * TILE_SIZE; // sit on 2 whole cells, not straddling — matches mapLoader
   }
   inst.rotation.y = THREE.MathUtils.degToRad(rec.rot);
   inst.scale.x = rec.mirror ? -1 : 1; // reflect-then-rotate, matches mapLoader
@@ -653,7 +674,7 @@ function rebuildAllPlacements(): void {
     if (obj) applyCellTransform(obj, rec);
   }
   for (let i = 0; i < props.length; i++) {
-    propObjs[i].position.set(props[i].x - HALF, props[i].y_level * LEVEL_HEIGHT, props[i].z - HALF);
+    propObjs[i].position.set((props[i].x - HALF) * TILE_SIZE, props[i].y_level * LEVEL_HEIGHT, (props[i].z - HALF) * TILE_SIZE);
   }
 }
 
@@ -669,11 +690,37 @@ function setGridSize(size: number): void {
   GRID_SIZE = clamped;
   HALF = (GRID_SIZE - 1) / 2;
   scene.remove(grid);
-  grid = new THREE.GridHelper(GRID_SIZE, GRID_SIZE, 0x00ffee, 0x333366);
+  grid = makeGridHelper();
   scene.add(grid);
   gridSizeInput.value = String(GRID_SIZE);
   rebuildAllPlacements();
   refreshCursor(lastClientX, lastClientY);
+}
+
+// Switches the grid metrics (tile size / level height) — the per-pack preset.
+// Cell-space records are untouched; every placed object's world transform is
+// re-derived, so switching presets on a non-empty map simply re-spaces the
+// content (useful mainly on an empty/new map, harmless otherwise, and fully
+// reversible by switching back).
+function setGridMetrics(tile: number, level: number): void {
+  if (tile === TILE_SIZE && level === LEVEL_HEIGHT) return;
+  TILE_SIZE = tile;
+  LEVEL_HEIGHT = level;
+  scene.remove(grid);
+  grid = makeGridHelper();
+  scene.add(grid);
+  updatePlane();
+  rebuildAllPlacements();
+  if (gridPresetSelect) gridPresetSelect.value = matchPresetName() ?? "custom";
+  refreshCursor(lastClientX, lastClientY);
+  scheduleAutosave();
+}
+
+function matchPresetName(): GridPresetName | null {
+  for (const [name, p] of Object.entries(GRID_PRESETS) as Array<[GridPresetName, { tile: number; level: number }]>) {
+    if (p.tile === TILE_SIZE && p.level === LEVEL_HEIGHT) return name;
+  }
+  return null;
 }
 
 // Shifts EVERY placed cell and prop by the same integer (dx, dz) so the
@@ -959,7 +1006,7 @@ function clientToCellSpace(clientX: number, clientY: number): { x: number; z: nu
   raycaster.setFromCamera(ndc, camera);
   const hit = raycaster.ray.intersectPlane(groundPlane, hitPoint);
   if (!hit) return null;
-  return { x: hit.x + HALF, z: hit.z + HALF };
+  return { x: hit.x / TILE_SIZE + HALF, z: hit.z / TILE_SIZE + HALF };
 }
 
 function showMarqueeBox(x1: number, y1: number, x2: number, y2: number): void {
@@ -1181,8 +1228,8 @@ function refreshCursor(clientX: number, clientY: number): void {
 
   const rot = ROT_CYCLE[rotIndex];
   if (hit) {
-    const cellSpaceX = hit.x + HALF;
-    const cellSpaceZ = hit.z + HALF;
+    const cellSpaceX = hit.x / TILE_SIZE + HALF;
+    const cellSpaceZ = hit.z / TILE_SIZE + HALF;
     lastCellX = THREE.MathUtils.clamp(Math.round(cellSpaceX), 0, GRID_SIZE - 1);
     lastCellZ = THREE.MathUtils.clamp(Math.round(cellSpaceZ), 0, GRID_SIZE - 1);
     lastFloatX = THREE.MathUtils.clamp(Math.round(cellSpaceX / PROP_STEP) * PROP_STEP, 0, GRID_SIZE - 1);
@@ -1198,13 +1245,13 @@ function refreshCursor(clientX: number, clientY: number): void {
   if (ghost && activeAsset) {
     ghost.visible = true;
     if (isPropAsset(activeAsset)) {
-      ghost.position.set(lastFloatX - HALF, yLevel * LEVEL_HEIGHT, lastFloatZ - HALF);
+      ghost.position.set((lastFloatX - HALF) * TILE_SIZE, yLevel * LEVEL_HEIGHT, (lastFloatZ - HALF) * TILE_SIZE);
     } else {
-      ghost.position.set(lastCellX - HALF, yLevel * LEVEL_HEIGHT, lastCellZ - HALF);
+      ghost.position.set((lastCellX - HALF) * TILE_SIZE, yLevel * LEVEL_HEIGHT, (lastCellZ - HALF) * TILE_SIZE);
       if (TWO_CELL_ASSETS.has(activeAsset)) {
         const [dx, dz] = longAxis(rot);
-        ghost.position.x += dx * 0.5;
-        ghost.position.z += dz * 0.5; // preview the 2-cell footprint offset
+        ghost.position.x += dx * 0.5 * TILE_SIZE;
+        ghost.position.z += dz * 0.5 * TILE_SIZE; // preview the 2-cell footprint offset
       }
     }
     ghost.rotation.y = THREE.MathUtils.degToRad(rot);
@@ -1509,7 +1556,7 @@ function buildMapJson(): MapJson {
     meta: {
       tile_size: TILE_SIZE,
       level_height: LEVEL_HEIGHT,
-      origin_offset: [-HALF, 0, -HALF],
+      origin_offset: [-HALF * TILE_SIZE, 0, -HALF * TILE_SIZE],
     },
     cells: Array.from(cells.values()),
     props: props.map(p => ({ ...p })),
@@ -1521,6 +1568,10 @@ function buildMapJson(): MapJson {
 // data model has no notion of a rectangle, only per-cell records.
 function loadMapJson(data: MapJson): void {
   clearAll();
+  // Adopt the map's own grid metrics (defaults = the legacy space-kit grid
+  // for maps that predate meta being authoritative here). Editor cell space
+  // stays integer grid coords; only world-transform scale changes.
+  setGridMetrics(data.meta?.tile_size ?? 1, data.meta?.level_height ?? 0.5);
   for (const rect of data.rect_fills ?? []) {
     for (let x = rect.x_min; x <= rect.x_max; x++) {
       for (let z = rect.z_min; z <= rect.z_max; z++) {
@@ -1618,6 +1669,11 @@ document.getElementById("btnDrive")!.addEventListener("click", () => {
   localStorage.setItem("editor-drive-meta",
     JSON.stringify({ name: loadedMapName ?? "unsaved", ts: Date.now() }));
   window.open("/?map=editor", "_blank");
+});
+
+gridPresetSelect?.addEventListener("change", () => {
+  const preset = GRID_PRESETS[gridPresetSelect.value as GridPresetName];
+  if (preset) setGridMetrics(preset.tile, preset.level);
 });
 
 gridSizeInput.addEventListener("change", () => {

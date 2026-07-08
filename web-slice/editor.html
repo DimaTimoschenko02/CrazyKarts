@@ -172,6 +172,13 @@
     <label class="inline" for="gridSizeInput">Grid size
       <input type="number" id="gridSizeInput" min="16" max="96" step="16" value="32">
     </label>
+    <label class="inline" for="gridPresetSelect" title="Метрика грида: Roads = тайлы 3м, этаж 1.1м; Space Kit (legacy) = 1м / 0.5м. Меняется автоматически при загрузке карты">Cell
+      <select id="gridPresetSelect">
+        <option value="roads" selected>Roads 3м</option>
+        <option value="space-kit">Space Kit 1м</option>
+        <option value="custom" hidden>custom</option>
+      </select>
+    </label>
   </div>
   <div id="saveAsPanel" class="hidden">
     <span>Save as:</span>

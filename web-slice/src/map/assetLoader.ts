@@ -14,6 +14,26 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 const ASSET_BASE = "/assets/space-kit/";
 
+// Kenney "3D Road Tiles" pack (public/assets/roads/roadTile_NNN.gltf) — the
+// map-building pack that supersedes space-kit terrain (owner decision
+// 2026-07-08, see docs/roads-catalog.md for the baked per-tile catalog).
+// Plain JSON .gltf files with embedded base64 buffers, no textures, no node
+// transforms, metalness already 0 (verified across all 302 files by
+// tools/bake-road-tiles.mjs) — GLTFLoader eats them directly.
+//
+// Pivot: unlike space-kit (shared staging pivot at (2, 0, 1.5)), every road
+// tile is authored in ONE staging window x∈[0,3], z∈[-3,0] (verified: all
+// 302 tiles, zero exceptions). So recentering is an EXACT constant translate
+// of (-1.5, 0, +1.5) — never the AABB approximation, which would silently
+// drag asymmetric tiles (river edges, partial ground pieces) toward the cell
+// center away from their authored in-cell position (the corridor_wall lesson).
+const ROADS_ASSET_BASE = "/assets/roads/";
+const ROAD_STAGING_CENTER = { x: 1.5, z: -1.5 };
+
+export function isRoadTile(name: string): boolean {
+  return name.startsWith("roadTile_");
+}
+
 // Kart/car bodies live in a separate Kenney pack ("Blocky Cars"), not the
 // terrain space-kit — the old craft_racer.glb (space-kit) scaled to a 1x1m
 // tile read as visibly too wide for a single map lane, see kart/stats.ts.
@@ -346,6 +366,16 @@ export async function loadAssetLibrary(names: readonly string[]): Promise<AssetL
   const lib = new Map<string, THREE.Group>();
   await Promise.all(
     names.filter(name => !PROCEDURAL_ASSETS.has(name)).map(async name => {
+      if (isRoadTile(name)) {
+        const gltf = await loader.loadAsync(ROADS_ASSET_BASE + name + ".gltf");
+        // Exact constant recenter — see ROAD_STAGING_CENTER doc above.
+        for (const child of gltf.scene.children) {
+          child.position.x -= ROAD_STAGING_CENTER.x;
+          child.position.z -= ROAD_STAGING_CENTER.z;
+        }
+        lib.set(name, gltf.scene);
+        return;
+      }
       const gltf = await loader.loadAsync(ASSET_BASE + name + ".glb");
       if (PIVOT_RECENTER_ASSETS.has(name)) recenterOnStagedPivot(gltf.scene);
       else recenterXZ(gltf.scene);

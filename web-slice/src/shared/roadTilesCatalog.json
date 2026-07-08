@@ -1,0 +1,7253 @@
+{
+ "roadTile_001": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "001 Water",
+  "size": [
+   3,
+   0.455,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.455,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Water": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_002": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "002 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.63,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_003": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "003 Slope −X rise 1.1",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.18,
+  "topMin": 0.653,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.63,
+   "rise": 1.1
+  }
+ },
+ "roadTile_004": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "004 Slope curved",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 0.894,
+  "topMin": 0.573,
+  "topMax": 1.627,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_005": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "005 Slope curved",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.55,
+  "topMax": 1.604,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_006": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "006 Slope curved",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 0.596,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_007": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "007 h1.65",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 1.65,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_008": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "008 h0.55",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.55,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_009": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "009 h1.65",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 1.65,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_010": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "010 Slope curved",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 0.875,
+  "topMin": 0.551,
+  "topMax": 1.618,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_011": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "011 Slope curved",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 0.773,
+  "topMin": 0.55,
+  "topMax": 1.618,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_012": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "012 Slope curved grass",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 0.773,
+  "topMin": 0.55,
+  "topMax": 1.618,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_013": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "013 Slope diag grass",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.373,
+   "Alternate_Dirt": 0.627
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_014": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "014 h0.46",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.181,
+   "Alternate_Dirt": 0.819
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_015": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "015 Misc grass",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.492,
+  "topMin": 0.205,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.5,
+   "Alternate_Dirt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_016": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "016 Slope diag grass",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.55,
+   "Alternate_Dirt": 0.45
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_017": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "017 grass h0.55",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.681,
+   "Alternate_Dirt": 0.319
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_018": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "018 Slope −X rise 1.1 grass",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.074,
+  "topMin": 0.478,
+  "topMax": 1.627,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.556,
+   "Alternate_Dirt": 0.444
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.508,
+   "rise": 1.1
+  }
+ },
+ "roadTile_019": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "019 Misc grass",
+  "size": [
+   0.809,
+   2.531,
+   0.934
+  ],
+  "topMedian": 2.048,
+  "topMin": 1.488,
+  "topMax": 2.507,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_020": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "020 Misc grass",
+  "size": [
+   1.721,
+   2.623,
+   1.491
+  ],
+  "topMedian": 2.188,
+  "topMin": 1.02,
+  "topMax": 2.584,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_021": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "021 Slope curved grass",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 0.875,
+  "topMin": 0.551,
+  "topMax": 1.618,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_022": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "022 Slope diag grass",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.776,
+   "Alternate_Dirt": 0.224
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_023": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "023 grass h0.55",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.556,
+   "Alternate_Dirt": 0.444
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_024": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "024 Misc grass",
+  "size": [
+   3,
+   0.705,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.476,
+  "topMax": 0.705,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.5,
+   "Alternate_Dirt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_025": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "025 road +X−X grass h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.458,
+   "White": 0.042
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_026": {
+  "kind": "flat",
+  "category": "Roads: End & Detail",
+  "physics": "exact",
+  "label": "026 road +X grass h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px"
+  ],
+  "materials": {
+   "Grass": 0.403,
+   "Stone": 0.455,
+   "Asphalt": 0.142
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_027": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "027 road +X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.125,
+   "Stone": 0.125,
+   "Asphalt": 0.75
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_028": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "028 grass h1.65",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 1.65,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_029": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "029 grass h0.55",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.55,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_030": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "030 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.875,
+   "Stone": 0.104,
+   "Grass": 0.021
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_031": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "031 road +X−X h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.063,
+   "Stone": 0.438,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_032": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "032 road +X−X+Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz"
+  ],
+  "materials": {
+   "Grass": 0.184,
+   "Stone": 0.25,
+   "Asphalt": 0.566
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_033": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "033 road +X−X+Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz"
+  ],
+  "materials": {
+   "Grass": 0.222,
+   "Stone": 0.422,
+   "Asphalt": 0.356
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_034": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "034 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.6,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.6,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_035": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "035 road +X−Z h0.62",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.615,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.234,
+   "Stone": 0.5,
+   "Asphalt": 0.266
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_036": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "036 grass h1.65",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 1.65,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_037": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "037 Slope curved grass",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 0.596,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_038": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "038 grass h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.344,
+   "Stone": 0.656
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_039": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "039 grass h0.55",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.042,
+   "Grass": 0.958
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_040": {
+  "kind": "flat",
+  "category": "Roads: End & Detail",
+  "physics": "exact",
+  "label": "040 road +X grass h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px"
+  ],
+  "materials": {
+   "Grass": 0.444,
+   "Stone": 0.399,
+   "Asphalt": 0.156
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_041": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "041 road +X+Z−Z grass h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.266,
+   "Stone": 0.227,
+   "Asphalt": 0.507
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_042": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "042 Water",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Water": 0.736,
+   "Sand": 0.215,
+   "Grass": 0.049
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_043": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "043 road −X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.109,
+   "Stone": 0.238,
+   "Asphalt": 0.653
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_044": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "044 Slope curved grass",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.431,
+   "Stone": 0.174,
+   "Asphalt": 0.396
+  },
+  "underpassFrac": 0.047
+ },
+ "roadTile_045": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "045 Bridge",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.69,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.234,
+   "Stone": 0.5,
+   "Asphalt": 0.266
+  },
+  "underpassFrac": 0.297
+ },
+ "roadTile_046": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "046 Slope curved",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.016,
+   "Stone": 0.047,
+   "Asphalt": 0.938
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_047": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "047 Slope curved",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.012,
+   "Stone": 0.036,
+   "Asphalt": 0.951
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_048": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "048 road +Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.236,
+   "Stone": 0.26,
+   "Asphalt": 0.503
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_049": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "049 Slope diag grass",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "pz"
+  ],
+  "materials": {
+   "Grass": 0.637,
+   "Stone": 0.139,
+   "Asphalt": 0.224
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_050": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "050 Slope curved",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.125,
+   "Stone": 0.125,
+   "Asphalt": 0.75
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_051": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "051 Slope curved",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.573,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.125,
+   "Stone": 0.125,
+   "Asphalt": 0.75
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_052": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "052 road −X−Z grass h0.55",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.104,
+   "Stone": 0.094,
+   "Grass": 0.802
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_053": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "053 road +X−X−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.634,
+   "Stone": 0.142,
+   "Grass": 0.224
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_054": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "054 Slope diag grass",
+  "size": [
+   3,
+   0.6,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.6,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz"
+  ],
+  "materials": {
+   "Grass": 0.398,
+   "Stone": 0.174,
+   "Asphalt": 0.429
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_055": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "055 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.012,
+   "Stone": 0.036,
+   "Asphalt": 0.951
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_056": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "056 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.016,
+   "Stone": 0.047,
+   "Asphalt": 0.938
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_057": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "057 road −X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.634,
+   "Stone": 0.142,
+   "Grass": 0.224
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_058": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "058 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.6,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.6,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_059": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "059 road +X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.25,
+   "Asphalt": 0.75
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_060": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "060 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.875,
+   "Stone": 0.125
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_061": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "061 road +X−Z h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.734,
+   "Asphalt": 0.266
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_062": {
+  "kind": "flat",
+  "category": "Roads: End & Detail",
+  "physics": "exact",
+  "label": "062 road +X h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px"
+  ],
+  "materials": {
+   "Stone": 0.625,
+   "Asphalt": 0.375
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_063": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "063 road +X−X h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.431,
+   "Asphalt": 0.569
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_064": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "064 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.63,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_065": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "065 road +X+Z−Z h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.505,
+   "Asphalt": 0.495
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_066": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "066 road −X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.347,
+   "Asphalt": 0.653
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_067": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "067 road +Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.488,
+   "Asphalt": 0.512
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_068": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "068 road −X+Z h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "pz"
+  ],
+  "materials": {
+   "Stone": 0.75,
+   "Asphalt": 0.25
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_069": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "069 road −X−Z h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.108,
+   "Stone": 0.892
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_070": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "070 road −X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.646,
+   "Stone": 0.354
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_071": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "071 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.063,
+   "Asphalt": 0.938
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_072": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "072 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.049,
+   "Asphalt": 0.951
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_073": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "073 road +X+Z h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz"
+  ],
+  "materials": {
+   "Stone": 0.649,
+   "Asphalt": 0.351
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_074": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "074 road +X−X−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.646,
+   "Stone": 0.354
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_075": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "075 road +X−X h0.62",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.615,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.458,
+   "White": 0.042
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_076": {
+  "kind": "flat",
+  "category": "Roads: End & Detail",
+  "physics": "exact",
+  "label": "076 road +X h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px"
+  ],
+  "materials": {
+   "Stone": 0.813,
+   "Asphalt": 0.188
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_077": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "077 road +X−X h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.467,
+   "Asphalt": 0.533
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_078": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "078 road +X−X+Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz"
+  ],
+  "materials": {
+   "Stone": 0.438,
+   "Asphalt": 0.563
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_079": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "079 road +X−X+Z h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz"
+  ],
+  "materials": {
+   "Stone": 0.653,
+   "Asphalt": 0.347
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_080": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "080 road +X−X h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.431,
+   "Asphalt": 0.569
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_081": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "081 Water",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Water": 0.736,
+   "Sand": 0.215,
+   "Stone": 0.036,
+   "Grass": 0.012
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_082": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "082 Bridge",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.73,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.649,
+   "Asphalt": 0.351
+  },
+  "underpassFrac": 0.092
+ },
+ "roadTile_083": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "083 Slope curved",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.049,
+   "Asphalt": 0.951
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_084": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "084 Slope curved",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.25,
+   "Asphalt": 0.75
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_085": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "085 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.917,
+   "Grey_Asphalt": 0.083
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_086": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "086 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.948,
+   "Grey_Asphalt": 0.052
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_087": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "087 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.84,
+   "Grey_Asphalt": 0.16
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_088": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "088 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.847,
+   "Grey_Asphalt": 0.153
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_089": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "089 Slope curved",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.25,
+   "Asphalt": 0.75
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_090": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "090 Slope curved",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.063,
+   "Asphalt": 0.938
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_091": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "091 Bridge",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.73,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.734,
+   "Asphalt": 0.266
+  },
+  "underpassFrac": 0.297
+ },
+ "roadTile_092": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "092 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.767,
+   "Grey_Asphalt": 0.233
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_093": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "093 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.84,
+   "Grey_Asphalt": 0.16
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_094": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "094 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.958,
+   "Grey_Asphalt": 0.042
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_095": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "095 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.776,
+   "Grey_Asphalt": 0.224
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_096": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "096 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.917,
+   "Grey_Asphalt": 0.083
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_097": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "097 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.991,
+   "Grey_Asphalt": 0.009
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_098": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "098 road +X−X h0.62",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.615,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.417,
+   "Grey_Asphalt": 0.083
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_099": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "099 road +X−X−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.667,
+   "Grey_Asphalt": 0.083,
+   "Stone": 0.25
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_100": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "100 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.877,
+   "Grey_Asphalt": 0.123
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_101": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "101 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.97,
+   "Grey_Asphalt": 0.03
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_102": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "102 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.823,
+   "Grey_Asphalt": 0.177
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_103": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "103 Slope −X rise 1.1",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.157,
+  "topMin": 0.593,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.917,
+   "Grey_Asphalt": 0.083
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.625,
+   "rise": 1.1
+  }
+ },
+ "roadTile_104": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "104 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.6,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.57,
+  "topMax": 0.6,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.917,
+   "Grey_Asphalt": 0.083
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_105": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "105 road −X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.688,
+   "Grey_Asphalt": 0.083,
+   "Stone": 0.229
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_106": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "106 road +Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.57,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.458,
+   "Grey_Asphalt": 0.083,
+   "Asphalt": 0.458
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_107": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "107 road +X+Z−Z h0.60",
+  "size": [
+   2.625,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.125,
+   "Asphalt": 0.875
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_108": {
+  "kind": "flat",
+  "category": "Roads: End & Detail",
+  "physics": "exact",
+  "label": "108 road +X h0.63",
+  "size": [
+   2.625,
+   0.63,
+   2.25
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px"
+  ],
+  "materials": {
+   "Stone": 0.774,
+   "Asphalt": 0.226
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_109": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "109 road +X−X h0.60",
+  "size": [
+   3,
+   0.63,
+   2.25
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.583,
+   "White": 0.083
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_110": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "110 Slope diag",
+  "size": [
+   2.252,
+   0.63,
+   2.252
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "pz"
+  ],
+  "materials": {
+   "Stone": 0.386,
+   "Asphalt": 0.614
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_111": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "111 road +X+Z h0.60",
+  "size": [
+   2.625,
+   0.6,
+   2.625
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.6,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz"
+  ],
+  "materials": {
+   "Stone": 0.288,
+   "Asphalt": 0.712
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_112": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "112 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.037,
+   "Asphalt": 0.963
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_113": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "113 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.048,
+   "Asphalt": 0.952
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_114": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "114 road −X+Z−Z h0.60",
+  "size": [
+   2.625,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.809,
+   "Stone": 0.191
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_115": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "115 Slope diag",
+  "size": [
+   1.746,
+   0.63,
+   1.746
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.523,
+   "Stone": 0.477
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_116": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "116 road +X−X−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   2.625
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.807,
+   "Stone": 0.193
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_117": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "117 Slope curved",
+  "size": [
+   2.625,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.125,
+   "Asphalt": 0.875
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_118": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "118 Slope curved",
+  "size": [
+   2.625,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.125,
+   "Asphalt": 0.875
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_119": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "119 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.894,
+   "Stone": 0.106
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_120": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "120 road +X−X h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.467,
+   "Asphalt": 0.533
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_121": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "121 road +X−X+Z h0.60",
+  "size": [
+   3,
+   0.63,
+   2.625
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz"
+  ],
+  "materials": {
+   "Stone": 0.3,
+   "Asphalt": 0.7
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_122": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "122 road +Z−Z h0.60",
+  "size": [
+   2.576,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.341,
+   "Asphalt": 0.659
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_123": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "123 Slope curved",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.037,
+   "Asphalt": 0.963
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_124": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "124 Slope curved",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.048,
+   "Asphalt": 0.952
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_125": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "125 Bridge",
+  "size": [
+   2.625,
+   1.73,
+   2.625
+  ],
+  "topMedian": 1.73,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.635,
+   "Asphalt": 0.365
+  },
+  "underpassFrac": 0.401
+ },
+ "roadTile_126": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "126 Slope curved",
+  "size": [
+   2.625,
+   1.73,
+   2.625
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.288,
+   "Asphalt": 0.712
+  },
+  "underpassFrac": 0.018
+ },
+ "roadTile_127": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "127 road −X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.267,
+   "Asphalt": 0.733
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_128": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "128 road +X−X+Z h0.63",
+  "size": [
+   3,
+   0.63,
+   2.438
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz"
+  ],
+  "materials": {
+   "Stone": 0.551,
+   "Asphalt": 0.449
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_129": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "129 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.6,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.6,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_130": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "130 road +X−Z h0.63",
+  "size": [
+   2.625,
+   0.63,
+   2.625
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.635,
+   "Asphalt": 0.365
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_131": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "131 h0.63",
+  "size": [
+   2.625,
+   0.63,
+   2.25
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.63,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_132": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "132 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.63,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_133": {
+  "kind": "flat",
+  "category": "Roads: End & Detail",
+  "physics": "exact",
+  "label": "133 road +X h0.63",
+  "size": [
+   2.438,
+   0.63,
+   1.875
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px"
+  ],
+  "materials": {
+   "Stone": 0.688,
+   "Asphalt": 0.313
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_134": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "134 road +X+Z−Z h0.60",
+  "size": [
+   2.625,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.322,
+   "Asphalt": 0.678
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_135": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "135 Slope diag",
+  "size": [
+   1.746,
+   0.63,
+   1.746
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.477,
+   "Asphalt": 0.523
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_136": {
+  "kind": "flat",
+  "category": "Roads: End & Detail",
+  "physics": "exact",
+  "label": "136 road +X h0.63",
+  "size": [
+   2.438,
+   0.63,
+   1.875
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px"
+  ],
+  "materials": {
+   "Stone": 0.711,
+   "Asphalt": 0.289
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_137": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "137 road +X−X h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.484,
+   "Asphalt": 0.516
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_138": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "138 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.217,
+   "Asphalt": 0.783
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_139": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "139 road +X−Z h1.23",
+  "size": [
+   2.625,
+   1.26,
+   2.625
+  ],
+  "topMedian": 1.23,
+  "topMin": 1.23,
+  "topMax": 1.26,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.375,
+   "Asphalt": 0.625
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_140": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "140 Slope curved grass",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.55,
+  "topMax": 1.604,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_141": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "141 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.042,
+   "Stone": 0.208,
+   "Asphalt": 0.75
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_142": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "142 road +X−X h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.021,
+   "Stone": 0.479,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_143": {
+  "kind": "flat",
+  "category": "Roads: End & Detail",
+  "physics": "exact",
+  "label": "143 road +X grass h0.55",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px"
+  ],
+  "materials": {
+   "Grass": 0.517,
+   "Stone": 0.352,
+   "Asphalt": 0.13
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_144": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "144 road +X−Z grass h0.55",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.802,
+   "Stone": 0.094,
+   "Asphalt": 0.104
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_145": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "145 Water",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.25,
+   "Water": 0.563,
+   "Sand": 0.188
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_146": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "146 Slope −X rise 0.1 grass",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.25,
+   "Sand": 0.375,
+   "Water": 0.375
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.425,
+   "rise": 0.107
+  }
+ },
+ "roadTile_147": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "147 grass h0.55",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.901,
+   "Stone": 0.073,
+   "Asphalt": 0.026
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_148": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "148 road +X+Z−Z grass h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.293,
+   "Stone": 0.399,
+   "Asphalt": 0.307
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_149": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "149 road +X−X h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.156,
+   "Stone": 0.344,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_150": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "150 road +X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.146,
+   "Stone": 0.229,
+   "Asphalt": 0.625
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_151": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "151 Slope curved grass",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 0.894,
+  "topMin": 0.573,
+  "topMax": 1.627,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_152": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "152 Slope −X rise 1.1 grass",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.1,
+  "topMin": 0.573,
+  "topMax": 1.627,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.55,
+   "rise": 1.1
+  }
+ },
+ "roadTile_153": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "153 Slope diag grass",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.41,
+   "Stone": 0.214,
+   "Asphalt": 0.377
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_154": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "154 Slope −X rise 1.1 grass",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.142,
+  "topMin": 0.573,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.595,
+   "rise": 1.1
+  }
+ },
+ "roadTile_155": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "155 Slope diag grass",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.512,
+   "Stone": 0.299,
+   "Asphalt": 0.189
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_156": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "156 road +X−X−Z grass h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.507,
+   "Stone": 0.227,
+   "Grass": 0.266
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_157": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "157 Slope diag grass",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.595,
+   "Sand": 0.299,
+   "Water": 0.106
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_158": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "158 grass h0.55",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.813,
+   "Water": 0.188
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_159": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "159 Water",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Water": 0.951,
+   "Grass": 0.049
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_160": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "160 road +X−X grass h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.333,
+   "Stone": 0.417,
+   "Asphalt": 0.25
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_161": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "161 Slope −X rise 1.1 grass",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.142,
+  "topMin": 0.573,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.595,
+   "rise": 1.1
+  }
+ },
+ "roadTile_162": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "162 road +X−X grass h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_163": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "163 grass h0.55",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.55,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_164": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "164 road +X−X grass h1.70",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.7,
+  "topMin": 1.65,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_165": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "165 Slope −X rise 1.1 grass",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.142,
+  "topMin": 0.573,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.595,
+   "rise": 1.1
+  }
+ },
+ "roadTile_166": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "166 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.111,
+   "Stone": 0.451,
+   "Asphalt": 0.438
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_167": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "167 Water",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.097,
+   "Water": 0.903
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_168": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "168 grass h0.55",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.625,
+   "Water": 0.375
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_169": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "169 grass h1.65",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 1.65,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_170": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "170 road +X−X grass h1.70",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.7,
+  "topMin": 1.65,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_171": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "171 Slope −X rise 1.1 grass",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.142,
+  "topMin": 0.573,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.595,
+   "rise": 1.1
+  }
+ },
+ "roadTile_172": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "172 Bridge",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.438,
+   "Stone": 0.214,
+   "Asphalt": 0.349
+  },
+  "underpassFrac": 0.056
+ },
+ "roadTile_173": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "173 Water",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.194,
+   "Water": 0.806
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_174": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "174 Water",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.25,
+   "Water": 0.75
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_175": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "175 Water",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.503,
+  "topMin": 0.23,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.5,
+   "Water": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_176": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "176 Water",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.472,
+   "Water": 0.528
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_177": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "177 Slope diag grass",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.595,
+   "Water": 0.405
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_178": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "178 Water",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.347,
+   "Water": 0.653
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_179": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "179 Slope curved grass",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 0.624,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_180": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "180 Slope −X rise 1.1 grass",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.142,
+  "topMin": 0.573,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.595,
+   "rise": 1.1
+  }
+ },
+ "roadTile_181": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "181 road +X−X grass h1.07",
+  "size": [
+   3,
+   1.1,
+   3
+  ],
+  "topMedian": 1.07,
+  "topMin": 1.02,
+  "topMax": 1.1,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_182": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "182 Misc grass",
+  "size": [
+   3,
+   1.26,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 1.26,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_183": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "183 Slope −X rise 0.6 grass",
+  "size": [
+   3,
+   1.18,
+   3
+  ],
+  "topMedian": 0.867,
+  "topMin": 0.561,
+  "topMax": 1.169,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.595,
+   "rise": 0.55
+  }
+ },
+ "roadTile_184": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "184 Misc grass",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.125,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_185": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "185 Slope diag grass",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.707,
+   "Water": 0.293
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_186": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "186 Bridge",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 0.455,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.707,
+   "Water": 0.293
+  },
+  "underpassFrac": 0.111
+ },
+ "roadTile_187": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "187 Misc",
+  "size": [
+   3,
+   0.975,
+   3
+  ],
+  "topMedian": 0.845,
+  "topMin": 0.455,
+  "topMax": 0.975,
+  "minY": 0,
+  "edges": [
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.125,
+   "Water": 0.125,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_188": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "188 Misc",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.125,
+   "Water": 0.125,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_189": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "189 Water",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.052,
+  "topMin": 0.478,
+  "topMax": 1.627,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.5,
+   "Water": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_190": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "190 Water",
+  "size": [
+   3,
+   0.55,
+   3
+  ],
+  "topMedian": 0.503,
+  "topMin": 0.455,
+  "topMax": 0.55,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.5,
+   "Water": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_191": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "191 Slope curved grass",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.573,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_192": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "192 Slope −X rise 0.6 grass",
+  "size": [
+   3,
+   1.18,
+   3
+  ],
+  "topMedian": 0.867,
+  "topMin": 0.561,
+  "topMax": 1.169,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.595,
+   "rise": 0.55
+  }
+ },
+ "roadTile_193": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "193 Slope curved grass",
+  "size": [
+   3,
+   1.26,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 1.26,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_194": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "194 Bridge",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.7,
+  "topMin": 1.65,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.056,
+   "Stone": 0.444,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0.25
+ },
+ "roadTile_195": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "195 Water",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.052,
+  "topMin": 0.455,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.5,
+   "Water": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_196": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "196 Water",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 0.514,
+  "topMin": 0.455,
+  "topMax": 1.627,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.5,
+   "Water": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_197": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "197 Misc",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.7,
+  "topMin": 0.455,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.125,
+   "Water": 0.125,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_198": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "198 road +X−X h1.72",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.715,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_199": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "199 road +X−X h1.72",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.715,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_200": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "200 road +X−X h1.72",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.715,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_201": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "201 Slope curved",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.7,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.406,
+   "Asphalt": 0.594
+  },
+  "underpassFrac": 0.031
+ },
+ "roadTile_202": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "202 road +X−X h1.72",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.715,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_203": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "203 road +X−X h1.72",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.715,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_204": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "204 road +X−X h1.72",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.715,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_205": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "205 Water",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.052,
+  "topMin": 0.455,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Water": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_206": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "206 Water",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.514,
+  "topMin": 0.455,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Water": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_207": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "207 Bridge",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.7,
+  "topMin": 1.65,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.056,
+   "Stone": 0.444,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0.25
+ },
+ "roadTile_208": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "208 road +X−X h1.70",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.7,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_209": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "209 road +X−X h1.70",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.7,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_210": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "210 Bridge",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.7,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.471,
+   "Asphalt": 0.529
+  },
+  "underpassFrac": 0.265
+ },
+ "roadTile_211": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "211 road +X−X h1.70",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.7,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_212": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "212 road +X−X h1.70",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.7,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_213": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "213 road +X−X h1.70",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.7,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_214": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "214 road +X−X h1.70",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.7,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_215": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "215 Water",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.503,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Water": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_216": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "216 Water",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.052,
+  "topMin": 0.478,
+  "topMax": 1.627,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Water": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_217": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "217 road +Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.038,
+   "Stone": 0.462,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_218": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "218 Slope curved",
+  "size": [
+   3,
+   1.26,
+   2.25
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.26,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_219": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "219 h1.65",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 1.65,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_220": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "220 Bridge",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.247,
+  "topMin": 0.6,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [
+   "px"
+  ],
+  "materials": {
+   "Stone": 0.708,
+   "Asphalt": 0.292
+  },
+  "underpassFrac": 0.063
+ },
+ "roadTile_221": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "221 h1.65",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 1.65,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_222": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "222 h1.65",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 1.65,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_223": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "223 Bridge",
+  "size": [
+   3,
+   2.2,
+   3
+  ],
+  "topMedian": 2.2,
+  "topMin": 2.2,
+  "topMax": 2.2,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0.5
+ },
+ "roadTile_224": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "224 Bridge",
+  "size": [
+   3,
+   2.2,
+   3
+  ],
+  "topMedian": 1.925,
+  "topMin": 1.661,
+  "topMax": 2.189,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0.25
+ },
+ "roadTile_225": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "225 Slope curved",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.448,
+  "topMin": 0.624,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_226": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "226 Slope −X rise 1.1",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.165,
+  "topMin": 0.623,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.61,
+   "rise": 1.1
+  }
+ },
+ "roadTile_227": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "227 road +X−X h1.07",
+  "size": [
+   3,
+   1.1,
+   2.25
+  ],
+  "topMedian": 1.07,
+  "topMin": 1.07,
+  "topMax": 1.1,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_228": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "228 Misc",
+  "size": [
+   3,
+   1.26,
+   2.25
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.26,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_229": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "229 Slope −X rise 0.6",
+  "size": [
+   3,
+   1.18,
+   2.25
+  ],
+  "topMedian": 0.886,
+  "topMin": 0.611,
+  "topMax": 1.169,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.61,
+   "rise": 0.55
+  }
+ },
+ "roadTile_230": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "230 Misc",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_231": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "231 Slope curved grass",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.573,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_232": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "232 Slope −X rise 0.6",
+  "size": [
+   3,
+   1.18,
+   2.25
+  ],
+  "topMedian": 0.886,
+  "topMin": 0.611,
+  "topMax": 1.169,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.61,
+   "rise": 0.55
+  }
+ },
+ "roadTile_233": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "233 Misc",
+  "size": [
+   3,
+   0.975,
+   3
+  ],
+  "topMedian": 0.845,
+  "topMin": 0.455,
+  "topMax": 0.975,
+  "minY": 0,
+  "edges": [
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Grass": 0.063,
+   "Stone": 0.313,
+   "Water": 0.125,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_234": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "234 Bridge",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 0.455,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.438,
+   "Stone": 0.214,
+   "Water": 0.349
+  },
+  "underpassFrac": 0.056
+ },
+ "roadTile_235": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "235 Misc grass",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.438,
+   "Stone": 0.214,
+   "Water": 0.349
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_236": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "236 Slope curved",
+  "size": [
+   3,
+   1.26,
+   3
+  ],
+  "topMedian": 0.631,
+  "topMin": 0.6,
+  "topMax": 1.26,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_237": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "237 Slope −X rise 0.6",
+  "size": [
+   3,
+   1.18,
+   3
+  ],
+  "topMedian": 0.89,
+  "topMin": 0.611,
+  "topMax": 1.169,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.615,
+   "rise": 0.55
+  }
+ },
+ "roadTile_238": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "238 Slope curved",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 0.626,
+  "topMin": 0.6,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_239": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "239 Misc",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.165,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_240": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "240 Slope −X rise 0.6",
+  "size": [
+   3,
+   1.18,
+   3
+  ],
+  "topMedian": 0.89,
+  "topMin": 0.611,
+  "topMax": 1.169,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.615,
+   "rise": 0.55
+  }
+ },
+ "roadTile_241": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "241 Misc",
+  "size": [
+   3,
+   1.26,
+   3
+  ],
+  "topMedian": 0.93,
+  "topMin": 0.6,
+  "topMax": 1.26,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_242": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "242 Water",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.168,
+   "Stone": 0.304,
+   "Water": 0.528
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_243": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "243 Misc grass",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.431,
+   "Stone": 0.174,
+   "Water": 0.396
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_244": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "244 Water",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.149,
+   "Stone": 0.198,
+   "Water": 0.653
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_245": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "245 Slope curved",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.718,
+  "topMin": 0.624,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_246": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "246 Slope −X rise 1.1",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.165,
+  "topMin": 0.623,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.615,
+   "rise": 1.1
+  }
+ },
+ "roadTile_247": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "247 road +X−X h1.09",
+  "size": [
+   3,
+   1.1,
+   3
+  ],
+  "topMedian": 1.085,
+  "topMin": 1.07,
+  "topMax": 1.1,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_248": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "248 road +X−X h1.72",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.715,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_249": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "249 Slope −X rise 1.1",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.165,
+  "topMin": 0.623,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.615,
+   "rise": 1.1
+  }
+ },
+ "roadTile_250": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "250 Bridge",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.73,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.707,
+   "Asphalt": 0.293
+  },
+  "underpassFrac": 0.111
+ },
+ "roadTile_251": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "251 Water",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.049,
+   "Stone": 0.146,
+   "Water": 0.806
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_252": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "252 Water",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.125,
+   "Stone": 0.125,
+   "Water": 0.75
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_253": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "253 Water",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.503,
+  "topMin": 0.23,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.25,
+   "Stone": 0.25,
+   "Water": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_254": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "254 road +X−X h1.70",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.7,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_255": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "255 Slope −X rise 1.1",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.165,
+  "topMin": 0.623,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.61,
+   "rise": 1.1
+  }
+ },
+ "roadTile_256": {
+  "kind": "bridge",
+  "category": "Bridges",
+  "physics": "approx",
+  "label": "256 Bridge",
+  "size": [
+   2.625,
+   1.73,
+   2.625
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.375,
+   "Asphalt": 0.625
+  },
+  "underpassFrac": 0.061
+ },
+ "roadTile_257": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "257 Slope curved",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 0.615,
+  "topMin": 0.6,
+  "topMax": 1.608,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_258": {
+  "kind": "slope-curved",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "258 Slope curved",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 0.626,
+  "topMin": 0.6,
+  "topMax": 1.629,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_259": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "259 h1.65",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 1.65,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_260": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "260 road +X−X+Z−Z h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.508,
+   "Asphalt": 0.492
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_261": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "261 Slope −X rise 1.1",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.165,
+  "topMin": 0.623,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.61,
+   "rise": 1.1
+  }
+ },
+ "roadTile_262": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "262 road +X−X h1.70",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.7,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_263": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "263 grass h1.65",
+  "size": [
+   3,
+   1.65,
+   3
+  ],
+  "topMedian": 1.65,
+  "topMin": 1.65,
+  "topMax": 1.65,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 1
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_264": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "264 grass h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.55,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.344,
+   "Stone": 0.656
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_265": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "265 Water",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.024,
+   "Stone": 0.073,
+   "Water": 0.903
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_266": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "266 road +X−X+Z−Z h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.563,
+   "Asphalt": 0.438
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_267": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "267 Slope −X rise 1.1",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.165,
+  "topMin": 0.623,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.615,
+   "rise": 1.1
+  }
+ },
+ "roadTile_268": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "268 road +X−X h1.72",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.715,
+  "topMin": 1.7,
+  "topMax": 1.73,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_269": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "269 road +X−X h0.62",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.615,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_270": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "270 Slope −X rise 1.1",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.165,
+  "topMin": 0.623,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.615,
+   "rise": 1.1
+  }
+ },
+ "roadTile_271": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "271 road +X−X h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.75,
+   "Asphalt": 0.25
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_272": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "272 Water",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Water": 0.951,
+   "Stone": 0.036,
+   "Grass": 0.012
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_273": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "273 Misc grass",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.405,
+   "Stone": 0.455,
+   "Water": 0.141
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_274": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "274 road +X−X h2.25",
+  "size": [
+   3,
+   2.28,
+   2.25
+  ],
+  "topMedian": 2.25,
+  "topMin": 2.25,
+  "topMax": 2.28,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_275": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "275 road +X−X h0.60",
+  "size": [
+   3,
+   0.63,
+   2.25
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_276": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "276 Slope −X rise 1.1",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.165,
+  "topMin": 0.623,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.61,
+   "rise": 1.1
+  }
+ },
+ "roadTile_277": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "277 road +X−X h0.63",
+  "size": [
+   3,
+   0.63,
+   1.875
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.583,
+   "Asphalt": 0.417
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_278": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "278 road +X−X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.25,
+   "Asphalt": 0.75
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_279": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "279 road +X−X h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.601,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_280": {
+  "kind": "flat",
+  "category": "Roads: End & Detail",
+  "physics": "exact",
+  "label": "280 road +X h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px"
+  ],
+  "materials": {
+   "Stone": 0.922,
+   "Asphalt": 0.078
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_281": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "281 road +X−Z h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.905,
+   "Asphalt": 0.095
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_282": {
+  "kind": "water",
+  "category": "Water",
+  "physics": "approx",
+  "label": "282 Water",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.125,
+   "Stone": 0.125,
+   "Water": 0.563,
+   "Sand": 0.188
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_283": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "283 Slope −X rise 0.2",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.455,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.125,
+   "Stone": 0.125,
+   "Sand": 0.375,
+   "Water": 0.375
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.416,
+   "rise": 0.145
+  }
+ },
+ "roadTile_284": {
+  "kind": "misc",
+  "category": "Misc",
+  "physics": "approx",
+  "label": "284 Misc grass",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.55,
+  "topMin": 0.455,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Grass": 0.431,
+   "Stone": 0.174,
+   "Sand": 0.29,
+   "Water": 0.106
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_285": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "285 road +X−X−Z h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.465,
+   "Stone": 0.535
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_286": {
+  "kind": "flat",
+  "category": "Ground",
+  "physics": "exact",
+  "label": "286 h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [],
+  "materials": {
+   "Stone": 0.974,
+   "Asphalt": 0.026
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_287": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "287 road +X+Z−Z h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.696,
+   "Asphalt": 0.304
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_288": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "288 road +X−Z h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.847,
+   "Asphalt": 0.153
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_289": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "289 Slope −X rise 1.1",
+  "size": [
+   3,
+   1.73,
+   3
+  ],
+  "topMedian": 1.165,
+  "topMin": 0.623,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.615,
+   "rise": 1.1
+  }
+ },
+ "roadTile_290": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "290 road +X−Z h0.63",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.707,
+   "Asphalt": 0.293
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_291": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "291 road +X+Z−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.375,
+   "Asphalt": 0.625
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_292": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "292 road +X−X h0.60",
+  "size": [
+   3,
+   0.63,
+   3
+  ],
+  "topMedian": 0.601,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.5,
+   "Asphalt": 0.5
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_293": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "293 road +X−X h1.23",
+  "size": [
+   3,
+   1.26,
+   2.25
+  ],
+  "topMedian": 1.23,
+  "topMin": 1.23,
+  "topMax": 1.26,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_294": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "294 road +X+Z−Z h0.60",
+  "size": [
+   2.625,
+   0.63,
+   3
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.251,
+   "Asphalt": 0.749
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_295": {
+  "kind": "flat",
+  "category": "Roads: Straight",
+  "physics": "exact",
+  "label": "295 road +X−X h0.60",
+  "size": [
+   3,
+   0.63,
+   2.625
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.398,
+   "Asphalt": 0.602
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_296": {
+  "kind": "slope",
+  "category": "Slopes",
+  "physics": "exact",
+  "label": "296 Slope −X rise 1.1",
+  "size": [
+   3,
+   1.73,
+   2.25
+  ],
+  "topMedian": 1.165,
+  "topMin": 0.623,
+  "topMax": 1.707,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx"
+  ],
+  "materials": {
+   "Stone": 0.333,
+   "Asphalt": 0.667
+  },
+  "underpassFrac": 0,
+  "slope": {
+   "ax": -1,
+   "az": 0,
+   "base": 0.61,
+   "rise": 1.1
+  }
+ },
+ "roadTile_297": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "297 road +X−Z h0.60",
+  "size": [
+   2.625,
+   0.63,
+   2.625
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.375,
+   "Asphalt": 0.625
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_298": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "298 road +X−Z h2.25",
+  "size": [
+   2.625,
+   2.28,
+   2.625
+  ],
+  "topMedian": 2.25,
+  "topMin": 2.25,
+  "topMax": 2.28,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.375,
+   "Asphalt": 0.625
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_299": {
+  "kind": "flat",
+  "category": "Roads: Corner",
+  "physics": "exact",
+  "label": "299 road +X−Z h0.63",
+  "size": [
+   2.438,
+   0.63,
+   2.438
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.624,
+   "Asphalt": 0.376
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_300": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "300 road +X−X−Z h0.60",
+  "size": [
+   3,
+   0.63,
+   2.625
+  ],
+  "topMedian": 0.6,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "nx",
+   "nz"
+  ],
+  "materials": {
+   "Asphalt": 0.68,
+   "Stone": 0.32
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_301": {
+  "kind": "slope-diagonal",
+  "category": "Slopes: Curved & Corner",
+  "physics": "approx",
+  "label": "301 Slope diag",
+  "size": [
+   1.469,
+   0.63,
+   1.469
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "nx",
+   "pz"
+  ],
+  "materials": {
+   "Stone": 0.715,
+   "Asphalt": 0.285
+  },
+  "underpassFrac": 0
+ },
+ "roadTile_302": {
+  "kind": "flat",
+  "category": "Roads: Cross & T",
+  "physics": "exact",
+  "label": "302 road +X+Z−Z h0.63",
+  "size": [
+   2.438,
+   0.63,
+   3
+  ],
+  "topMedian": 0.63,
+  "topMin": 0.6,
+  "topMax": 0.63,
+  "minY": 0,
+  "edges": [
+   "px",
+   "pz",
+   "nz"
+  ],
+  "materials": {
+   "Stone": 0.575,
+   "Asphalt": 0.425
+  },
+  "underpassFrac": 0
+ }
+}
