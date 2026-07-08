@@ -130,6 +130,21 @@ export function normRot(rot: number | undefined): number {
   return ((Math.round(rot ?? 0) % 360) + 360) % 360;
 }
 
+// Assets whose footprint is 2 cells long (local Z ∈ [-1, 1]) instead of 1×1.
+// They can't be placed like a 1×1 tile: centred on a cell they straddle the
+// two neighbours' halves. Instead they sit at +0.5 along their long axis so
+// they occupy the clicked cell + the next one cleanly, and the heightfield
+// expands them into two half-height ramp cells (see fromMapJson). Shared by
+// the editor (placement/ghost), the loader (visual offset) and the sampler.
+export const TWO_CELL_ASSETS = new Set(["terrain_rampLarge", "terrain_rampLarge_detailed"]);
+
+// Unit long-axis (local +Z, the direction a ramp ascends) rotated by rot. For
+// the 4 grid rotations this is an axis-aligned ±1 step to the "next" cell.
+export function longAxis(rot: number): [number, number] {
+  const r = (normRot(rot) * Math.PI) / 180;
+  return [Math.round(Math.sin(r)), Math.round(Math.cos(r))];
+}
+
 export function heightCellFor(asset: string, yLevel: number, rot: number, levelHeight: number): HeightCell {
   const lh = levelHeight;
   if (asset.startsWith("terrain_ramp")) {
@@ -197,7 +212,20 @@ export class Heightfield {
     }
     for (const cell of data.cells ?? []) {
       const rot = normRot(cell.rot);
-      hf.setCell(cell.x, cell.z, heightCellFor(cell.asset, cell.y_level, rot, hf.levelHeight));
+      if (TWO_CELL_ASSETS.has(cell.asset)) {
+        // Expand a 2-cell ramp into two half-height ramp cells: the clicked
+        // cell (low half, base = y_level) and the next cell along the long
+        // axis (high half, base = y_level + half). Each rises half a level so
+        // the pair spans one full level_height across two tiles — a gentle
+        // slope, matching the mesh (its Y-span is one level over two cells).
+        const [dx, dz] = longAxis(rot);
+        const half = hf.levelHeight / 2;
+        const base = cell.y_level * hf.levelHeight;
+        hf.setCell(cell.x, cell.z, { base, rise: half, ax: dx, az: dz });
+        hf.setCell(cell.x + dx, cell.z + dz, { base: base + half, rise: half, ax: dx, az: dz });
+      } else {
+        hf.setCell(cell.x, cell.z, heightCellFor(cell.asset, cell.y_level, rot, hf.levelHeight));
+      }
     }
     return hf;
   }

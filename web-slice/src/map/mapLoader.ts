@@ -9,7 +9,7 @@
 // duplicating the ascent tables — see server/config/arena.ts).
 import * as THREE from "three";
 import type { AssetLibrary } from "./assetLoader";
-import { Heightfield, type CellDef, type MapJson, type PropDef } from "../shared/heightfield";
+import { Heightfield, TWO_CELL_ASSETS, longAxis, type CellDef, type MapJson, type PropDef } from "../shared/heightfield";
 import type { KartObstacle } from "../physics/kartCollision";
 
 export type { MapJson };
@@ -70,6 +70,14 @@ export class GameMap {
       def.z * this.tile + this.origin.z
     );
     inst.rotation.y = THREE.MathUtils.degToRad(rot);
+    // 2-cell ramps sit at +0.5 along their long axis so their 2-tile footprint
+    // lands on the clicked cell + the next one, instead of straddling the two
+    // neighbours' halves (see TWO_CELL_ASSETS). Matches the editor's placement.
+    if (TWO_CELL_ASSETS.has(def.asset)) {
+      const [dx, dz] = longAxis(rot);
+      inst.position.x += dx * 0.5 * this.tile;
+      inst.position.z += dz * 0.5 * this.tile;
+    }
     // Mirror = reflect across local X before the rotation (three.js applies
     // scale before rotation in its TRS matrix, so setting scale.x here gives
     // reflect-then-rotate). See CellDef.mirror — visual only. three.js flips

@@ -132,6 +132,29 @@ describe("terrain_sideCornerInner: two-gradient MAX shape, y_level = LOW corner"
   });
 });
 
+describe("2-cell ramps (terrain_rampLarge*) expand to two half-height ramp cells", () => {
+  it("rot=0 spans one full level over cells z and z+1 (low half then high half)", () => {
+    const hf = makeHeightfield([{ asset: "terrain_rampLarge", x: 0, z: 0, y_level: 0, rot: 0 }]);
+    // Low cell (z=0): rises 0 -> 0.25 across its own -Z..+Z span.
+    expect(hf.sample(0, -0.49)).toBeCloseTo(0.0, 2); // outer/low edge
+    expect(hf.sample(0, 0.0)).toBeCloseTo(0.125, 2); // mid of low cell
+    // Seam between the two cells is continuous at 0.25.
+    expect(hf.sample(0, 0.49)).toBeCloseTo(0.25, 2);
+    expect(hf.sample(0, 0.51)).toBeCloseTo(0.25, 2);
+    // High cell (z=1): rises 0.25 -> 0.5.
+    expect(hf.sample(0, 1.49)).toBeCloseTo(0.5, 2); // inner/high edge
+    // Off the 2-cell footprint entirely -> no cell (wall).
+    expect(hf.sample(0, 2.0)).toBeNull();
+  });
+
+  it("rot=90 extends along +X instead of +Z", () => {
+    const hf = makeHeightfield([{ asset: "terrain_rampLarge_detailed", x: 5, z: 3, y_level: 1, rot: 90 }]);
+    expect(hf.sample(5, 3)).toBeCloseTo(0.5 + 0.125, 2); // low cell mid (base y_level=1 -> 0.5)
+    expect(hf.sample(6, 3)).toBeCloseTo(0.5 + 0.375, 2); // high cell mid at x+1
+    expect(hf.sample(5, 4)).toBeNull(); // not along the long axis
+  });
+});
+
 describe("normRot / heightCellFor exports used directly by the diagnostic scan script", () => {
   it("normRot wraps to [0, 360)", () => {
     expect(normRot(-90)).toBe(270);

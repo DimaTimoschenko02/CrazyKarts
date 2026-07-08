@@ -14,6 +14,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { loadAssetLibrary } from "../map/assetLoader";
 import type { AssetLibrary } from "../map/assetLoader";
 import type { MapJson } from "../map/mapLoader";
+import { TWO_CELL_ASSETS, longAxis } from "../shared/heightfield";
 
 const MIN_GRID_SIZE = 16;
 const MAX_GRID_SIZE = 96;
@@ -335,6 +336,11 @@ function placeCell(rec: CellRecord): void {
   if (!template) return;
   const inst = template.clone(true);
   inst.position.set(rec.x - HALF, rec.y_level * LEVEL_HEIGHT, rec.z - HALF);
+  if (TWO_CELL_ASSETS.has(rec.asset)) {
+    const [dx, dz] = longAxis(rec.rot);
+    inst.position.x += dx * 0.5;
+    inst.position.z += dz * 0.5; // sit on 2 whole cells, not straddling — matches mapLoader
+  }
   inst.rotation.y = THREE.MathUtils.degToRad(rec.rot);
   if (rec.mirror) inst.scale.x = -1; // reflect-then-rotate, matches mapLoader
   scene.add(inst);
@@ -530,6 +536,11 @@ function refreshCursor(clientX: number, clientY: number): void {
       ghost.position.set(lastFloatX - HALF, yLevel * LEVEL_HEIGHT, lastFloatZ - HALF);
     } else {
       ghost.position.set(lastCellX - HALF, yLevel * LEVEL_HEIGHT, lastCellZ - HALF);
+      if (TWO_CELL_ASSETS.has(activeAsset)) {
+        const [dx, dz] = longAxis(rot);
+        ghost.position.x += dx * 0.5;
+        ghost.position.z += dz * 0.5; // preview the 2-cell footprint offset
+      }
     }
     ghost.rotation.y = THREE.MathUtils.degToRad(rot);
     ghost.scale.x = mirrorState ? -1 : 1; // preview the mirror before placing
