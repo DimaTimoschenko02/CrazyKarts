@@ -7,7 +7,7 @@
 // is decided here and only here; clients render what the server tells them.
 import { Client, Room } from "colyseus";
 import { MatchState, Player, WeaponBox } from "../schema/MatchState";
-import { ARENA_HEIGHTFIELD, BOX_POINTS, SPAWN_POINTS, groundHeightAt, type WorldPoint } from "../config/arena";
+import { loadArena, type Arena, type WorldPoint } from "../config/arena";
 import { faceCenterYaw, pickInitialSpawn, pickRespawnSpawn } from "../spawn/spawnSelect";
 import { WEAPON_TYPES } from "../../src/weapons/stats";
 import {
@@ -124,10 +124,23 @@ interface ActiveRocket {
 // server flushes it — a simulation/transport setting, not game logic.
 const PATCH_RATE_MS = 1000 / 30;
 
+interface RoomCreateOptions {
+  // Which map this room's arena is built from — see server/config/arena.ts
+  // loadArena() for name validation/fallback. Only the FIRST joinOrCreate()
+  // call that actually creates this room (see server/index.ts filterBy(
+  // ["code"]) — same `code` routes subsequent joiners into this same room
+  // instance) has its `map` honored: onJoin() below never reads
+  // options.map, so a later joiner passing a different map is silently
+  // ignored. This mirrors the lobby's own contract (src/lobby/main.ts) —
+  // whoever creates the invite link picks the arena everyone plays on.
+  map?: string;
+}
+
 export class MatchRoom extends Room<{ state: MatchState }> {
   maxClients = 8;
   patchRate = PATCH_RATE_MS;
 
+  private arena!: Arena;
   private rockets: ActiveRocket[] = [];
   private nextRocketId = 0;
   private spawnIndex = 0;
@@ -135,14 +148,15 @@ export class MatchRoom extends Room<{ state: MatchState }> {
   // mirrored to schema (no shield VFX in this pass, just damage immunity).
   private invulnerableUntil = new Map<string, number>();
 
-  onCreate(): void {
+  onCreate(options?: RoomCreateOptions): void {
+    this.arena = loadArena(options?.map);
     this.setState(new MatchState());
 
-    BOX_POINTS.forEach((p, i) => {
+    this.arena.boxPoints.forEach((p, i) => {
       const box = new WeaponBox();
       box.x = p.x;
       box.z = p.z;
-      box.y = groundHeightAt(p) + BOX_HOVER_HEIGHT_M;
+      box.y = this.arena.groundHeightAt(p) + BOX_HOVER_HEIGHT_M;
       box.active = true;
       this.state.boxes.set(String(i), box);
     });
@@ -176,9 +190,9 @@ export class MatchRoom extends Room<{ state: MatchState }> {
 
   onJoin(client: Client, options?: { nick?: string; kartType?: string }): void {
     const player = new Player();
-    const spawn = pickInitialSpawn(SPAWN_POINTS, this.spawnIndex++);
+    const spawn = pickInitialSpawn(this.arena.spawnPoints, this.spawnIndex++);
     player.x = spawn.x;
-    player.y = groundHeightAt(spawn);
+    player.y = this.arena.groundHeightAt(spawn);
     player.z = spawn.z;
     player.yaw = faceCenterYaw(spawn);
     player.nick = options?.nick?.slice(0, 24) || "guest";
@@ -228,9 +242,9 @@ export class MatchRoom extends Room<{ state: MatchState }> {
     this.invulnerableUntil.clear();
     this.spawnIndex = 0;
     for (const player of this.state.players.values()) {
-      const spawn = pickInitialSpawn(SPAWN_POINTS, this.spawnIndex++);
+      const spawn = pickInitialSpawn(this.arena.spawnPoints, this.spawnIndex++);
       player.x = spawn.x;
-      player.y = groundHeightAt(spawn);
+      player.y = this.arena.groundHeightAt(spawn);
       player.z = spawn.z;
       player.yaw = faceCenterYaw(spawn);
       player.hp = 100;
@@ -269,7 +283,7 @@ export class MatchRoom extends Room<{ state: MatchState }> {
       // Probed around the KART (player.x/z), NOT the muzzle: the muzzle sits
       // 1.2m ahead, past the edge of a 1m ramp tile — see the regression
       // note on computeLaunchPitchRad in rocketSim.ts.
-      const pitch = computeLaunchPitchRad(player.x, player.z, dir.dx, dir.dz, ARENA_HEIGHTFIELD);
+      const pitch = computeLaunchPitchRad(player.x, player.z, dir.dx, dir.dz, this.arena.heightfield);
       const dir3d = tiltDirection3D(dir.dx, dir.dz, pitch);
 
       const id = `r${this.nextRocketId++}`;
@@ -341,7 +355,7 @@ export class MatchRoom extends Room<{ state: MatchState }> {
       // frozen launch-time height) — this is what lets a rocket that flew
       // over a low point still explode when it reaches a hill further along
       // its (possibly tilted) straight line.
-      const blocked = isBlockedByTerrain(next, ARENA_HEIGHTFIELD);
+      const blocked = isBlockedByTerrain(next, this.arena.heightfield);
       const expired = rocket.age >= rocket.lifetime;
 
       if (hitId || blocked || expired) {
@@ -409,12 +423,12 @@ export class MatchRoom extends Room<{ state: MatchState }> {
     for (const [id, p] of this.state.players.entries()) {
       if (id !== sessionId && p.alive) enemies.push({ x: p.x, z: p.z });
     }
-    const spawn = pickRespawnSpawn(SPAWN_POINTS, enemies);
+    const spawn = pickRespawnSpawn(this.arena.spawnPoints, enemies);
     const yaw = faceCenterYaw(spawn);
 
     player.x = spawn.x;
     player.z = spawn.z;
-    player.y = groundHeightAt(spawn);
+    player.y = this.arena.groundHeightAt(spawn);
     player.yaw = yaw;
     player.hp = 100;
     player.alive = true;

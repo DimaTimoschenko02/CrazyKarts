@@ -35,6 +35,12 @@ export interface InitNetOptions {
   // callbacks above. Optional so net/ still works standalone (e.g. tests)
   // without a combat module attached.
   combat?: Pick<NetCallbacks, "onRocketSpawn" | "onRocketExplode" | "onKill" | "onRespawn" | "onMatchEnd" | "onMatchRestart">;
+  // Which map this client resolved from ?map= (src/main.ts) — forwarded to
+  // joinOrCreate() so a room's CREATOR picks the arena the server actually
+  // builds (see server/rooms/MatchRoom.ts onCreate()). Later joiners' value
+  // here is ignored server-side; optional purely so net/ keeps working
+  // standalone (e.g. tests) without a map resolved yet.
+  map?: string;
 }
 
 // Fire-and-forget: connects in the background, wires remote-kart rendering,
@@ -59,7 +65,7 @@ export function initNet(opts: InitNetOptions): NetHandle {
       onPlayerRemove: id => remotes.remove(id),
       onPlayerChange: (id, player) => remotes.onSnapshot(id, player),
       ...opts.combat,
-    }, roomCode)
+    }, roomCode, opts.map)
     .then(connected => {
       window.__net.connected = connected;
       if (connected) client.startSending(opts.getLocalState);

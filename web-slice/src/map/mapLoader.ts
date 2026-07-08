@@ -56,6 +56,37 @@ export class GameMap {
     return this.heightfield.sample(wx, wz);
   }
 
+  // Fallback spawn point for when the authored SPAWN constant (main.ts) lands
+  // off this particular map (e.g. a hand-built or server-loaded map that
+  // never got a cell at the default coordinates) — the kart would otherwise
+  // free-fall through the "off map = wall" null sample. Picks the walkable
+  // cell nearest the map's own bounding-box center (not nearest to the
+  // missed spawn point — a small/offset map may have no cells anywhere near
+  // (0, *, 6.5) at all), so the kart always lands somewhere inside the
+  // authored layout. Returns null only if the map has no walkable cells at
+  // all (e.g. a pure decoration/no-terrain map, which shouldn't happen but
+  // isn't this method's job to validate).
+  findFallbackSpawn(): { x: number; y: number; z: number } | null {
+    const coords = this.heightfield.listCellCoords();
+    if (coords.length === 0) return null;
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const c of coords) {
+      minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x);
+      minZ = Math.min(minZ, c.z); maxZ = Math.max(maxZ, c.z);
+    }
+    const centerX = (minX + maxX) / 2;
+    const centerZ = (minZ + maxZ) / 2;
+    let best = coords[0];
+    let bestDistSq = Infinity;
+    for (const c of coords) {
+      const distSq = (c.x - centerX) ** 2 + (c.z - centerZ) ** 2;
+      if (distSq < bestDistSq) { bestDistSq = distSq; best = c; }
+    }
+    const world = this.heightfield.gridToWorld(best.x, best.z);
+    const y = this.heightfield.sample(world.x, world.z) ?? 0;
+    return { x: world.x, y, z: world.z };
+  }
+
   private place(lib: AssetLibrary, def: CellDef): void {
     const template = lib.get(def.asset);
     if (!template) {

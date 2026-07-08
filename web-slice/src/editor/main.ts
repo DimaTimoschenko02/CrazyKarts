@@ -53,6 +53,8 @@ const PALETTE: PaletteCategory[] = [
   ] },
   { category: "Walls", isProp: false, items: [
     { asset: "wall_block", label: "Wall Block" },
+    { asset: "wall_block_round", label: "Wall Round" },
+    { asset: "wall_block_corner", label: "Wall Corner" },
   ] },
   { category: "Props", isProp: true, items: [
     { asset: "rock", label: "Rock" },
@@ -81,6 +83,7 @@ const gridSizeInput = document.getElementById("gridSizeInput") as HTMLInputEleme
 const selLoad = document.getElementById("selLoad") as HTMLSelectElement;
 const serverStatus = document.getElementById("serverStatus")!;
 const btnUndo = document.getElementById("btnUndo") as HTMLButtonElement;
+const btnCenterMap = document.getElementById("btnCenterMap") as HTMLButtonElement;
 
 // ── Scene ──────────────────────────────────────────────────────────────
 const scene = new THREE.Scene();
@@ -436,7 +439,13 @@ function removePropByRef(rec: PropRecord): boolean {
 const UNDO_LIMIT = 50;
 interface CellUndoEntry { kind: "cell"; key: string; before: CellRecord | null; after: CellRecord | null }
 interface PropUndoEntry { kind: "prop"; before: PropRecord | null; after: PropRecord | null }
-type UndoEntry = CellUndoEntry | PropUndoEntry;
+// Groups several cell/prop mutations into one undo/redo step — used by
+// "Center Map" (btnCenterMap below), which touches every placed cell and
+// prop in one user action. `entries` is recorded in the order the mutations
+// were applied; undo replays it back-to-front (so removals happen before the
+// re-adds they depended on), redo replays it forward.
+interface BatchUndoEntry { kind: "batch"; entries: UndoEntry[] }
+type UndoEntry = CellUndoEntry | PropUndoEntry | BatchUndoEntry;
 
 const undoStack: UndoEntry[] = [];
 const redoStack: UndoEntry[] = [];
@@ -453,6 +462,11 @@ function pushUndo(entry: UndoEntry): void {
 }
 
 function applyEntry(entry: UndoEntry, direction: "undo" | "redo"): void {
+  if (entry.kind === "batch") {
+    const ordered = direction === "undo" ? [...entry.entries].reverse() : entry.entries;
+    for (const sub of ordered) applyEntry(sub, direction);
+    return;
+  }
   if (entry.kind === "cell") {
     const target = direction === "undo" ? entry.before : entry.after;
     if (target) placeCell(target); else removeCell(entry.key);
@@ -514,6 +528,63 @@ function setGridSize(size: number): void {
   gridSizeInput.value = String(GRID_SIZE);
   rebuildAllPlacements();
   refreshCursor(lastClientX, lastClientY);
+}
+
+// Shifts EVERY placed cell and prop by the same integer (dx, dz) so the
+// content's own bounding-box center lands on the grid's center — handy after
+// building off to one side, or after Import brings in a map authored around
+// different coordinates. Recorded as a single batch undo entry (see
+// BatchUndoEntry) so one Ctrl+Z reverts the whole shift, not one tile at a
+// time. dx/dz are rounded to whole cells — props keep their PROP_STEP
+// sub-cell offset within the cell, since the shift itself is integer.
+function centerMap(): void {
+  if (cells.size === 0 && props.length === 0) return;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const rec of cells.values()) {
+    minX = Math.min(minX, rec.x); maxX = Math.max(maxX, rec.x);
+    minZ = Math.min(minZ, rec.z); maxZ = Math.max(maxZ, rec.z);
+  }
+  for (const p of props) {
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+  }
+  const dx = Math.round(HALF - (minX + maxX) / 2);
+  const dz = Math.round(HALF - (minZ + maxZ) / 2);
+  if (dx === 0 && dz === 0) return;
+
+  // Snapshot before mutating — cells/props arrays/maps change as we go.
+  const oldCells = Array.from(cells.values());
+  const oldProps = props.slice();
+  const batch: UndoEntry[] = [];
+
+  // Remove everything first (recording "after: null" entries), THEN place
+  // the shifted copies — doing remove+place per-record interleaved risks a
+  // shifted record's new key colliding with an old record that hasn't been
+  // processed yet (the shift is a uniform integer offset, so keys stay
+  // unique overall, but only once ALL old keys are cleared first).
+  for (const rec of oldCells) {
+    const oldKey = cellKey(rec.x, rec.z, rec.y_level);
+    removeCell(oldKey);
+    batch.push({ kind: "cell", key: oldKey, before: rec, after: null });
+  }
+  for (const rec of oldProps) {
+    removePropByRef(rec);
+    batch.push({ kind: "prop", before: rec, after: null });
+  }
+  for (const rec of oldCells) {
+    const moved: CellRecord = { ...rec, x: rec.x + dx, z: rec.z + dz };
+    placeCell(moved);
+    batch.push({ kind: "cell", key: cellKey(moved.x, moved.z, moved.y_level), before: null, after: moved });
+  }
+  for (const rec of oldProps) {
+    const moved: PropRecord = { ...rec, x: rec.x + dx, z: rec.z + dz };
+    addProp(moved);
+    batch.push({ kind: "prop", before: null, after: moved });
+  }
+
+  pushUndo({ kind: "batch", entries: batch });
+  refreshCursor(lastClientX, lastClientY);
+  scheduleAutosave();
 }
 
 function clearAll(): void {
@@ -587,6 +658,12 @@ function hintFor(asset: string | null): string {
   if (!asset) return "";
   if (asset === "wall_block") {
     return "стена — непроходимо. y_level = низ блока (растёт вверх). Ставь по краю плато / стакай по высоте";
+  }
+  if (asset === "wall_block_round") {
+    return "стена со скруглённым верхним краем — непроходимо. R крутит куда смотрит скруглённая сторона. y_level = низ блока";
+  }
+  if (asset === "wall_block_corner") {
+    return "угловая стена (два скруглённых верхних края + блендом в углу) — непроходимо. R крутит куда смотрит угол. y_level = низ блока";
   }
   // See .claude/rules/map-building.md — these two families use OPPOSITE
   // y_level conventions and mixing them up is the classic map-building bug.
@@ -722,6 +799,7 @@ addEventListener("blur", () => {
 
 btnUndo.addEventListener("click", () => undo());
 updateUndoButton();
+btnCenterMap.addEventListener("click", () => centerMap());
 
 // ── Export / Import / Clear / Drive ─────────────────────────────────────
 function buildMapJson(): MapJson {

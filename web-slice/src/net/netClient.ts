@@ -185,12 +185,21 @@ export class NetClient {
   // Resolves once connected+joined, or immediately (offline mode) if the
   // server can't be reached. Never rejects/throws past this point — a
   // network hiccup must never take down the local game.
-  async connect(nick: string, callbacks: NetCallbacks, code?: string): Promise<boolean> {
+  async connect(nick: string, callbacks: NetCallbacks, code?: string, map?: string): Promise<boolean> {
     try {
       const client = new Client(`http://${location.hostname}:${DEFAULT_PORT}`);
       // `code` partitions rooms server-side (filterBy in server/index.ts) —
-      // same code from the lobby invite link → same room.
-      const room = await client.joinOrCreate("match", { nick, kartType: "racer", ...(code ? { code } : {}) });
+      // same code from the lobby invite link → same room. `map` only matters
+      // for whoever's joinOrCreate() call actually CREATES the room (the
+      // first person to open the invite link) — server/rooms/MatchRoom.ts
+      // onCreate() reads options.map once and every later joiner's value is
+      // ignored, so it's harmless (if redundant) to keep sending it here.
+      const room = await client.joinOrCreate("match", {
+        nick,
+        kartType: "racer",
+        ...(code ? { code } : {}),
+        ...(map ? { map } : {}),
+      });
       this.room = room;
 
       const cb = Callbacks.get(room);

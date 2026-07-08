@@ -189,6 +189,19 @@ export class Kart {
     this.skids.clear();
   }
 
+  // Boot-time spawn-point fallback (main.ts): when the authored SPAWN
+  // constant lands off the loaded map's drivable footprint, main.ts finds a
+  // walkable cell near the map center (GameMap.findFallbackSpawn()) and
+  // re-anchors the kart there BEFORE the first physics tick. Unlike
+  // teleport() below (mid-game respawn, keeps the current vertical state),
+  // this replaces the spawn point itself and runs the FULL reset() so the
+  // new position's ground height seeds `vertical` correctly too.
+  respawnAt(pos: THREE.Vector3, yaw = this.state.yaw): void {
+    this.spawn.copy(pos);
+    this.reset();
+    this.state.yaw = yaw;
+  }
+
   // Server-driven respawn teleport (P3 combat slice, server/rooms/MatchRoom.ts
   // respawnPlayer() → "respawn" message). Deliberately separate from reset():
   // that one always returns to the fixed offline-mode spawn point, this one

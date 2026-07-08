@@ -153,9 +153,10 @@ export function longAxis(rot: number): [number, number] {
 // true, so this predicate (and any future branch) must never be confused
 // with the generic terrain_side family, which stays fully drivable.
 export function isWallOnlyAsset(asset: string): boolean {
-  // `wall_block` is the procedural straight vertical wall (map/assetLoader.ts) —
-  // same "no walkable height → null → solid" treatment as the cliff face.
-  return asset === "wall_block" || asset.startsWith("terrain_sideCliff");
+  // `wall_block`, `wall_block_round`, `wall_block_corner` are the procedural
+  // straight/filleted vertical walls (map/assetLoader.ts) — same "no walkable
+  // height → null → solid" treatment as the cliff face.
+  return asset.startsWith("wall_block") || asset.startsWith("terrain_sideCliff");
 }
 
 export function heightCellFor(asset: string, yLevel: number, rot: number, levelHeight: number): HeightCell {
@@ -257,6 +258,21 @@ export class Heightfield {
   // duplicating the tile/origin formula.
   gridToWorld(gx: number, gz: number): { x: number; z: number } {
     return { x: gx * this.tile + this.originX, z: gz * this.tile + this.originZ };
+  }
+
+  // Every walkable column's (integer) grid coordinates — wall-only columns
+  // (isWallOnlyAsset) never make it into `cells` (fromMapJson skips setCell
+  // for them), so this is exactly the drivable footprint. Used by the
+  // spawn-fallback search (main.ts) when the authored SPAWN point lands off
+  // the map (e.g. after a redesigned layout moves the spawn cell) — it needs
+  // to find *some* drivable cell without duplicating the "x,z" key parsing.
+  listCellCoords(): Array<{ x: number; z: number }> {
+    const out: Array<{ x: number; z: number }> = [];
+    for (const key of this.cells.keys()) {
+      const [x, z] = key.split(",").map(Number);
+      out.push({ x, z });
+    }
+    return out;
   }
 
   // Ground height at a world XZ point, or null when there is no cell there

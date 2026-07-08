@@ -11,14 +11,25 @@
 //       `/?room=<CODE>` (6 uppercase chars from ROOM_CODE_CHARSET).
 //     The game client is responsible for reading `?room=` and driving
 //     Colyseus connection/room join — not implemented here.
-//   - This lobby does NOT talk to any server (no /api/rooms calls) at MVP
-//     scope. "Create room" only generates a client-side code for a
-//     friends-style invite link; whether/how that code is registered with
-//     a real room server happens on the game-client side, out of scope
-//     for this page.
+//   - The room CREATOR also picks a map (dropdown on the "room ready"
+//     screen, populated from GET /__editor-maps — a dev-only Vite plugin,
+//     see vite.config.ts, that doesn't exist in a production build, hence
+//     the try/catch fallback to just [ACTIVE_MAP] below). That choice rides
+//     along as `&map=<name>` on both the invite link and this creator's own
+//     "Go" navigation. Whoever's joinOrCreate() call actually creates the
+//     Colyseus room (i.e. the first person to open a `/?room=CODE&map=...`
+//     link) is the one whose map wins — see server/rooms/MatchRoom.ts
+//     onCreate(). Joining by typing a bare code into "Join Room" (no link,
+//     no `map` param) always gets whatever the server's default is; this
+//     lobby has no way to know or influence the map in that path.
+//   - Beyond the GET above, this lobby does NOT talk to the match server —
+//     "Create room" only generates a client-side code for a friends-style
+//     invite link; whether/how that code is registered with a real room
+//     happens on the game-client side, out of scope for this page.
 // ---------------------------------------------------------------------
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from "./roomCode";
 import { validateNick } from "./nick";
+import { ACTIVE_MAP } from "../shared/activeMap";
 
 const NICK_STORAGE_KEY = "sk-nick";
 
@@ -101,6 +112,35 @@ function renderHome(nick: string): void {
   document.getElementById("join-error")!.textContent = "";
 }
 
+// GET /__editor-maps is a dev-only Vite middleware (vite.config.ts
+// editorMapsFilePlugin, `apply: "serve"`) that lists public/maps/*.json by
+// name. It does not exist in a production build (`vite preview`/nginx), so
+// this always has a working fallback: just the one map both sides already
+// default to (src/shared/activeMap.ts).
+async function fetchAvailableMaps(): Promise<string[]> {
+  try {
+    const res = await fetch("/__editor-maps");
+    if (!res.ok) return [ACTIVE_MAP];
+    const body = (await res.json()) as { maps?: unknown };
+    const maps = Array.isArray(body.maps) ? body.maps.filter((m): m is string => typeof m === "string") : [];
+    return maps.length > 0 ? maps : [ACTIVE_MAP];
+  } catch {
+    return [ACTIVE_MAP];
+  }
+}
+
+function populateMapSelect(maps: string[]): void {
+  const select = document.getElementById("map-select") as HTMLSelectElement;
+  select.innerHTML = "";
+  for (const name of maps) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    select.appendChild(opt);
+  }
+  select.value = maps.includes(ACTIVE_MAP) ? ACTIVE_MAP : maps[0];
+}
+
 function initHomeScreen(): void {
   const changeBtn = document.getElementById("btn-change-nick")!;
   const createBtn = document.getElementById("btn-create-room")!;
@@ -121,6 +161,9 @@ function initHomeScreen(): void {
     const code = generateRoomCode();
     renderRoomScreen(code, "created");
     showScreen("screen-room");
+    // Populate the map dropdown after the screen is already visible — no
+    // reason to make the creator wait on this fetch before seeing their code.
+    void fetchAvailableMaps().then(populateMapSelect);
   });
 
   const submitJoin = (): void => {
@@ -143,12 +186,16 @@ function initHomeScreen(): void {
 
 // --- Room hand-off --------------------------------------------------------
 
-function buildInviteLink(code: string): string {
-  return `${location.origin}/?room=${code}`;
+// `map` is only ever passed for the "created" flow (see renderRoomScreen) —
+// a bare joined-by-code room has no map selection UI, so it navigates
+// without the param and the game client/server both fall back to their own
+// default (see src/main.ts and server/config/arena.ts loadArena()).
+function buildInviteLink(code: string, map?: string): string {
+  return map ? `${location.origin}/?room=${code}&map=${map}` : `${location.origin}/?room=${code}`;
 }
 
-function buildGameUrl(code: string): string {
-  return `/?room=${code}`;
+function buildGameUrl(code: string, map?: string): string {
+  return map ? `/?room=${code}&map=${map}` : `/?room=${code}`;
 }
 
 /** Copies `text` to the clipboard, falling back to a hidden-textarea trick
@@ -187,6 +234,11 @@ function renderRoomScreen(code: string, mode: "created" | "joined"): void {
   document.getElementById("copy-feedback")!.textContent = "";
   const goBtn = document.getElementById("btn-go") as HTMLButtonElement;
   goBtn.dataset.roomCode = code;
+  // Map choice only makes sense for the room's creator — see the file-header
+  // hand-off contract for why a "joined by bare code" room has no way to
+  // pick one.
+  const mapRow = document.getElementById("map-select-row")!;
+  mapRow.style.display = mode === "created" ? "" : "none";
 }
 
 function initRoomScreen(): void {
@@ -194,17 +246,27 @@ function initRoomScreen(): void {
   const copyFeedback = document.getElementById("copy-feedback")!;
   const goBtn = document.getElementById("btn-go") as HTMLButtonElement;
   const backBtn = document.getElementById("btn-back-home")!;
+  const mapSelect = document.getElementById("map-select") as HTMLSelectElement;
+
+  // Reads the select fresh on each click (not captured once) so switching
+  // the dropdown after the room screen renders is honored — mirrors how
+  // the room code itself is already read live off the DOM below.
+  function selectedMap(): string | undefined {
+    const mapRow = document.getElementById("map-select-row")!;
+    if (mapRow.style.display === "none") return undefined; // "joined" flow — no map choice
+    return mapSelect.value || undefined;
+  }
 
   copyBtn.addEventListener("click", () => {
     const code = document.getElementById("room-code-display")!.textContent ?? "";
-    void copyToClipboard(buildInviteLink(code)).then((ok) => {
+    void copyToClipboard(buildInviteLink(code, selectedMap())).then((ok) => {
       copyFeedback.textContent = ok ? "Link copied!" : "Copy failed — select and copy manually";
     });
   });
 
   goBtn.addEventListener("click", () => {
     const code = goBtn.dataset.roomCode ?? document.getElementById("room-code-display")!.textContent ?? "";
-    location.href = buildGameUrl(code);
+    location.href = buildGameUrl(code, selectedMap());
   });
 
   backBtn.addEventListener("click", () => {

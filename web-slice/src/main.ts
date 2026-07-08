@@ -29,7 +29,7 @@ const MAP_ASSETS = [
   "terrain_roadEnd", "terrain_roadSplit",
   "terrain_side", "terrain_sideCorner", "terrain_sideCornerInner",
   "terrain_sideEnd", "terrain_sideCliff",
-  "wall_block",
+  "wall_block", "wall_block_round", "wall_block_corner",
   "rock", "rock_largeA", "rock_largeB", "rock_crystals",
   "rock_crystalsLargeA", "rock_crystalsLargeB", "rocks_smallA", "rocks_smallB",
 ] as const;
@@ -83,6 +83,25 @@ const hud = document.getElementById("hud")!;
 // and the fire button is a no-op.
 const combat = createCombat(scene, kart);
 
+// Which map this session plays on: `?map=editor` is the frozen-snapshot
+// preview path (unchanged below, see the asset-load IIFE), `?map=<name>`
+// is the lobby's Create-Room map picker (src/lobby/main.ts) riding along on
+// the invite link, and no param at all is the plain default. Resolved once,
+// up here, so the SAME name can be handed to both the map loader below and
+// initNet() (which forwards it into joinOrCreate — see server/rooms/
+// MatchRoom.ts onCreate() for how the server decides the room's actual map).
+const MAP_NAME_RE = /^[a-z0-9_-]+$/i;
+const rawMapParam = new URLSearchParams(location.search).get("map");
+const isEditorSnapshot = rawMapParam === "editor";
+let mapName = ACTIVE_MAP;
+if (rawMapParam && !isEditorSnapshot) {
+  if (MAP_NAME_RE.test(rawMapParam)) {
+    mapName = rawMapParam;
+  } else {
+    console.warn(`[boot] invalid ?map= value "${rawMapParam}" — falling back to "${ACTIVE_MAP}"`);
+  }
+}
+
 // Multiplayer skeleton: owner-authoritative, strictly optional (see net/).
 // Runs its own connect/send/interpolate lifecycle — nothing else in this
 // file ever touches net/ internals again after this call except to pass
@@ -92,6 +111,7 @@ const net = initNet({
   scene,
   getLocalState: () => ({ x: kart.position.x, y: kart.position.y, z: kart.position.z, yaw: kart.yaw }),
   combat: combat.netCallbacks,
+  map: mapName,
 });
 
 // Corner badge shown when driving a FROZEN editor snapshot (?map=editor) so a
@@ -120,12 +140,34 @@ let map: GameMap | null = null;
     const lib = await loadAssetLibrary(MAP_ASSETS);
     // Editor hand-off: /?map=editor + a map JSON stashed in localStorage by
     // the "Drive" button in the browser map editor (see src/editor/main.ts).
-    const driveJson = new URLSearchParams(location.search).get("map") === "editor"
-      ? localStorage.getItem("editor-drive-map")
-      : null;
-    map = driveJson ? GameMap.fromJson(JSON.parse(driveJson), lib) : await GameMap.load(`/maps/${ACTIVE_MAP}.json`, lib);
-    if (driveJson) showEditorSnapshotBadge(); // this is a FROZEN editor snapshot, not the live disk map — make that unmissable
+    const driveJson = isEditorSnapshot ? localStorage.getItem("editor-drive-map") : null;
+    if (driveJson) {
+      map = GameMap.fromJson(JSON.parse(driveJson), lib);
+      showEditorSnapshotBadge(); // this is a FROZEN editor snapshot, not the live disk map — make that unmissable
+    } else {
+      try {
+        map = await GameMap.load(`/maps/${mapName}.json`, lib);
+      } catch (e) {
+        console.warn(`[boot] failed to load map "${mapName}", falling back to "${ACTIVE_MAP}"`, e);
+        map = await GameMap.load(`/maps/${ACTIVE_MAP}.json`, lib);
+      }
+    }
     scene.add(map.root);
+    // The authored SPAWN constant only matches the shipped ACTIVE_MAP layout
+    // — a different map (server-picked ?map=, editor Drive snapshot) may
+    // have no cell there at all, which reads to the mover as an off-map
+    // wall (see kart.ts step 8) and drops the kart into the void. Detect
+    // that BEFORE the first physics tick and re-anchor to a walkable cell
+    // near the map's own center instead (GameMap.findFallbackSpawn()).
+    if (map.sampleHeight(SPAWN.x, SPAWN.z) === null) {
+      const fallback = map.findFallbackSpawn();
+      if (fallback) {
+        console.warn(`[boot] SPAWN (${SPAWN.x}, ${SPAWN.z}) is off "${mapName}" — falling back to (${fallback.x}, ${fallback.z})`);
+        kart.respawnAt(new THREE.Vector3(fallback.x, fallback.y, fallback.z));
+      } else {
+        console.warn(`[boot] "${mapName}" has no walkable cells at all — driving on the fallback plane`);
+      }
+    }
     telemetry.setMapHandles(map, scene);
     net.setMap(map); // remote-kart body tilt (src/net/remoteKarts.ts) needs the heightfield too
     await kart.loadModel(stats.model, stats.modelLength);

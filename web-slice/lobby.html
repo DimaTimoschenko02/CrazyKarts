@@ -206,6 +206,25 @@
     padding: 14px 10px;
   }
 
+  .map-select-row {
+    display: flex; flex-direction: column; gap: 6px; text-align: left;
+  }
+  .map-select-row label {
+    color: var(--text-dim); font-size: 12px; letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .map-select-row select {
+    background: var(--bg-input);
+    border: 1px solid var(--border-normal);
+    border-radius: var(--radius-input);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 16px;
+    padding: 10px 12px;
+    outline: none;
+  }
+  .map-select-row select:focus { border-color: var(--border-focus); }
+
   .copy-feedback {
     min-height: 18px;
     color: var(--status-ok);
@@ -251,6 +270,10 @@
     <div class="panel">
       <h2 id="room-title">Room Ready</h2>
       <div class="room-code-display" id="room-code-display">------</div>
+      <div class="map-select-row" id="map-select-row">
+        <label for="map-select">Map</label>
+        <select id="map-select"></select>
+      </div>
       <button id="btn-copy-link" class="btn btn-secondary">Copy Invite Link</button>
       <div class="copy-feedback" id="copy-feedback"></div>
       <button id="btn-go" class="btn">Go</button>

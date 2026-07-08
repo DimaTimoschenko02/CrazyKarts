@@ -21,6 +21,8 @@ describe("isWallOnlyAsset prefix trap (terrain_sideCliff vs. the generic terrain
     // which is required to stay drivable (ramps/roads).
     expect(isWallOnlyAsset("terrain_sideCliff")).toBe(true);
     expect(isWallOnlyAsset("wall_block")).toBe(true);
+    expect(isWallOnlyAsset("wall_block_round")).toBe(true);
+    expect(isWallOnlyAsset("wall_block_corner")).toBe(true);
     expect(isWallOnlyAsset("terrain_side")).toBe(false);
     expect(isWallOnlyAsset("terrain_sideCorner")).toBe(false);
     expect(isWallOnlyAsset("terrain_sideCornerInner")).toBe(false);
@@ -67,6 +69,15 @@ describe("terrain_sideCliff: visual-only, contributes no walkable height", () =>
     const hf = makeHeightfield([{ asset: "wall_block", x: 2, z: 3, y_level: 1, rot: 0 }]);
     expect(hf.sample(2, 3)).toBeNull();
     expect(hf.sample(2.3, 3)).toBeNull();
+  });
+
+  it("wall_block_round and wall_block_corner are solid walls too (same procedural-wall family)", () => {
+    const hf = makeHeightfield([
+      { asset: "wall_block_round", x: 0, z: 0, y_level: 0, rot: 90 },
+      { asset: "wall_block_corner", x: 1, z: 0, y_level: 0, rot: 0 },
+    ]);
+    expect(hf.sample(0, 0)).toBeNull();
+    expect(hf.sample(1, 0)).toBeNull();
   });
 });
 
@@ -182,5 +193,18 @@ describe("normRot / heightCellFor exports used directly by the diagnostic scan s
   it("normRot wraps to [0, 360)", () => {
     expect(normRot(-90)).toBe(270);
     expect(normRot(450)).toBe(90);
+  });
+});
+
+describe("Heightfield.listCellCoords — drivable-footprint enumeration used by the spawn fallback", () => {
+  it("lists only walkable columns, excluding wall-only cells", () => {
+    const hf = makeHeightfield([
+      { asset: "terrain", x: 0, z: 0, y_level: 0, rot: 0 },
+      { asset: "terrain", x: 1, z: 0, y_level: 0, rot: 0 },
+      { asset: "wall_block", x: 2, z: 0, y_level: 0, rot: 0 },
+    ]);
+    const coords = hf.listCellCoords();
+    expect(coords).toHaveLength(2);
+    expect(coords).toEqual(expect.arrayContaining([{ x: 0, z: 0 }, { x: 1, z: 0 }]));
   });
 });
