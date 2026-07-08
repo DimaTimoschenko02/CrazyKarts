@@ -3,16 +3,15 @@
 // cases the SAT static-polygon path (shared/staticColliders.ts) does NOT
 // cover, because they aren't discrete authored shapes:
 //   1. Genuine off-map edges (heightfield.hasColumn===false — nothing
-//      authored there at all, not even a wall_block).
-//   2. A rise between two REAL terrain cells steeper than a kart can climb
-//      (rare after collision-v2: every Edges-family asset is now a smooth
-//      drivable ramp, but kept as a safety net for stacked/malformed columns).
-//
-// wall_block* cells are DELIBERATELY EXCLUDED here (see the hasColumn guard
-// below) — those are fully owned by the SAT poly system now. Reacting to
-// them here too would reproduce the exact P1 bug this rework fixes: a
-// footprint-radius-wide "you can't get within half a meter of the wall"
-// block instead of the SAT system's flush skin margin.
+//      authored there at all).
+//   2. A rise between two terrain cells steeper than a kart can climb
+//      (> MAX_STEP). Since the 2026-07-08 wall_block rework this is the
+//      PRIMARY wall mechanism, not a rare safety net: wall_block*/
+//      ground_block cube sides present exactly this full-level 0.5 step, so
+//      this path owns block-side collision (the blocks' old SAT AABBs are
+//      gone — a 2D poly would shove a kart standing ON a block off it).
+//      The blocked corner stops at the cell boundary = the cube's visible
+//      face, so this is contour-exact per the owner's collision rule.
 //
 // Design: reuses shared/collision2d.ts's slideVelocity (I2 — same v·n<0 gate
 // as the static-poly resolver) so every contact type in this rework — walls,
@@ -56,19 +55,20 @@ export function footprintPoints(x: number, z: number, fwd: Vec2, right: Vec2, ha
 
 export interface TerrainSampler {
   sample(x: number, z: number): number | null;
-  // See heightfield.ts Heightfield.hasColumn doc — true for BOTH walkable
-  // and wall_block columns, false only for a genuinely unauthored spot.
+  // See heightfield.ts Heightfield.hasColumn doc — false only for a
+  // genuinely unauthored spot (every authored column is walkable now).
   hasColumn(x: number, z: number): boolean;
 }
 
 // One footprint corner's before/after check — returns true if this corner's
-// move should be treated as hitting a genuine terrain edge (NOT a wall_block
-// hole, see the module doc comment).
+// move should be treated as hitting a terrain edge (off-map or a step
+// steeper than the kart can climb — cube sides included, see module doc).
 function cornerBlocked(sampler: TerrainSampler, cur: Vec2, next: Vec2, maxStep: number): boolean {
   const hNext = sampler.sample(next.x, next.z);
   if (hNext === null) {
-    // Off-map at the destination — a wall_block hole is NOT a terrain edge
-    // (SAT owns it); anything else genuinely has no ground there.
+    // Off-map at the destination. hasColumn is redundant with sample===null
+    // since the wall_block rework, kept as a cheap belt-and-braces guard in
+    // case a null-sampling-but-authored column kind ever returns.
     return !sampler.hasColumn(next.x, next.z);
   }
   const hCur = sampler.sample(cur.x, cur.z);

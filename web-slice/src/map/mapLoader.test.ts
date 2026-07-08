@@ -172,7 +172,7 @@ describe("GameMap static colliders — end-to-end wiring to shared/staticCollide
     expect(map.getStaticColliders()).toEqual([]);
   });
 
-  it("wall_block cells get a 1x1 AABB collider even with no dedicated wall_block template needed for shape math", () => {
+  it("wall_block cells get NO static collider — drivable cubes since 2026-07-08, sides owned by the MAX_STEP path", () => {
     const map = GameMap.fromJson(
       {
         meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
@@ -180,12 +180,12 @@ describe("GameMap static colliders — end-to-end wiring to shared/staticCollide
       },
       new Map<string, THREE.Group>([["wall_block", new THREE.Group()], ["terrain", new THREE.Group()]])
     );
-    const colliders = map.getStaticColliders();
-    expect(colliders).toHaveLength(1);
-    expect(colliders[0].verts).toHaveLength(4);
+    expect(map.getStaticColliders()).toHaveLength(0);
+    // ...and the cube TOP is walkable ground instead.
+    expect(map.sampleHeight(2, 0)).toBeCloseTo(0.5);
   });
 
-  it("hasColumn distinguishes a wall_block cell (true) from a genuine off-map spot (false)", () => {
+  it("hasColumn distinguishes a wall_block cell (true, walkable top) from a genuine off-map spot (false)", () => {
     const map = GameMap.fromJson(
       {
         meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
@@ -194,7 +194,7 @@ describe("GameMap static colliders — end-to-end wiring to shared/staticCollide
       new Map<string, THREE.Group>([["wall_block", new THREE.Group()]])
     );
     expect(map.hasColumn(2, 0)).toBe(true);
-    expect(map.sampleHeight(2, 0)).toBeNull();
+    expect(map.sampleHeight(2, 0)).toBeCloseTo(0.5);
     expect(map.hasColumn(50, 50)).toBe(false);
   });
 });

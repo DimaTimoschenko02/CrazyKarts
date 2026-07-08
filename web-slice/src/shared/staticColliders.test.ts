@@ -1,6 +1,8 @@
-// Pins buildStaticColliders' placement math (wall_block AABB grid alignment,
-// prop OBB/hull transform, size gates) — see design/notes/collision-v2.md §2
-// and the map-building.md grid conventions this must mirror exactly.
+// Pins buildStaticColliders' placement math (prop OBB/hull transform, size
+// gates) — see design/notes/collision-v2.md §2 and the map-building.md grid
+// conventions this must mirror exactly. wall_block* cells contribute NO
+// colliders since the 2026-07-08 rework (drivable cubes, owned by the
+// heightfield MAX_STEP path — see the module doc in staticColliders.ts).
 import { describe, expect, it } from "vitest";
 import { buildStaticColliders, type CollisionShapesTable } from "./staticColliders";
 import { pointInPoly } from "./collision2d";
@@ -10,48 +12,25 @@ function baseMeta(originOffset: [number, number, number] = [0, 0, 0]): MapJson["
   return { tile_size: 1, level_height: 0.5, origin_offset: originOffset };
 }
 
-describe("buildStaticColliders — wall_block cells", () => {
-  it("places a 1x1 AABB centered at the cell's world position", () => {
-    const map: MapJson = { meta: baseMeta(), cells: [{ asset: "wall_block", x: 3, z: -2, y_level: 0 }] };
-    const colliders = buildStaticColliders(map, {});
-    expect(colliders).toHaveLength(1);
-    const [a, b, c, d] = colliders[0].verts;
-    expect(a).toEqual({ x: 2.5, z: -2.5 });
-    expect(b).toEqual({ x: 3.5, z: -2.5 });
-    expect(c).toEqual({ x: 3.5, z: -1.5 });
-    expect(d).toEqual({ x: 2.5, z: -1.5 });
-  });
-
-  it("wall_block_round / wall_block_corner both get the SAME 1x1 AABB (fillets are top-edge-only, invisible in XZ)", () => {
+describe("buildStaticColliders — cells contribute no colliders (heightfield owns cell collision)", () => {
+  it("wall_block* cells contribute NO collider — drivable cubes, sides owned by the MAX_STEP path", () => {
+    // Regression pin for the 2026-07-08 rework: a 2D XZ AABB here would
+    // shove a kart standing ON TOP of the block off it.
     const map: MapJson = {
       meta: baseMeta(),
       cells: [
+        { asset: "wall_block", x: 3, z: -2, y_level: 0 },
         { asset: "wall_block_round", x: 0, z: 0, y_level: 0 },
         { asset: "wall_block_corner", x: 1, z: 0, y_level: 0 },
       ],
+      rect_fills: [{ asset: "wall_block", x_min: 5, x_max: 6, z_min: 0, z_max: 0, y_level: 0 }],
     };
-    const colliders = buildStaticColliders(map, {});
-    expect(colliders).toHaveLength(2);
-    expect(colliders[0].verts[0]).toEqual({ x: -0.5, z: -0.5 });
-  });
-
-  it("expands wall_block rect_fills to one AABB per covered cell", () => {
-    const map: MapJson = {
-      meta: baseMeta(),
-      rect_fills: [{ asset: "wall_block", x_min: 0, x_max: 1, z_min: 0, z_max: 0, y_level: 0 }],
-    };
-    expect(buildStaticColliders(map, {})).toHaveLength(2);
-  });
-
-  it("non-wall terrain cells contribute NO collider (handled by the heightfield/terrain-slide path instead)", () => {
-    const map: MapJson = { meta: baseMeta(), cells: [{ asset: "terrain", x: 0, z: 0, y_level: 0 }] };
     expect(buildStaticColliders(map, {})).toHaveLength(0);
   });
 
-  it("respects origin_offset when placing a wall cell", () => {
-    const map: MapJson = { meta: baseMeta([-2.5, 0, -2.5]), cells: [{ asset: "wall_block", x: 0, z: 0, y_level: 0 }] };
-    const collider = buildStaticColliders(map, {})[0];
-    expect(collider.verts[0]).toEqual({ x: -3, z: -3 });
+  it("terrain cells contribute NO collider (handled by the heightfield/terrain-slide path instead)", () => {
+    const map: MapJson = { meta: baseMeta(), cells: [{ asset: "terrain", x: 0, z: 0, y_level: 0 }] };
+    expect(buildStaticColliders(map, {})).toHaveLength(0);
   });
 });
 

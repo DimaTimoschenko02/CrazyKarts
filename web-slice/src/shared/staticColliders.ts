@@ -1,8 +1,16 @@
-// Builds the full set of static XZ collision polygons for a map — wall_block*
-// cells (AABB) + props (OBB for structural, convex hull for natural decor) —
-// from a MapJson + the baked shape table (collisionShapes.json). Pure, no
-// THREE — shared by the browser bundle (src/map/mapLoader.ts wraps this for
-// rendering) and the Colyseus match server (design/notes/collision-v2.md §6).
+// Builds the full set of static XZ collision polygons for a map — props only
+// (OBB for structural, convex hull for natural decor) — from a MapJson + the
+// baked shape table (collisionShapes.json). Pure, no THREE — shared by the
+// browser bundle (src/map/mapLoader.ts wraps this for rendering) and the
+// Colyseus match server (design/notes/collision-v2.md §6).
+//
+// wall_block* cells used to contribute 1x1 AABBs here (collision-v2.md §2.2)
+// but no longer do (owner decision 2026-07-08): the blocks are now walkable
+// on top (see shared/heightfield.ts heightCellFor's cube branch), and a 2D
+// XZ polygon can't express "solid below the top, open above" — it would
+// shove a kart standing ON the block off it. Block sides are owned by the
+// heightfield MAX_STEP path (src/physics/terrainWall.ts) instead, which is
+// contour-exact at the cell boundary.
 //
 // This module is also the SINGLE SOURCE for "which prop asset gets a
 // collider at all" (STRUCTURAL_PROP_ASSETS / NATURAL_DECOR_ASSETS / the size
@@ -10,8 +18,8 @@
 // circle-collision code (see git history), now centralized here so the
 // client's visual placement code and this shape-collision code can never
 // drift on WHICH props are solid, only on how they render.
-import { ConvexPoly, makeAabb, transformLocalPoly } from "./collision2d";
-import { isWallOnlyAsset, normRot, type MapJson } from "./heightfield";
+import { ConvexPoly, transformLocalPoly } from "./collision2d";
+import { normRot, type MapJson } from "./heightfield";
 
 // Skin margin for static-vs-kart contact resolution (design doc §2.1/§3.2,
 // owner decision: "коллизии точно по контурам, ездить на грани" — skin is a
@@ -86,15 +94,6 @@ function degToRad(deg: number): number {
   return (deg * Math.PI) / 180;
 }
 
-// Adds one wall_block* cell's 1x1 AABB — see collision-v2.md §2.2 ("никакого
-// чтения меша", the fillet families round only the top edges, invisible in
-// XZ). `tile` half-extent is tile_size/2 both axes (square grid cells).
-function addWallCell(out: ConvexPoly[], x: number, z: number, tile: number, originX: number, originZ: number): void {
-  const cx = x * tile + originX;
-  const cz = z * tile + originZ;
-  out.push(makeAabb(cx, cz, tile / 2, tile / 2));
-}
-
 function propDiameter(shape: ShapeEntry): number {
   if (shape.type === "obb") return Math.max(shape.halfX, shape.halfZ) * 2;
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -145,26 +144,15 @@ function buildPropCollider(
   return transformLocalPoly(localVerts, rotRad, x, z);
 }
 
-// Builds every static collider for a map: wall_block* cells (from both
-// rect_fills and cells, mirroring shared/heightfield.ts's own two loops) +
-// qualifying props. Mirrors mapLoader.ts's placement math (world_pos = grid *
-// tile_size + origin_offset — see .claude/rules/map-building.md) exactly so
-// a collider always lines up with where the asset is actually rendered.
+// Builds every static collider for a map: qualifying props only (see the
+// module doc for why wall_block* cells no longer appear here). Mirrors
+// mapLoader.ts's placement math (world_pos = grid * tile_size +
+// origin_offset — see .claude/rules/map-building.md) exactly so a collider
+// always lines up with where the asset is actually rendered.
 export function buildStaticColliders(map: MapJson, shapes: CollisionShapesTable): ConvexPoly[] {
   const tile = map.meta.tile_size;
   const [originX, , originZ] = map.meta.origin_offset;
   const out: ConvexPoly[] = [];
-
-  for (const rect of map.rect_fills ?? []) {
-    if (!isWallOnlyAsset(rect.asset)) continue;
-    for (let x = rect.x_min; x <= rect.x_max; x++) {
-      for (let z = rect.z_min; z <= rect.z_max; z++) addWallCell(out, x, z, tile, originX, originZ);
-    }
-  }
-  for (const cell of map.cells ?? []) {
-    if (!isWallOnlyAsset(cell.asset)) continue;
-    addWallCell(out, cell.x, cell.z, tile, originX, originZ);
-  }
 
   for (const prop of map.props ?? []) {
     const worldX = prop.x * tile + originX;

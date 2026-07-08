@@ -39,14 +39,12 @@ export type AssetLibrary = ReadonlyMap<string, THREE.Group>;
 // Procedural (non-GLB) assets built in code rather than loaded from a file.
 // The Kenney terrain kit has NO straight vertical wall piece (only slanted
 // side/cliff faces), so the wall_block family are boxes the map author drops
-// to get straight, grid-aligned solid walls/fences. Their collision comes
-// from the same heightfield "wall cell" path as terrain_sideCliff (see
-// isWallOnlyAsset in shared/heightfield.ts — a wall_block* cell contributes
-// no height → sample() returns null → kart.ts step 8 treats it as solid).
-// ground_block reuses the exact wall_block cube VISUAL but is drivable: its
-// top face contributes walkable height (heightCellFor "ground_block" branch)
-// instead of the wall-only null. Owner request: building mountains out of
-// stacked cubes — wall_block looked identical but bounced the kart off.
+// to get straight, grid-aligned walls/fences. Since the 2026-07-08 owner
+// decision ALL four cubes share the same physics (heightCellFor's cube
+// branch in shared/heightfield.ts): the top face is walkable, the sides
+// block because a full-level 0.5 step exceeds MAX_STEP. wall_block* and
+// ground_block now differ only visually (top-edge fillets); ground_block is
+// kept as a plain-cube alias so existing maps keep loading.
 const PROCEDURAL_ASSETS = new Set<string>(["wall_block", "wall_block_round", "wall_block_corner", "ground_block"]);
 
 // A wall block is 1×1 in plan (exactly one grid cell). LEVEL_HEIGHT is 0.5m

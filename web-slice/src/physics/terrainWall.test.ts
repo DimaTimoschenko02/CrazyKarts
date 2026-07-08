@@ -76,23 +76,48 @@ describe("resolveTerrainSlide — genuine off-map edges", () => {
   });
 });
 
-describe("resolveTerrainSlide — wall_block holes are IGNORED here (owned by the SAT poly path)", () => {
-  it("a wall_block cell's null sample does NOT trigger terrain-slide (hasColumn=true there)", () => {
+describe("resolveTerrainSlide — wall_block cube sides ARE terrain steps now (2026-07-08 rework)", () => {
+  it("driving into a wall_block's side is blocked: its top sits a full 0.5 level above the ground (> MAX_STEP)", () => {
     const hf = Heightfield.fromMapJson({
       meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
       cells: [
+        // terrain at x=-1 keeps the kart's REAR corners on the map — without
+        // it they'd read as off-map edges too, and the leading/rear push
+        // directions would cancel to a degenerate zero normal.
+        { asset: "terrain", x: -1, z: 0, y_level: 0 },
         { asset: "terrain", x: 0, z: 0, y_level: 0 },
         { asset: "wall_block", x: 1, z: 0, y_level: 0 },
       ],
     });
     const sampler = samplerFromHf(hf);
     const dt = 1 / 120;
-    // Driving toward the wall_block cell — terrain-slide must let this
-    // through uncorrected (the SAT static-poly path is responsible for
-    // actually stopping the kart at the wall's real face, tested separately
-    // in kart.test.ts / staticColliders.test.ts).
+    // Driving from the flat terrain (h=0) toward the block cell (top h=0.5,
+    // cell spans x∈[0.5, 1.5]): position the kart so its leading corner
+    // (pos.x + halfLength = 0.45) sits just BEFORE the boundary and moves
+    // across it this substep — the corner's height jump 0.5 > MAX_STEP 0.3,
+    // so the inward velocity component must be killed (the block's old SAT
+    // AABB is gone; this path is now THE wall mechanism for cube sides).
+    const vel = { x: 12, z: 0 };
+    const out = resolveTerrainSlide(sampler, { x: -0.15, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, MAX_STEP);
+    expect(out.vel.x).toBeLessThanOrEqual(0.01);
+  });
+
+  it("a kart already ON TOP of a block strip drives along it freely (top is flat walkable ground)", () => {
+    const hf = Heightfield.fromMapJson({
+      meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
+      cells: [
+        { asset: "wall_block", x: 0, z: 0, y_level: 0 },
+        { asset: "wall_block", x: 1, z: 0, y_level: 0 },
+        { asset: "wall_block", x: 2, z: 0, y_level: 0 },
+      ],
+    });
+    const sampler = samplerFromHf(hf);
+    const dt = 1 / 120;
+    // Small footprint so it fits within the 1-cell-wide strip (same trick as
+    // the ramp test below). Moving along the strip: every sample is the same
+    // flat 0.5 top — no step, no off-map, velocity untouched.
     const vel = { x: 3, z: 0 };
-    const out = resolveTerrainSlide(sampler, { x: 0.3, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, MAX_STEP);
+    const out = resolveTerrainSlide(sampler, { x: 0.5, z: 0 }, vel, dt, FWD, RIGHT, 0.3, 0.2, MAX_STEP);
     expect(out.vel.x).toBeCloseTo(3, 6);
   });
 });

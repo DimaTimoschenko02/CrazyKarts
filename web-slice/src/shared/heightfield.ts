@@ -102,9 +102,9 @@ const SIDE_ASCENT: Record<number, [number, number]> = {
   0: [0, 1], 90: [1, 0], 180: [0, -1], 270: [-1, 0],
 };
 // sideCliff ("крутой обрыв" — steep dropoff) is a DRIVABLE steep slope
-// (game-designer decision, 2026-07: walls are now exclusively the
-// wall_block* family, see isWallOnlyAsset below — sideCliff was briefly
-// wall-only, reverted). Axial ascent basis identical to terrain_side (low/
+// (game-designer decision, 2026-07 — sideCliff was briefly wall-only,
+// reverted; the wall_block* family later stopped being walls too, see the
+// note above heightCellFor). Axial ascent basis identical to terrain_side (low/
 // high edges are straight lines, not a diagonal corner — verified by vertex
 // read, docs/space-kit-terrain-catalog.md "terrain_sideCliff"), but the
 // mesh's Y-span sits ABOVE the pivot like a ramp, so y_level means the LOW
@@ -208,17 +208,14 @@ export function longAxis(rot: number): [number, number] {
   return [Math.round(Math.sin(r)), Math.round(Math.cos(r))];
 }
 
-// Assets that contribute NO walkable height to the heightfield — sample() on
-// a lone column of one of these returns null, the same "off-map" wall
-// sentinel kart.ts step 8 and rocketSim.isBlockedByTerrain already treat as
-// solid. `wall_block`, `wall_block_round`, `wall_block_corner` are the
-// procedural straight/filleted vertical walls (map/assetLoader.ts) — the
-// ONLY wall-only family (game-designer decision, 2026-07): every Edges-family
-// terrain asset (terrain_side/sideCliff/sideCorner/sideCornerInner/sideEnd)
-// stays a smooth drivable slope, sideCliff included.
-export function isWallOnlyAsset(asset: string): boolean {
-  return asset.startsWith("wall_block");
-}
+// NOTE (owner decision 2026-07-08): the "wall-only asset" concept is GONE.
+// wall_block* used to be infinite walls (no walkable height, SAT-owned
+// collision) — but a 1x0.5 cube you can never stand on contradicted the
+// owner's mental model ("через него нельзя проехать, но сверху можно").
+// wall_block* now shares ground_block's physics exactly: the cube TOP is a
+// walkable surface, the sides block naturally because a full-level 0.5 step
+// exceeds the kart's MAX_STEP. Rockets fly over a block when above its top
+// (rocketSim.isBlockedByTerrain compares heights) — also physically right.
 
 export function heightCellFor(
   asset: string,
@@ -277,14 +274,16 @@ export function heightCellFor(
     const [ax, az] = SIDE_ASCENT[rot] ?? [0, 0]; // mirror: no-op, ax0=0 — see CellDef.mirror doc
     return { base: yLevel * lh - lh, rise: lh, ax, az }; // y_level = HIGH edge
   }
-  if (asset === "ground_block") {
-    // Drivable cube (map/assetLoader.ts — same visual as wall_block, opposite
-    // physics): the walkable surface is the cube's TOP face, one level above
-    // the pivot (the cube spans [y_level, y_level+1] * level_height). Stacked
-    // ground_blocks each add a flat layer; sample()'s per-point MAX picks the
-    // top of the stack. Sides block naturally: a full-level 0.5 step exceeds
-    // MAX_STEP, so terrainWall treats the cube face as a wall — drive onto it
-    // via a ramp/slope, exactly like a plateau edge.
+  if (asset === "ground_block" || asset.startsWith("wall_block")) {
+    // Drivable cube (map/assetLoader.ts): the walkable surface is the cube's
+    // TOP face, one level above the pivot (the cube spans
+    // [y_level, y_level+1] * level_height). Stacked cubes each add a flat
+    // layer; sample()'s per-point MAX picks the top of the stack. Sides block
+    // naturally: a full-level 0.5 step exceeds MAX_STEP, so terrainWall
+    // treats the cube face as a wall — drive onto it via a ramp/slope,
+    // exactly like a plateau edge. wall_block* shares this branch since the
+    // 2026-07-08 owner decision (see the note above heightCellFor) — the two
+    // families differ only in top-edge fillets, which are purely visual.
     return { base: (yLevel + 1) * lh, rise: 0, ax: 0, az: 0 };
   }
   return { base: yLevel * lh, rise: 0, ax: 0, az: 0 }; // flat terrain / roads
@@ -303,14 +302,6 @@ export class Heightfield {
   // slope beneath it even where the slope's own peak (its far edge) ties the
   // cap's height.
   private readonly cells = new Map<string, HeightCell[]>();
-  // Grid coords of wall_block* cells (isWallOnlyAsset) — tracked SEPARATELY
-  // from `cells` (see design/notes/collision-v2.md §3.3): a wall_block column
-  // and a genuine off-map/unauthored column both sample() as null, but only
-  // the latter is a real "terrain edge" the dynamic terrain-slide path
-  // (src/physics/terrainWall.ts) should react to — wall_block collision is
-  // now fully owned by the SAT static-polygon path (shared/staticColliders.ts).
-  // hasColumn() below is the predicate that tells the two apart.
-  private readonly wallCells = new Set<string>();
   private tile = 1;
   private levelHeight = 0.5;
   private originX = 0;
@@ -324,12 +315,6 @@ export class Heightfield {
     hf.originZ = data.meta.origin_offset[2];
 
     for (const rect of data.rect_fills ?? []) {
-      if (isWallOnlyAsset(rect.asset)) {
-        for (let x = rect.x_min; x <= rect.x_max; x++) {
-          for (let z = rect.z_min; z <= rect.z_max; z++) hf.wallCells.add(x + "," + z);
-        }
-        continue; // visual-only — see isWallOnlyAsset doc
-      }
       const rot = normRot(rect.rot);
       for (let x = rect.x_min; x <= rect.x_max; x++) {
         for (let z = rect.z_min; z <= rect.z_max; z++) {
@@ -340,10 +325,6 @@ export class Heightfield {
       }
     }
     for (const cell of data.cells ?? []) {
-      if (isWallOnlyAsset(cell.asset)) {
-        hf.wallCells.add(cell.x + "," + cell.z);
-        continue; // visual-only — see isWallOnlyAsset doc
-      }
       const rot = normRot(cell.rot);
       if (TWO_CELL_ASSETS.has(cell.asset)) {
         // Expand a 2-cell ramp into two half-height ramp cells: the clicked
@@ -379,13 +360,13 @@ export class Heightfield {
     return { x: gx * this.tile + this.originX, z: gz * this.tile + this.originZ };
   }
 
-  // Every walkable column's (integer) grid coordinates — wall-only columns
-  // (isWallOnlyAsset) never make it into `cells` (fromMapJson skips setCell
-  // for them), so this is exactly the drivable footprint. Used by the
-  // spawn-fallback search (main.ts / server/spawn) when the authored SPAWN
-  // point lands off the map (e.g. after a redesigned layout moves the spawn
-  // cell) — it needs to find *some* drivable cell without duplicating the
-  // "x,z" key parsing.
+  // Every authored column's (integer) grid coordinates. Since the 2026-07-08
+  // wall_block rework EVERY authored cell is walkable (wall/ground cubes
+  // included — their walkable surface is the cube top), so this is exactly
+  // the drivable footprint. Used by the spawn-fallback search (main.ts /
+  // server/spawn) when the authored SPAWN point lands off the map (e.g.
+  // after a redesigned layout moves the spawn cell) — it needs to find
+  // *some* drivable cell without duplicating the "x,z" key parsing.
   listCellCoords(): Array<{ x: number; z: number }> {
     const out: Array<{ x: number; z: number }> = [];
     for (const key of this.cells.keys()) {
@@ -395,21 +376,16 @@ export class Heightfield {
     return out;
   }
 
-  // True if EITHER a walkable cell OR a wall_block* cell was authored at this
-  // world XZ's grid column — i.e. "this spot is part of the map's authored
-  // footprint at all," regardless of whether sample() itself returns a
-  // height. See the wallCells doc comment above: this is what lets the
-  // terrain-slide path (src/physics/terrainWall.ts) distinguish a genuine
-  // off-map edge (hasColumn===false, terrain-slide should react) from a
-  // wall_block hole (hasColumn===true, sample()===null, but the SAT static-
-  // polygon path already owns that collision — terrain-slide must NOT also
-  // react there, or a kart would get shoved back a full footprint-radius
-  // away from the wall instead of the SAT system's flush skin margin).
+  // True if any cell was authored at this world XZ's grid column — i.e.
+  // "this spot is part of the map's authored footprint." Since the 2026-07-08
+  // wall_block rework every authored column also has a walkable height, so
+  // this is equivalent to sample() !== null; kept as its own predicate
+  // because callers (src/physics/terrainWall.ts, kart.ts step 8c) ask the
+  // "is this off the map?" question, not the "how high is the ground?" one.
   hasColumn(wx: number, wz: number): boolean {
     const cx = Math.round((wx - this.originX) / this.tile);
     const cz = Math.round((wz - this.originZ) / this.tile);
-    const key = cx + "," + cz;
-    return this.cells.has(key) || this.wallCells.has(key);
+    return this.cells.has(cx + "," + cz);
   }
 
   // Ground height at a world XZ point, or null when there is no cell there

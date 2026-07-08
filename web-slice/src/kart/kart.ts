@@ -369,13 +369,15 @@ export class Kart {
     // 8. Integrate position with map collision — Collision v2 (design/notes/
     // collision-v2.md). Two collision primitives, chained in this order:
     //   8a. Dynamic terrain-edge slide (physics/terrainWall.ts): handles
-    //       genuine off-map boundaries and any residual too-steep terrain
-    //       step (wall_block* holes are explicitly EXCLUDED, see that
-    //       module's doc — those are owned by 8b below). Integrates the
-    //       candidate XZ move itself and slides tangentially (I2) instead of
-    //       killing a whole world axis.
+    //       genuine off-map boundaries and any too-steep terrain step —
+    //       including wall_block*/ground_block cube sides (a full-level 0.5
+    //       step > MAX_STEP), which this path owns since the 2026-07-08
+    //       rework (blocks are walkable on top now, so their old 2D SAT
+    //       AABBs are gone — see shared/staticColliders.ts module doc).
+    //       Integrates the candidate XZ move itself and slides tangentially
+    //       (I2) instead of killing a whole world axis.
     //   8b. Static SAT contact resolution (physics/staticSlide.ts) against
-    //       every wall_block*/prop collider (shared/staticColliders.ts,
+    //       every prop collider (shared/staticColliders.ts,
     //       shared/collision2d.ts SAT+MTV) — push-out by MTV depth + skin,
     //       slide velocity's normal component (I2). This is what fixes the
     //       old "half a meter of dead air in front of every wall" bug (P1)

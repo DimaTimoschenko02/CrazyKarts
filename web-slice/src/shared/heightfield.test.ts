@@ -6,7 +6,7 @@
 // client renderer (map/mapLoader.ts wraps it) and the Colyseus match server
 // (server/config/arena.ts).
 import { describe, expect, it } from "vitest";
-import { Heightfield, heightCellFor, isWallOnlyAsset, normRot, type MapJson } from "./heightfield";
+import { Heightfield, heightCellFor, normRot, type MapJson } from "./heightfield";
 
 function makeHeightfield(cells: MapJson["cells"]): Heightfield {
   return Heightfield.fromMapJson({
@@ -15,22 +15,15 @@ function makeHeightfield(cells: MapJson["cells"]): Heightfield {
   });
 }
 
-describe("isWallOnlyAsset — walls are exclusively the wall_block* family", () => {
-  it("matches wall_block* only — every Edges-family terrain asset (sideCliff included) stays drivable", () => {
-    // Game-designer decision (2026-07): terrain_sideCliff was briefly made
-    // wall-only, then reverted to a drivable steep slope — walls are now
-    // ONLY the wall_block* procedural family (map/assetLoader.ts).
-    expect(isWallOnlyAsset("wall_block")).toBe(true);
-    expect(isWallOnlyAsset("wall_block_round")).toBe(true);
-    expect(isWallOnlyAsset("wall_block_corner")).toBe(true);
-    expect(isWallOnlyAsset("terrain_sideCliff")).toBe(false);
-    expect(isWallOnlyAsset("terrain_side")).toBe(false);
-    expect(isWallOnlyAsset("terrain_sideCorner")).toBe(false);
-    expect(isWallOnlyAsset("terrain_sideCornerInner")).toBe(false);
-    expect(isWallOnlyAsset("terrain_sideEnd")).toBe(false);
-    expect(isWallOnlyAsset("terrain_ramp")).toBe(false);
-    expect(isWallOnlyAsset("terrain")).toBe(false);
-    expect(isWallOnlyAsset("ground_block")).toBe(false); // drivable cube — NOT a wall despite sharing the visual
+describe("wall_block* shares ground_block's cube physics (owner decision 2026-07-08)", () => {
+  it("every cube family member samples its TOP face at (y_level + 1) * level_height", () => {
+    // Blocks stopped being infinite walls: сквозь нельзя (ступень 0.5 >
+    // MAX_STEP), сверху можно. All four cubes go through the same
+    // heightCellFor branch.
+    for (const asset of ["wall_block", "wall_block_round", "wall_block_corner", "ground_block"]) {
+      const hf = makeHeightfield([{ asset, x: 0, z: 0, y_level: 0 }]);
+      expect(hf.sample(0, 0)).toBeCloseTo(0.5);
+    }
   });
 });
 
@@ -120,19 +113,19 @@ describe("terrain_sideCliff: drivable steep slope (reverted from wall-only)", ()
     expect(hf.sample(0, 0.4)).not.toBeNull();
   });
 
-  it("wall_block is still a solid wall — its cell samples null at any y_level", () => {
+  it("wall_block samples its flat TOP across the whole cell (cube at y_level=1 → top = 1.0)", () => {
     const hf = makeHeightfield([{ asset: "wall_block", x: 2, z: 3, y_level: 1, rot: 0 }]);
-    expect(hf.sample(2, 3)).toBeNull();
-    expect(hf.sample(2.3, 3)).toBeNull();
+    expect(hf.sample(2, 3)).toBeCloseTo(1.0);
+    expect(hf.sample(2.3, 3)).toBeCloseTo(1.0);
   });
 
-  it("wall_block_round and wall_block_corner are solid walls too (same procedural-wall family)", () => {
+  it("wall_block_round and wall_block_corner sample the same cube top (fillets are visual-only)", () => {
     const hf = makeHeightfield([
       { asset: "wall_block_round", x: 0, z: 0, y_level: 0, rot: 90 },
       { asset: "wall_block_corner", x: 1, z: 0, y_level: 0, rot: 0 },
     ]);
-    expect(hf.sample(0, 0)).toBeNull();
-    expect(hf.sample(1, 0)).toBeNull();
+    expect(hf.sample(0, 0)).toBeCloseTo(0.5);
+    expect(hf.sample(1, 0)).toBeCloseTo(0.5);
   });
 });
 
@@ -315,11 +308,10 @@ describe("stacked columns (several assets sharing one XZ) — topmost solid wins
     expect(highFirst.sample(3, 3)).toBeCloseTo(1.0, 6);
   });
 
-  it("wall_block sharing a column with flat terrain contributes nothing — terrain's flat height wins either JSON order", () => {
-    // wall_block is skipped entirely by fromMapJson (isWallOnlyAsset), so it
-    // never becomes a layer in this column — there's nothing to "shadow",
-    // this just proves the skip doesn't accidentally drop/corrupt the real
-    // terrain layer regardless of which one is authored first.
+  it("wall_block sharing a column with flat terrain is just another layer — its cube TOP wins either JSON order", () => {
+    // A wall_block at y_level=3 spans [1.5, 2.0]; the flat terrain layer at
+    // y_level=1 sits at 0.5. The per-point MAX picks the cube top (2.0)
+    // regardless of authoring order — the kart drives on top of the block.
     const wallFirst = makeHeightfield([
       { asset: "wall_block", x: 0, z: 0, y_level: 3, rot: 0 },
       { asset: "terrain", x: 0, z: 0, y_level: 1, rot: 0 },
@@ -328,21 +320,21 @@ describe("stacked columns (several assets sharing one XZ) — topmost solid wins
       { asset: "terrain", x: 0, z: 0, y_level: 1, rot: 0 },
       { asset: "wall_block", x: 0, z: 0, y_level: 3, rot: 0 },
     ]);
-    expect(wallFirst.sample(0, 0)).toBeCloseTo(0.5, 6);
-    expect(terrainFirst.sample(0, 0)).toBeCloseTo(0.5, 6);
+    expect(wallFirst.sample(0, 0)).toBeCloseTo(2.0, 6);
+    expect(terrainFirst.sample(0, 0)).toBeCloseTo(2.0, 6);
   });
 });
 
-describe("Heightfield.hasColumn — distinguishes wall_block holes from genuine off-map edges (collision-v2 §3.3)", () => {
+describe("Heightfield.hasColumn — authored footprint vs genuine off-map edges", () => {
   it("true for a walkable cell", () => {
     const hf = makeHeightfield([{ asset: "terrain", x: 0, z: 0, y_level: 0 }]);
     expect(hf.hasColumn(0, 0)).toBe(true);
   });
 
-  it("true for a wall_block cell even though sample() there is null", () => {
+  it("true for a wall_block cell — and sample() there is the cube top, not null", () => {
     const hf = makeHeightfield([{ asset: "wall_block", x: 2, z: 3, y_level: 0 }]);
     expect(hf.hasColumn(2, 3)).toBe(true);
-    expect(hf.sample(2, 3)).toBeNull();
+    expect(hf.sample(2, 3)).toBeCloseTo(0.5);
   });
 
   it("false for a genuinely unauthored column (real off-map edge)", () => {
@@ -356,7 +348,7 @@ describe("Heightfield.hasColumn — distinguishes wall_block holes from genuine 
       rect_fills: [{ asset: "wall_block", x_min: 0, x_max: 2, z_min: 0, z_max: 0, y_level: 0 }],
     });
     expect(hf.hasColumn(1, 0)).toBe(true);
-    expect(hf.sample(1, 0)).toBeNull();
+    expect(hf.sample(1, 0)).toBeCloseTo(0.5);
   });
 });
 
@@ -368,14 +360,14 @@ describe("normRot / heightCellFor exports used directly by the diagnostic scan s
 });
 
 describe("Heightfield.listCellCoords — drivable-footprint enumeration used by the spawn fallback", () => {
-  it("lists only walkable columns, excluding wall-only cells", () => {
+  it("lists every authored column — wall_block cells included (their cube top is drivable now)", () => {
     const hf = makeHeightfield([
       { asset: "terrain", x: 0, z: 0, y_level: 0, rot: 0 },
       { asset: "terrain", x: 1, z: 0, y_level: 0, rot: 0 },
       { asset: "wall_block", x: 2, z: 0, y_level: 0, rot: 0 },
     ]);
     const coords = hf.listCellCoords();
-    expect(coords).toHaveLength(2);
-    expect(coords).toEqual(expect.arrayContaining([{ x: 0, z: 0 }, { x: 1, z: 0 }]));
+    expect(coords).toHaveLength(3);
+    expect(coords).toEqual(expect.arrayContaining([{ x: 0, z: 0 }, { x: 1, z: 0 }, { x: 2, z: 0 }]));
   });
 });
