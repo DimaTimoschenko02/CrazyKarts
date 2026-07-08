@@ -70,6 +70,12 @@ export class GameMap {
       def.z * this.tile + this.origin.z
     );
     inst.rotation.y = THREE.MathUtils.degToRad(rot);
+    // Mirror = reflect across local X before the rotation (three.js applies
+    // scale before rotation in its TRS matrix, so setting scale.x here gives
+    // reflect-then-rotate). See CellDef.mirror — visual only. three.js flips
+    // the render winding for the resulting negative-determinant matrix, so
+    // normals/lighting stay correct without a DoubleSide hack.
+    if (def.mirror) inst.scale.x = -1;
     this.root.add(inst);
   }
 

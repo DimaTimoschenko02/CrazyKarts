@@ -164,7 +164,7 @@ function isTextInputFocused(): boolean {
 }
 
 // ── Editor state ─────────────────────────────────────────────────────────
-interface CellRecord { asset: string; x: number; z: number; y_level: number; rot: number }
+interface CellRecord { asset: string; x: number; z: number; y_level: number; rot: number; mirror?: boolean }
 interface PropRecord { asset: string; x: number; z: number; y_level: number; rot: number; scale: number }
 
 const cells = new Map<string, CellRecord>();
@@ -176,6 +176,7 @@ let lib: AssetLibrary | null = null;
 let activeAsset: string | null = null;
 let rotIndex = 0;
 let yLevel = 0;
+let mirrorState = false; // reflect the piece across local X (Space) — see CellDef.mirror
 let ghost: THREE.Object3D | null = null;
 
 let lastClientX = innerWidth / 2;
@@ -335,6 +336,7 @@ function placeCell(rec: CellRecord): void {
   const inst = template.clone(true);
   inst.position.set(rec.x - HALF, rec.y_level * LEVEL_HEIGHT, rec.z - HALF);
   inst.rotation.y = THREE.MathUtils.degToRad(rec.rot);
+  if (rec.mirror) inst.scale.x = -1; // reflect-then-rotate, matches mapLoader
   scene.add(inst);
   cells.set(key, rec);
   cellObjs.set(key, inst);
@@ -530,6 +532,7 @@ function refreshCursor(clientX: number, clientY: number): void {
       ghost.position.set(lastCellX - HALF, yLevel * LEVEL_HEIGHT, lastCellZ - HALF);
     }
     ghost.rotation.y = THREE.MathUtils.degToRad(rot);
+    ghost.scale.x = mirrorState ? -1 : 1; // preview the mirror before placing
   }
 
   updateStatusBar(rot);
@@ -550,8 +553,9 @@ function hintFor(asset: string | null): string {
 
 function updateStatusBar(rot: number): void {
   const assetLabel = activeAsset ?? "(none)";
+  const mir = mirrorState ? "  mirror: ON" : "";
   statusMain.textContent =
-    `asset: ${assetLabel}  rot: ${rot}  y_level: ${yLevel}  cell: (${lastCellX}, ${lastCellZ})`;
+    `asset: ${assetLabel}  rot: ${rot}${mir}  y_level: ${yLevel}  cell: (${lastCellX}, ${lastCellZ})`;
   statusHint.textContent = hintFor(activeAsset);
 }
 
@@ -574,6 +578,7 @@ renderer.domElement.addEventListener("pointerdown", e => {
       const key = cellKey(lastCellX, lastCellZ);
       const before = cells.get(key) ?? null;
       const rec: CellRecord = { asset: activeAsset, x: lastCellX, z: lastCellZ, y_level: yLevel, rot };
+      if (mirrorState) rec.mirror = true;
       placeCell(rec);
       pushUndo({ kind: "cell", key, before, after: rec });
     }
@@ -628,6 +633,12 @@ addEventListener("keydown", e => {
 
   if (e.code === "KeyR") {
     rotIndex = (rotIndex + 1) % ROT_CYCLE.length;
+    refreshCursor(lastClientX, lastClientY);
+  } else if (e.code === "Space") {
+    // Mirror the piece across its local X axis — the 4 orientations rotation
+    // can't reach on chiral tiles (roadCorner/Split, sideEnd, detailed ramps).
+    e.preventDefault(); // Space would otherwise scroll the page
+    mirrorState = !mirrorState;
     refreshCursor(lastClientX, lastClientY);
   } else if (e.code === "KeyQ") {
     yLevel = THREE.MathUtils.clamp(yLevel - 1, 0, MAX_Y_LEVEL);
@@ -684,7 +695,9 @@ function loadMapJson(data: MapJson): void {
     }
   }
   for (const cell of data.cells ?? []) {
-    placeCell({ asset: cell.asset, x: cell.x, z: cell.z, y_level: cell.y_level, rot: cell.rot ?? 0 });
+    const rec: CellRecord = { asset: cell.asset, x: cell.x, z: cell.z, y_level: cell.y_level, rot: cell.rot ?? 0 };
+    if (cell.mirror) rec.mirror = true;
+    placeCell(rec);
   }
   for (const prop of data.props ?? []) {
     addProp({

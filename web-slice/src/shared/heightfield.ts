@@ -21,6 +21,17 @@ export interface CellDef {
   z: number;
   y_level: number;
   rot?: number;
+  // Reflect the tile across its local X axis (scale.x = -1) BEFORE the Y
+  // rotation — reaches the 4 orientations rotation alone can't for CHIRAL
+  // pieces (roadCorner/Split, sideEnd, detailed ramps). This is a VISUAL-only
+  // flag: the heightfield sample below ignores it deliberately. That's exact
+  // for the pieces mirror is actually used on — flat roads (height unaffected)
+  // and slopes symmetric across the mirror axis — and for corners/ramps any
+  // mirror-reachable *shape* is also rotation-reachable, so there's never a
+  // case where the drawn slope and the driven height disagree. If a mirrored
+  // asymmetric SLOPE ever needs true height mirroring, store rot0 base ascents
+  // + apply reflect-then-rotate here instead of the pre-rotated tables.
+  mirror?: boolean;
 }
 
 export interface RectFill {
