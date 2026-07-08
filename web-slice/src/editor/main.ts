@@ -264,7 +264,103 @@ function toggleCategory(category: string, labelEl: HTMLDivElement, itemEls: read
   saveCollapsedCategories();
 }
 
+// ── Recent assets (MRU history) ──────────────────────────────────────────
+// Owner request 2026-07-08: with a 300+ tile pack incoming, "what did I use
+// recently" beats scrolling the whole palette. Tracks the last RECENT_MAX
+// assets actually PLACED (not merely selected — see the pointerdown
+// left-click handler), most-recent first, persisted across reloads.
+// Rendered as a pseudo-category pinned above the real palette; collapse
+// state rides the same collapsedCategories mechanism as real categories.
+const RECENT_STORAGE_KEY = "editor-recent-assets";
+const RECENT_MAX = 15;
+const RECENT_CATEGORY = "Recent";
+
+function loadRecentAssets(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_STORAGE_KEY);
+    if (raw) return (JSON.parse(raw) as string[]).filter(a => typeof a === "string");
+  } catch (err) {
+    console.error("[editor] failed to parse recent-assets state:", err);
+  }
+  return [];
+}
+
+let recentAssets: string[] = loadRecentAssets();
+const recentButtons = new Map<string, HTMLButtonElement>();
+let recentLabelEl: HTMLDivElement | null = null;
+let recentContainerEl: HTMLDivElement | null = null;
+
+// asset → human label lookup for rendering recent rows (PALETTE stays the
+// single source of truth for names; an asset that later leaves the palette
+// falls back to its raw asset id).
+const ASSET_LABELS = new Map<string, string>();
+for (const cat of PALETTE) {
+  for (const item of cat.items) ASSET_LABELS.set(item.asset, item.label);
+}
+
+// Recent rows reuse the main palette button's already-rendered thumbnail
+// (data URL) instead of re-rendering the model — free, and guaranteed to
+// look identical to the source button.
+function thumbSrcFor(asset: string): string | null {
+  const img = paletteButtons.get(asset)?.querySelector("img.palette-thumb") as HTMLImageElement | null;
+  return img?.src ?? null;
+}
+
+function renderRecentSection(): void {
+  if (!recentLabelEl || !recentContainerEl) return;
+  recentContainerEl.innerHTML = "";
+  recentButtons.clear();
+  // No history yet → hide the header entirely instead of showing an empty
+  // category (first-run noise).
+  recentLabelEl.style.display = recentAssets.length === 0 ? "none" : "";
+  const itemEls: HTMLButtonElement[] = [];
+  for (const asset of recentAssets) {
+    const btn = document.createElement("button");
+    btn.className = "palette-btn";
+    if (asset === activeAsset) btn.classList.add("active");
+    const src = thumbSrcFor(asset);
+    if (src) {
+      const img = document.createElement("img");
+      img.className = "palette-thumb";
+      img.src = src;
+      img.alt = "";
+      btn.appendChild(img);
+    }
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "palette-label";
+    labelSpan.textContent = ASSET_LABELS.get(asset) ?? asset;
+    btn.appendChild(labelSpan);
+    btn.addEventListener("click", () => selectAsset(asset));
+    recentContainerEl.appendChild(btn);
+    recentButtons.set(asset, btn);
+    itemEls.push(btn);
+  }
+  applyCategoryCollapse(RECENT_CATEGORY, recentLabelEl, itemEls);
+}
+
+function recordRecentAsset(asset: string): void {
+  const next = [asset, ...recentAssets.filter(a => a !== asset)].slice(0, RECENT_MAX);
+  // Placing the same tile repeatedly is the common case — skip the DOM
+  // rebuild when the list didn't actually change.
+  if (next.length === recentAssets.length && next.every((a, i) => a === recentAssets[i])) return;
+  recentAssets = next;
+  localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(recentAssets));
+  renderRecentSection();
+}
+
 function buildPalette(): void {
+  // Recent section first, so it stays pinned above every real category.
+  recentLabelEl = document.createElement("div");
+  recentLabelEl.className = "category-label";
+  sidebar.appendChild(recentLabelEl);
+  recentContainerEl = document.createElement("div");
+  sidebar.appendChild(recentContainerEl);
+  recentLabelEl.addEventListener("click", () => {
+    // Item list is dynamic — recompute the buttons at toggle time instead of
+    // capturing a stale array like the static categories below do.
+    if (recentLabelEl) toggleCategory(RECENT_CATEGORY, recentLabelEl, [...recentButtons.values()]);
+  });
+
   for (const cat of PALETTE) {
     const label = document.createElement("div");
     label.className = "category-label";
@@ -287,6 +383,7 @@ function buildPalette(): void {
     label.addEventListener("click", () => toggleCategory(cat.category, label, itemEls));
     applyCategoryCollapse(cat.category, label, itemEls);
   }
+  renderRecentSection(); // text-only rows for now; thumbnails re-render below
 }
 
 // ── Palette thumbnails ──────────────────────────────────────────────────
@@ -356,11 +453,13 @@ function addPaletteThumbnails(): void {
   // The offscreen GL context isn't needed again after this pass.
   thumbRenderer?.dispose();
   thumbRenderer = null;
+  renderRecentSection(); // recent rows can now borrow the freshly rendered thumbs
 }
 
 function selectAsset(asset: string): void {
   activeAsset = asset;
   for (const [name, btn] of paletteButtons) btn.classList.toggle("active", name === asset);
+  for (const [name, btn] of recentButtons) btn.classList.toggle("active", name === asset);
   rebuildGhost();
   refreshCursor(lastClientX, lastClientY);
 }
@@ -368,6 +467,7 @@ function selectAsset(asset: string): void {
 function deselectAsset(): void {
   activeAsset = null;
   for (const btn of paletteButtons.values()) btn.classList.remove("active");
+  for (const btn of recentButtons.values()) btn.classList.remove("active");
   if (ghost) { scene.remove(ghost); ghost = null; }
   refreshCursor(lastClientX, lastClientY);
 }
@@ -1223,6 +1323,7 @@ renderer.domElement.addEventListener("pointerdown", e => {
       placeCell(rec);
       pushUndo({ kind: "cell", key, before, after: rec });
     }
+    recordRecentAsset(activeAsset); // "used" = actually placed, not just clicked in the palette
     scheduleAutosave();
   } else if (e.button === 2) {
     // Right click: delete whatever is under the cursor. Usually that's a
