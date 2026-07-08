@@ -22,23 +22,17 @@ export interface StaticObstacle extends KartObstacle {
   radius: number;
 }
 
-// Which prop asset names get a physical collision circle — everything else
-// (rock, rocks_smallA/B, rock_crystals, and all "small decor" from the full
-// Space Kit added in shared/mapAssets.ts — barrels, chimneys, craters,
-// meteors, astronauts...) is pure decoration the kart drives straight
-// through. See .claude/rules/map-building.md "Props" section for the asset
-// catalog this mirrors. Keep this in sync if new big rock/crystal/building
-// props are added to the Space Kit prop set.
-//
-// Full-kit additions included here: buildings (corridor/hangar/structure/
-// gate — solid rooms/walls) and rockets/craft (large solid hulls) get
-// collision unconditionally; from Structures only the visibly large solid
-// pieces (generators, big satellite dish, turrets) do — desks/stairs/
-// supports/weapons stay walk-through, matching a small/thin-decor call.
-// Tech/Track (pipe/platform/monorail/rail) is left walk-through everywhere:
-// it reads as track/ground-level decor a kart drives over, not a wall.
-const LARGE_PROP_ASSETS = new Set([
-  "rock_largeA", "rock_crystalsLargeA", "rock_crystalsLargeB",
+// Buildings/rockets/heavy machinery: UNCONDITIONALLY solid, always get a
+// collision circle sized from their footprint AABB regardless of raw
+// dimensions. Curated at the FAMILY level (not derived from measured size —
+// see NATURAL_DECOR_ASSETS below for the size-driven half of this module),
+// because plenty of walk-through Tech/Track and Structures pieces (platforms,
+// pipes, rails, monorails, desks/stairs/supports/weapons) have a comparable
+// or even larger footprint than these but read as track-level decor a kart
+// drives over, not a wall — that curation is a deliberate game-designer call,
+// unchanged by the P1.6 prop-collision rework (owner report, 2026-07-08) and
+// out of this pass's scope. See .claude/rules/map-building.md "Props".
+const STRUCTURAL_PROP_ASSETS = new Set([
   // Buildings
   "corridor", "corridor_corner", "corridor_cornerRound", "corridor_cornerRoundWindow",
   "corridor_cross", "corridor_detailed", "corridor_end", "corridor_open", "corridor_roof",
@@ -59,6 +53,64 @@ const LARGE_PROP_ASSETS = new Set([
   // Decor — vehicle-sized only
   "rover",
 ]);
+
+// Natural-terrain decor family (rocks/crystals/meteors/craters/bones) —
+// collision here is SIZE-DERIVED instead of a hand-maintained include/
+// exclude list. Owner report 2026-07-08: adding a rock and a meteor produced
+// inconsistent collision (some rocks solid, some not; a "micro" rock got a
+// whole-cell-sized circle) because the old LARGE_PROP_ASSETS set was picked
+// by eyeballing names, not measuring geometry — it had rock_largeA in but
+// rock_crystalsLargeA/B's near-identical-size sibling rock_largeB OUT, and
+// excluded the entire meteor family even though meteor/meteor_detailed are
+// the same scale as rock_largeA.
+//
+// Actual measured footprint (max(size.x,size.z)) / height (size.y), from
+// the real GLBs (tools/_tmp_glb_bbox2.ts, run once during this fix, numbers
+// recorded here since the script itself was a throwaway):
+//   rock                 diam=0.851 h=0.300  -> decor (below height floor)
+//   rocks_smallA         diam=0.937 h=0.105  -> decor (flat pebble scatter)
+//   rocks_smallB         diam=0.729 h=0.186  -> decor (flat pebble scatter)
+//   rock_crystals        diam=0.851 h=0.337  -> decor (below height floor)
+//   rock_largeA          diam=0.919 h=0.500  -> SOLID
+//   rock_largeB          diam=0.939 h=0.500  -> SOLID (bug fix: was missing)
+//   rock_crystalsLargeA  diam=0.919 h=0.541  -> SOLID
+//   rock_crystalsLargeB  diam=0.939 h=0.550  -> SOLID
+//   meteor               diam=0.866 h=0.735  -> SOLID (new)
+//   meteor_detailed      diam=0.866 h=0.735  -> SOLID (new)
+//   meteor_half          diam=0.866 h=0.367  -> SOLID (new)
+//   crater               diam=0.826 h=0.118  -> decor (flat ground decal)
+//   craterLarge          diam=0.886 h=0.120  -> decor (flat ground decal)
+//   bones                diam=0.861 h=0.442  -> decor, EXPLICIT exception
+//     (clears both thresholds on paper — a scattered bone PILE's bbox is
+//     tall because one bone juts up, but the pile has almost no actual
+//     blocking volume, same design call as crater/craterLarge — see
+//     DECOR_HEIGHT_EXCEPTIONS below)
+const NATURAL_DECOR_ASSETS = new Set([
+  "rock", "rocks_smallA", "rocks_smallB", "rock_crystals",
+  "rock_largeA", "rock_largeB", "rock_crystalsLargeA", "rock_crystalsLargeB",
+  "meteor", "meteor_detailed", "meteor_half",
+  "crater", "craterLarge", "bones",
+]);
+
+// Below this scaled footprint diameter, ANY prop (structural or natural
+// decor) is too small to plausibly block a kart's body regardless of shape —
+// the general "small object → collision sized or none" principle from the
+// owner's bug report. Comfortably below every structural asset's real size
+// (smallest is machine_barrel at 0.646m) and above every genuinely tiny
+// decor item Space Kit ships (furniture/weapons/characters top out around
+// 0.5m — see tools/_tmp_glb_bbox.ts sweep run during this fix).
+const MIN_OBSTACLE_DIAMETER = 0.6;
+
+// Below this scaled height, a NATURAL_DECOR_ASSETS prop stays walk-through
+// even if its footprint clears MIN_OBSTACLE_DIAMETER — a wide-but-flat prop
+// (crater, a loose pebble scatter) doesn't sit tall enough to actually
+// obstruct a kart's undercarriage. Only applied to the natural-decor family:
+// STRUCTURAL_PROP_ASSETS are always solid once past the diameter floor (a
+// building or rocket hull is never "too flat to block").
+const MIN_OBSTACLE_HEIGHT = 0.35;
+
+// Explicit override — see NATURAL_DECOR_ASSETS "bones" note above.
+const DECOR_HEIGHT_EXCEPTIONS = new Set(["bones"]);
 
 // Large props get a collision circle shrunk from their raw footprint AABB by
 // this factor — arcade standard so grazing the rock's rough/uneven visual
@@ -165,15 +217,27 @@ export class GameMap {
     inst.scale.setScalar(def.scale ?? 1);
     this.root.add(inst);
 
-    if (LARGE_PROP_ASSETS.has(def.asset)) {
+    const isStructural = STRUCTURAL_PROP_ASSETS.has(def.asset);
+    const isNaturalDecor = NATURAL_DECOR_ASSETS.has(def.asset) && !DECOR_HEIGHT_EXCEPTIONS.has(def.asset);
+    if (isStructural || isNaturalDecor) {
       // Radius from the UNSCALED template's own footprint AABB (rotation
       // around Y doesn't change the circle enclosing a centered footprint,
       // so def.rot needs no compensation here — only def.scale does).
       const box = new THREE.Box3().setFromObject(template);
       const size = box.getSize(new THREE.Vector3());
       const scale = def.scale ?? 1;
-      const radius = (Math.max(size.x, size.z) / 2) * scale * PROP_COLLISION_SHRINK;
-      this.staticObstacles.push({ x: inst.position.x, z: inst.position.z, alive: true, radius });
+      const scaledDiameter = Math.max(size.x, size.z) * scale;
+      const scaledHeight = size.y * scale;
+      // Size-driven gate (owner report 2026-07-08 — see NATURAL_DECOR_ASSETS
+      // doc above): too-small footprint never gets an obstacle regardless of
+      // family; the natural-decor family ALSO needs real height (not just a
+      // wide flat footprint) to count as blocking mass.
+      const passesDiameter = scaledDiameter >= MIN_OBSTACLE_DIAMETER;
+      const passesHeight = isStructural || scaledHeight >= MIN_OBSTACLE_HEIGHT;
+      if (passesDiameter && passesHeight) {
+        const radius = (scaledDiameter / 2) * PROP_COLLISION_SHRINK;
+        this.staticObstacles.push({ x: inst.position.x, z: inst.position.z, alive: true, radius });
+      }
     }
   }
 

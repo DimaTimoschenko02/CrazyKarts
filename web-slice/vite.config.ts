@@ -56,11 +56,15 @@ function devParamsFilePlugin(): Plugin {
 // topology, memory: project_p0_testability_done.md). This plugin lets the
 // editor read/write public/maps/*.json directly on the machine running
 // `vite dev`, so "Save to server" + "Load" close the loop over LAN.
-// GET  /__editor-maps          -> {"maps": ["arena_slice", ...]}  (names, no .json)
-// POST /__editor-maps {name, data} -> writes public/maps/<name>.json
+// GET    /__editor-maps          -> {"maps": ["arena_slice", ...]}  (names, no .json)
+// POST   /__editor-maps {name, data} -> writes public/maps/<name>.json
 //   - name is restricted to [a-z0-9_-]+ to keep this within the maps folder
 //   - overwriting an existing file first copies it to public/maps/.backup/
 //     <name>.<timestamp>.json so a bad overwrite is always recoverable
+// DELETE /__editor-maps {name} -> "deletes" public/maps/<name>.json
+//   - never unlinks: moves the file into public/maps/.backup/<name>.<ts>.json,
+//     the exact same recoverable-rename trick the overwrite path already uses,
+//     so a mis-click never destroys a map for good.
 function editorMapsFilePlugin(): Plugin {
   const mapsDir = resolve(__dirname, "public/maps");
   const backupDir = resolve(mapsDir, ".backup");
@@ -107,6 +111,36 @@ function editorMapsFilePlugin(): Plugin {
                 mkdirSync(mapsDir, { recursive: true });
               }
               writeFileSync(targetPath, JSON.stringify(parsed.data, null, 2), "utf-8");
+              res.statusCode = 204;
+              res.end();
+            } catch (err) {
+              res.statusCode = 400;
+              res.end(String(err));
+            }
+          });
+          return;
+        }
+        if (req.method === "DELETE") {
+          let body = "";
+          req.on("data", (chunk: Buffer) => { body += chunk.toString("utf-8"); });
+          req.on("end", () => {
+            try {
+              const parsed = JSON.parse(body) as { name?: unknown };
+              const name = parsed.name;
+              if (typeof name !== "string" || !nameRe.test(name)) {
+                res.statusCode = 400;
+                res.end("invalid map name — use [a-z0-9_-]+ only");
+                return;
+              }
+              const targetPath = resolve(mapsDir, `${name}.json`);
+              if (!existsSync(targetPath)) {
+                res.statusCode = 404;
+                res.end("map not found");
+                return;
+              }
+              if (!existsSync(backupDir)) mkdirSync(backupDir, { recursive: true });
+              const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+              renameSync(targetPath, resolve(backupDir, `${name}.${stamp}.json`));
               res.statusCode = 204;
               res.end();
             } catch (err) {

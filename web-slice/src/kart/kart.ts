@@ -20,6 +20,7 @@ import { buildKartPhysicsParams, type KartStats } from "./stats";
 import type { RawInput } from "../core/input";
 import { KART_COLLISION_RADIUS, resolveKartPush, type KartObstacle } from "../physics/kartCollision";
 import { createVerticalState, stepVertical, type VerticalState } from "../physics/vertical";
+import { footprintHalfExtents, footprintHitsWall } from "../physics/footprintWall";
 import { computeAttitudeTarget } from "./attitude";
 
 // Godot: forward = -Z rotated by yaw around +Y.
@@ -79,6 +80,10 @@ export class Kart {
 
   private readonly params: KartPhysicsParams;
   private readonly axle = DEFAULT_AXLE_GEOMETRY;
+  // Body-footprint probe half-extents for the wall-collision fix (see
+  // physics/footprintWall.ts) — derived once from the axle geometry, same
+  // half-wheelbase/half-track distances kart/attitude.ts already probes at.
+  private readonly footprintHalf = footprintHalfExtents(this.axle);
   private readonly bicycle: BicyclePhysics;
   private readonly driftSM: ContinuousDrift;
   private readonly skids: RearSkidMarks;
@@ -363,16 +368,32 @@ export class Kart {
     // check reused whether grounded or airborne (a solid rise ahead blocks
     // either way — this module doesn't model true 3D walls a flying kart
     // could clear, only the heightfield).
+    //
+    // Wall test is FOOTPRINT-aware (physics/footprintWall.ts), not a single
+    // center-point sample — see that module's doc comment for the map_v2.json
+    // bug this fixes (kart corners clipping through terrain_sideCliff mesh
+    // in a tight corner/cliff maze while the center-point reading stayed
+    // clear). fwdNow/rightNow use the yaw AFTER this tick's rotation (step 6
+    // above already applied it) so the probed footprint matches the body's
+    // actual current facing.
     if (map) {
-      const curH = map.sampleHeight(this.state.pos.x, this.state.pos.z) ?? this.vertical.y;
-      const nx = this.state.pos.x + this.state.vel.x * dt;
-      const hx = map.sampleHeight(nx, this.state.pos.z);
-      if (hx === null || hx - curH > MAX_STEP) this.state.vel.x = 0;
-      else this.state.pos.x = nx;
-      const nz = this.state.pos.z + this.state.vel.z * dt;
-      const hz = map.sampleHeight(this.state.pos.x, nz);
-      if (hz === null || hz - curH > MAX_STEP) this.state.vel.z = 0;
-      else this.state.pos.z = nz;
+      const fwdNow = forwardOf(this.state.yaw);
+      const rightNow = rightOf(this.state.yaw);
+      const sampleFn = (x: number, z: number) => map.sampleHeight(x, z);
+      const curX = this.state.pos.x;
+      const curZ = this.state.pos.z;
+      const nx = curX + this.state.vel.x * dt;
+      if (footprintHitsWall(sampleFn, curX, curZ, nx, curZ, fwdNow, rightNow, MAX_STEP, this.footprintHalf.halfLength, this.footprintHalf.halfWidth)) {
+        this.state.vel.x = 0;
+      } else {
+        this.state.pos.x = nx;
+      }
+      const nz = curZ + this.state.vel.z * dt;
+      if (footprintHitsWall(sampleFn, this.state.pos.x, curZ, this.state.pos.x, nz, fwdNow, rightNow, MAX_STEP, this.footprintHalf.halfLength, this.footprintHalf.halfWidth)) {
+        this.state.vel.z = 0;
+      } else {
+        this.state.pos.z = nz;
+      }
     } else {
       this.state.pos.addScaledVector(this.state.vel, dt);
     }
@@ -412,11 +433,18 @@ export class Kart {
         pushedVelZ = res.vel.z;
       }
       if (map) {
-        const curH = map.sampleHeight(preX, preZ) ?? this.vertical.y;
-        const hx = map.sampleHeight(pushedX, preZ);
-        if (hx === null || hx - curH > MAX_STEP) pushedX = preX;
-        const hz = map.sampleHeight(pushedX, pushedZ);
-        if (hz === null || hz - curH > MAX_STEP) pushedZ = preZ;
+        // Same footprint-aware wall test as step 8 above — a kart-kart shove
+        // must not be allowed to push a flank through terrain that a plain
+        // forward drive would have blocked.
+        const fwdNow = forwardOf(this.state.yaw);
+        const rightNow = rightOf(this.state.yaw);
+        const sampleFn = (x: number, z: number) => map.sampleHeight(x, z);
+        if (footprintHitsWall(sampleFn, preX, preZ, pushedX, preZ, fwdNow, rightNow, MAX_STEP, this.footprintHalf.halfLength, this.footprintHalf.halfWidth)) {
+          pushedX = preX;
+        }
+        if (footprintHitsWall(sampleFn, pushedX, preZ, pushedX, pushedZ, fwdNow, rightNow, MAX_STEP, this.footprintHalf.halfLength, this.footprintHalf.halfWidth)) {
+          pushedZ = preZ;
+        }
       }
       this.state.pos.x = pushedX;
       this.state.pos.z = pushedZ;

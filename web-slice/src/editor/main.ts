@@ -15,6 +15,7 @@ import { loadAssetLibrary } from "../map/assetLoader";
 import type { AssetLibrary } from "../map/assetLoader";
 import type { MapJson } from "../map/mapLoader";
 import { TWO_CELL_ASSETS, longAxis } from "../shared/heightfield";
+import { shouldDeletePropFirst, topCellYLevelAt } from "./deletePriority";
 // Palette data (categories/items/isProp) is shared with the game's preload
 // list (src/main.ts) — see shared/mapAssets.ts header comment for why.
 import { PALETTE, ASSET_NAMES, isPropAsset, DEFAULT_COLLAPSED_CATEGORIES } from "../shared/mapAssets";
@@ -36,7 +37,8 @@ const sidebar = document.getElementById("sidebar")!;
 const statusMain = document.getElementById("statusMain")!;
 const statusHint = document.getElementById("statusHint")!;
 const gridSizeInput = document.getElementById("gridSizeInput") as HTMLInputElement;
-const selLoad = document.getElementById("selLoad") as HTMLSelectElement;
+const btnMapsMenu = document.getElementById("btnMapsMenu") as HTMLButtonElement;
+const mapsMenuPanel = document.getElementById("mapsMenuPanel") as HTMLDivElement;
 const serverStatus = document.getElementById("serverStatus")!;
 const btnUndo = document.getElementById("btnUndo") as HTMLButtonElement;
 const btnCenterMap = document.getElementById("btnCenterMap") as HTMLButtonElement;
@@ -713,8 +715,23 @@ renderer.domElement.addEventListener("pointerdown", e => {
     }
     scheduleAutosave();
   } else if (e.button === 2) {
-    // Right click: delete whatever is under the cursor — a snapped cell tile
-    // first, then the nearest prop, regardless of the currently active asset.
+    // Right click: delete whatever is under the cursor. Usually that's a
+    // snapped cell tile first, then the nearest prop — but a prop resting
+    // at or above the top of the cell stack at this spot (e.g. a rock
+    // placed on a road tile) is the visible top layer, so it should come
+    // off first instead of the road underneath it. See deletePriority.ts.
+    const propIdx = findNearestPropIndex(lastFloatX, lastFloatZ);
+    const topCellY = topCellYLevelAt(cells.values(), lastCellX, lastCellZ);
+    const propY = propIdx >= 0 ? props[propIdx].y_level : null;
+
+    if (shouldDeletePropFirst(topCellY, propY)) {
+      const rec = props[propIdx];
+      removePropByRef(rec);
+      pushUndo({ kind: "prop", before: rec, after: null });
+      scheduleAutosave();
+      return;
+    }
+
     const key = cellKeyToDelete(lastCellX, lastCellZ, yLevel);
     const cellBefore = key ? cells.get(key) ?? null : null;
     const removedCell = key ? removeCell(key) : false;
@@ -723,7 +740,6 @@ renderer.domElement.addEventListener("pointerdown", e => {
       scheduleAutosave();
       return;
     }
-    const propIdx = findNearestPropIndex(lastFloatX, lastFloatZ);
     if (propIdx >= 0) {
       const rec = props[propIdx];
       removePropByRef(rec);
@@ -778,6 +794,7 @@ addEventListener("keydown", e => {
     updatePlane();
     refreshCursor(lastClientX, lastClientY);
   } else if (e.code === "Escape") {
+    closeMapsMenu();
     deselectAsset();
   } else if (CAMERA_PAN_KEYS.has(e.code)) {
     pressedKeys.add(e.code);
@@ -939,32 +956,101 @@ function showServerStatus(text: string, kind: "ok" | "error"): void {
   setTimeout(() => { serverStatus.textContent = ""; serverStatus.className = ""; }, 4000);
 }
 
+// Names come back sorted by the dev server's readdirSync order (filesystem-
+// dependent, not guaranteed alphabetical, but stable enough for a small
+// personal map list); renderMapsMenu() rebuilds the panel rows from this
+// cache on every open, so the confirm-to-delete state below never survives
+// a reopen.
+let knownMapNames: string[] = [];
+
 async function refreshServerMapList(): Promise<void> {
   try {
     const res = await fetch("/__editor-maps");
     if (!res.ok) throw new Error(String(res.status));
     const { maps } = (await res.json()) as { maps: string[] };
-    const previous = selLoad.value;
-    selLoad.innerHTML = "";
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "Load ▾";
-    selLoad.appendChild(placeholder);
-    for (const name of maps) {
-      const opt = document.createElement("option");
-      opt.value = name;
-      opt.textContent = name;
-      selLoad.appendChild(opt);
-    }
-    selLoad.value = maps.includes(previous) ? previous : "";
+    knownMapNames = maps;
+    renderMapsMenu();
   } catch (err) {
     console.error("[editor] failed to list server maps:", err);
   }
 }
 
-selLoad.addEventListener("change", () => {
-  const name = selLoad.value;
-  if (!name) return;
+// Rebuilds the maps-menu panel's rows from knownMapNames. Called both when
+// the list changes (after save/delete) and every time the panel is opened,
+// so a half-confirmed delete button never lingers into the next session —
+// reopening always starts from a clean "🗑" state.
+function renderMapsMenu(): void {
+  mapsMenuPanel.innerHTML = "";
+  if (knownMapNames.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "maps-menu-empty";
+    empty.textContent = "(нет сохранённых карт)";
+    mapsMenuPanel.appendChild(empty);
+    return;
+  }
+  for (const name of knownMapNames) {
+    const row = document.createElement("div");
+    row.className = "maps-menu-row";
+
+    const nameBtn = document.createElement("button");
+    nameBtn.className = "maps-menu-name";
+    nameBtn.textContent = name;
+    nameBtn.addEventListener("click", () => loadFromServer(name));
+    row.appendChild(nameBtn);
+
+    // Two-click delete, inline — mirrors Save As's "no window.confirm()"
+    // rule. First click arms it ("точно?"); a second click on the SAME
+    // button deletes. Clicking anything else closes the panel (see the
+    // document-level click listener below), which discards the arm state
+    // along with the DOM node, so there's no dangling timer to clean up.
+    const delBtn = document.createElement("button");
+    delBtn.className = "maps-menu-del";
+    delBtn.textContent = "🗑";
+    delBtn.title = `Удалить ${name}.json (уходит в public/maps/.backup/, можно восстановить)`;
+    let confirming = false;
+    delBtn.addEventListener("click", ev => {
+      ev.stopPropagation();
+      if (!confirming) {
+        confirming = true;
+        delBtn.textContent = "точно?";
+        delBtn.classList.add("confirm");
+        return;
+      }
+      deleteFromServer(name);
+    });
+    row.appendChild(delBtn);
+
+    mapsMenuPanel.appendChild(row);
+  }
+}
+
+function openMapsMenu(): void {
+  renderMapsMenu(); // fresh rows — resets any armed delete confirmation
+  mapsMenuPanel.classList.remove("hidden");
+}
+
+function closeMapsMenu(): void {
+  mapsMenuPanel.classList.add("hidden");
+}
+
+btnMapsMenu.addEventListener("click", ev => {
+  ev.stopPropagation();
+  if (mapsMenuPanel.classList.contains("hidden")) openMapsMenu();
+  else closeMapsMenu();
+});
+
+// Click-outside-to-close, same pattern as any other dropdown — the panel
+// itself and its opener button are exempt so clicking a row or re-toggling
+// the button doesn't immediately close what it just opened.
+document.addEventListener("click", e => {
+  if (mapsMenuPanel.classList.contains("hidden")) return;
+  const target = e.target as Node;
+  if (mapsMenuPanel.contains(target) || target === btnMapsMenu) return;
+  closeMapsMenu();
+});
+
+function loadFromServer(name: string): void {
+  closeMapsMenu();
   fetch(`/maps/${name}.json`)
     .then(res => {
       if (!res.ok) throw new Error(String(res.status));
@@ -981,9 +1067,34 @@ selLoad.addEventListener("change", () => {
     .catch(err => {
       console.error("[editor] load from server failed:", err);
       showServerStatus(`load failed: ${String(err)}`, "error");
+    });
+}
+
+// Deletion is a rename-to-backup on the server (see vite.config.ts), never
+// an unlink — this is just the client half of that contract. If the
+// deleted map was the one currently open, the loaded name is cleared (but
+// the scene content is left alone — the owner may want to Save As right
+// away) and the label falls back to "(unsaved)".
+function deleteFromServer(name: string): void {
+  fetch("/__editor-maps", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  })
+    .then(res => {
+      if (!res.ok) return res.text().then(msg => { throw new Error(msg || String(res.status)); });
+      if (loadedMapName === name) {
+        loadedMapName = null;
+        updateMapNameLabel();
+      }
+      showServerStatus(`deleted ${name}.json`, "ok");
+      return refreshServerMapList(); // re-renders the (still open) panel with the map gone
     })
-    .finally(() => { selLoad.value = ""; });
-});
+    .catch(err => {
+      console.error("[editor] delete from server failed:", err);
+      showServerStatus(`delete failed: ${String(err)}`, "error");
+    });
+}
 
 // Save writes straight to the currently-loaded map name — no prompt, no
 // confirmation, just overwrite (matches every other "Save" button anywhere).

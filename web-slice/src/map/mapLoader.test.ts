@@ -121,27 +121,45 @@ describe("GameMap heightfield", () => {
   });
 });
 
-// Static prop collision (large decorative rocks get a physics circle, small
-// ones stay pure decoration) — see gameplay-programmer brief and
-// .claude/rules/map-building.md "Props" section for the asset catalog.
+// Static prop collision — see .claude/rules/map-building.md "Props" and the
+// STRUCTURAL_PROP_ASSETS / NATURAL_DECOR_ASSETS doc comments in mapLoader.ts
+// for the two-tier model this pins: buildings/rockets/heavy machinery are
+// unconditionally solid (family-curated), natural-terrain decor (rocks/
+// crystals/meteors/craters/bones) is SIZE-DERIVED from measured footprint
+// diameter + height (owner report 2026-07-08 — replaced an inconsistent
+// hand-maintained include/exclude list, see git history for the prior
+// LARGE_PROP_ASSETS set this superseded).
 describe("GameMap static prop obstacles", () => {
-  // A template's footprint is whatever geometry it carries — real asset
-  // templates are recentered on XZ by assetLoader.ts before they ever reach
-  // GameMap, so a Box3 built here (already centered at the mesh's local
-  // origin) is representative of what placeProp() actually sees at runtime.
-  function boxTemplate(sizeX: number, sizeZ: number): THREE.Group {
+  // A template's footprint/height is whatever geometry it carries — real
+  // asset templates are recentered on XZ by assetLoader.ts before they ever
+  // reach GameMap, so a Box3 built here (already centered at the mesh's
+  // local origin) is representative of what placeProp() actually sees at
+  // runtime. sizeY defaults to 1 (irrelevant for STRUCTURAL_PROP_ASSETS,
+  // which don't gate on height) but is set explicitly for every
+  // NATURAL_DECOR_ASSETS template below to mirror the real measured AABBs
+  // documented in mapLoader.ts.
+  function boxTemplate(sizeX: number, sizeZ: number, sizeY = 1): THREE.Group {
     const group = new THREE.Group();
-    group.add(new THREE.Mesh(new THREE.BoxGeometry(sizeX, 1, sizeZ)));
+    group.add(new THREE.Mesh(new THREE.BoxGeometry(sizeX, sizeY, sizeZ)));
     return group;
   }
 
   function libWithProps(): Map<string, THREE.Group> {
     return new Map<string, THREE.Group>([
       ["terrain", new THREE.Group()],
-      ["rock_largeA", boxTemplate(2.0, 1.2)], // non-square footprint, max dim = x
-      ["rock_crystalsLargeA", boxTemplate(1.0, 1.6)], // max dim = z
-      ["rock", boxTemplate(0.6, 0.6)], // small decorative rock — no collision
-      ["rocks_smallA", boxTemplate(0.8, 0.8)], // small scatter — no collision
+      // STRUCTURAL_PROP_ASSETS — unconditionally solid, no height gate.
+      ["corridor", boxTemplate(1.0, 1.0)],
+      // NATURAL_DECOR_ASSETS — real measured (diam, height) pairs, see the
+      // doc comment in mapLoader.ts for the source measurements.
+      ["rock_largeA", boxTemplate(2.0, 1.2, 0.5)], // non-square footprint, max dim = x, real height class
+      ["rock_largeB", boxTemplate(0.939, 0.928, 0.5)], // bug fix: missing from the old LARGE_PROP_ASSETS set
+      ["rock_crystalsLargeA", boxTemplate(1.0, 1.6, 0.541)], // max dim = z
+      ["rock", boxTemplate(0.851, 0.801, 0.3)], // real footprint is NOT tiny (~0.85m) — stays decor via the HEIGHT gate (0.3 < 0.35), not diameter
+      ["rocks_smallA", boxTemplate(0.937, 0.87, 0.105)], // flat pebble scatter — wide footprint, decor via height gate
+      ["meteor", boxTemplate(0.866, 0.75, 0.735)], // new: solid chunk, same scale as rock_largeA
+      ["crater", boxTemplate(0.826, 0.715, 0.118)], // flat ground decal — decor via height gate
+      ["bones", boxTemplate(0.861, 0.582, 0.442)], // clears BOTH thresholds but explicitly excepted (scattered pile, not real mass)
+      ["desk_chair", boxTemplate(0.15, 0.15, 0.294)], // not in either set at all — never gets an obstacle
     ]);
   }
 
@@ -155,15 +173,23 @@ describe("GameMap static prop obstacles", () => {
     );
   }
 
-  it("large prop (rock_largeA) gets a collision circle at its world position, scaled and shrunk", () => {
-    const map = makePropMap([{ asset: "rock_largeA", x: 3, z: -2, y_level: 1, scale: 0.8 }], [-1, 0, 0.5]);
+  it("structural prop (corridor) gets a collision circle at its world position, scaled and shrunk", () => {
+    const map = makePropMap([{ asset: "corridor", x: 3, z: -2, y_level: 1, scale: 0.8 }], [-1, 0, 0.5]);
     const obstacles = map.getStaticObstacles();
     expect(obstacles).toHaveLength(1);
     // world x = 3*1 + (-1) = 2, world z = -2*1 + 0.5 = -1.5.
     expect(obstacles[0].x).toBeCloseTo(2, 6);
     expect(obstacles[0].z).toBeCloseTo(-1.5, 6);
     expect(obstacles[0].alive).toBe(true);
-    // footprint max(size.x, size.z) = max(2.0, 1.2) = 2.0 → radius = (2.0/2) * 0.8(scale) * 0.8(shrink) = 0.64.
+    // footprint max(1.0, 1.0) = 1.0 → radius = (1.0/2) * 0.8(scale) * 0.8(shrink) = 0.32.
+    expect(obstacles[0].radius).toBeCloseTo(0.32, 6);
+  });
+
+  it("large natural-decor prop (rock_largeA) gets a collision circle, scaled and shrunk", () => {
+    const map = makePropMap([{ asset: "rock_largeA", x: 0, z: 0, y_level: 0, scale: 0.8 }]);
+    const obstacles = map.getStaticObstacles();
+    expect(obstacles).toHaveLength(1);
+    // footprint max(2.0, 1.2) = 2.0 → radius = (2.0/2) * 0.8(scale) * 0.8(shrink) = 0.64.
     expect(obstacles[0].radius).toBeCloseTo(0.64, 6);
   });
 
@@ -173,21 +199,59 @@ describe("GameMap static prop obstacles", () => {
     expect(map.getStaticObstacles()[0].radius).toBeCloseTo(0.64, 6);
   });
 
-  it("small decorative props (rock, rocks_smallA) get NO collision circle", () => {
+  it("bug fix: rock_largeB (same scale as rock_largeA) now gets a collision circle", () => {
+    // Was silently missing from the old hand-maintained LARGE_PROP_ASSETS
+    // set despite being near-identical in size to rock_largeA/B's siblings.
+    const map = makePropMap([{ asset: "rock_largeB", x: 0, z: 0, y_level: 0 }]);
+    expect(map.getStaticObstacles()).toHaveLength(1);
+    expect(map.getStaticObstacles()[0].radius).toBeCloseTo((0.939 / 2) * 0.8, 6);
+  });
+
+  it("meteor family gets a collision circle now (was entirely excluded before)", () => {
+    const map = makePropMap([{ asset: "meteor", x: 0, z: 0, y_level: 0 }]);
+    expect(map.getStaticObstacles()).toHaveLength(1);
+  });
+
+  it("wide-but-flat natural decor (rock, rocks_smallA, crater) stays walk-through despite footprint above the diameter floor", () => {
     const map = makePropMap([
-      { asset: "rock", x: 1, z: 1, y_level: 0 },
-      { asset: "rocks_smallA", x: 2, z: 2, y_level: 0 },
+      { asset: "rock", x: 1, z: 1, y_level: 0 }, // diam 0.851 clears MIN_OBSTACLE_DIAMETER, height 0.3 fails MIN_OBSTACLE_HEIGHT
+      { asset: "rocks_smallA", x: 2, z: 2, y_level: 0 }, // diam 0.937 clears, height 0.105 fails
+      { asset: "crater", x: 3, z: 3, y_level: 0 }, // diam 0.826 clears, height 0.118 fails
     ]);
     expect(map.getStaticObstacles()).toHaveLength(0);
   });
 
-  it("defaults to scale 1 when a large prop omits it", () => {
+  it("bones stays walk-through via the explicit exception even though it clears both thresholds", () => {
+    // bones: diam 0.861 >= 0.6, height 0.442 >= 0.35 — would pass the
+    // generic size gate, but is explicitly excepted (see DECOR_HEIGHT_EXCEPTIONS).
+    const map = makePropMap([{ asset: "bones", x: 0, z: 0, y_level: 0 }]);
+    expect(map.getStaticObstacles()).toHaveLength(0);
+  });
+
+  it("a prop outside both STRUCTURAL_PROP_ASSETS and NATURAL_DECOR_ASSETS never gets an obstacle regardless of size", () => {
+    const map = makePropMap([{ asset: "desk_chair", x: 0, z: 0, y_level: 0 }]);
+    expect(map.getStaticObstacles()).toHaveLength(0);
+  });
+
+  it("scaling a natural-decor prop below MIN_OBSTACLE_DIAMETER drops its obstacle (small object -> no collision)", () => {
+    // rock_largeA scaled down to 0.2: diam = 2.0*0.2 = 0.4 < 0.6 -> decor.
+    const map = makePropMap([{ asset: "rock_largeA", x: 0, z: 0, y_level: 0, scale: 0.2 }]);
+    expect(map.getStaticObstacles()).toHaveLength(0);
+  });
+
+  it("scaling a structural prop below MIN_OBSTACLE_DIAMETER also drops its obstacle", () => {
+    // corridor scaled to 0.3: diam = 1.0*0.3 = 0.3 < 0.6 -> no obstacle even though it's STRUCTURAL.
+    const map = makePropMap([{ asset: "corridor", x: 0, z: 0, y_level: 0, scale: 0.3 }]);
+    expect(map.getStaticObstacles()).toHaveLength(0);
+  });
+
+  it("defaults to scale 1 when a natural-decor prop omits it", () => {
     const map = makePropMap([{ asset: "rock_largeA", x: 0, z: 0, y_level: 0 }]);
     // radius = (2.0/2) * 1(default scale) * 0.8 = 0.8.
     expect(map.getStaticObstacles()[0].radius).toBeCloseTo(0.8, 6);
   });
 
-  it("a map with no large props exposes an empty static obstacle list", () => {
+  it("a map with no qualifying props exposes an empty static obstacle list", () => {
     const map = makeMap([{ asset: "terrain", x: 0, z: 0, y_level: 0 }]);
     expect(map.getStaticObstacles()).toEqual([]);
   });

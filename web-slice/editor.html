@@ -90,6 +90,33 @@
     background: #12122a; color: #00ffee; border: 1px solid #00ffee88;
     padding: 5px 8px; font-family: inherit; font-size: 13px; border-radius: 4px; width: 200px;
   }
+
+  /* Maps menu: dropdown-ish panel replacing the old bare <select> so each
+     saved map can carry its own delete button (a native <select>'s <option>
+     can't host a button). Load stays a single click on the name; delete
+     needs a second confirming click, same "no blocking dialogs" rule as
+     Save As. */
+  #mapsMenuWrap { position: relative; }
+  #mapsMenuPanel {
+    position: absolute; top: 34px; left: 0; z-index: 30; min-width: 220px; max-height: 320px;
+    overflow-y: auto; background: #1a1a3a; border: 1px solid #00ffee88; border-radius: 6px;
+    box-shadow: 0 4px 18px #000a; padding: 4px;
+  }
+  #mapsMenuPanel.hidden { display: none; }
+  .maps-menu-empty { padding: 8px 10px; font-size: 12px; color: #00ffee66; }
+  .maps-menu-row { display: flex; align-items: center; gap: 6px; padding: 2px; border-radius: 4px; }
+  .maps-menu-row:hover { background: #00ffee14; }
+  .maps-menu-name {
+    flex: 1 1 auto; background: none; border: none; color: #cde; text-align: left;
+    font-family: inherit; font-size: 12px; padding: 5px 6px; cursor: pointer; border-radius: 3px;
+  }
+  .maps-menu-name:hover { color: #00ffee; }
+  .maps-menu-del {
+    flex: 0 0 auto; background: #12122a; color: #ff8899; border: 1px solid #ff556655;
+    padding: 4px 8px; font-size: 12px; border-radius: 3px; cursor: pointer;
+  }
+  .maps-menu-del:hover { background: #ff556622; border-color: #ff5566; }
+  .maps-menu-del.confirm { background: #ff5566; color: #12122a; border-color: #ff5566; font-weight: bold; }
 </style>
 </head>
 <body>
@@ -100,9 +127,10 @@
     <button id="btnExport">Export</button>
     <label class="file-btn" for="fileImport">Import</label>
     <input type="file" id="fileImport" accept="application/json" style="display:none">
-    <select id="selLoad" title="Load a map from the dev server (public/maps/)">
-      <option value="">Load ▾</option>
-    </select>
+    <div id="mapsMenuWrap">
+      <button id="btnMapsMenu" title="Load or delete a map from the dev server (public/maps/)">Load ▾</button>
+      <div id="mapsMenuPanel" class="hidden"></div>
+    </div>
     <button id="btnSave" title="Save over the currently-loaded map (asks for a name if none is loaded)">Save</button>
     <button id="btnSaveAs" title="Save as a new name, never overwriting the current map">Save As</button>
     <span id="mapNameLabel">Map: (unsaved)</span>
