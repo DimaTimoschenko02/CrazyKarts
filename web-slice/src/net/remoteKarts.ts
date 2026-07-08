@@ -9,6 +9,7 @@ import type { KartObstacle } from "../physics/kartCollision";
 import type { GameMap } from "../map/mapLoader";
 import { forwardOf, rightOf } from "../kart/kart";
 import { computeAirborneFactor, computeAttitudeTarget, LEVEL as LEVEL_ATTITUDE } from "../kart/attitude";
+import { sampleGroundProbes } from "../kart/groundProbe";
 import { DEFAULT_AXLE_GEOMETRY, DEFAULT_KART_PHYSICS_PARAMS } from "../physics/types";
 import { KART_TYPES } from "../kart/stats";
 
@@ -164,17 +165,23 @@ export class RemoteKartManager {
       const airborneRaw = computeAirborneFactor(groundHere, pose.y, REMOTE_AIRBORNE_HEIGHT, REMOTE_AIRBORNE_BAND);
       kart.airborneSm += (airborneRaw - kart.airborneSm) * (1 - Math.exp(-AIRBORNE_FACTOR_RATE * dt));
 
+      const halfWheelbase = DEFAULT_AXLE_GEOMETRY.wheelbase * 0.5;
+      const halfTrack = DEFAULT_AXLE_GEOMETRY.trackWidth * 0.5;
       const grounded =
-        groundHere === null
+        groundHere === null || !this.map
           ? LEVEL_ATTITUDE
           : computeAttitudeTarget(
-              this.map,
-              pose.x,
-              pose.z,
-              forwardOf(pose.yaw),
-              rightOf(pose.yaw),
-              DEFAULT_AXLE_GEOMETRY.wheelbase * 0.5,
-              DEFAULT_AXLE_GEOMETRY.trackWidth * 0.5
+              sampleGroundProbes(
+                (x, z) => this.map!.sampleHeight(x, z),
+                pose.x,
+                pose.z,
+                forwardOf(pose.yaw),
+                rightOf(pose.yaw),
+                halfWheelbase,
+                halfTrack
+              ),
+              halfWheelbase,
+              halfTrack
             );
       const groundedFactor = 1 - kart.airborneSm;
       const target = { pitch: grounded.pitch * groundedFactor, roll: grounded.roll * groundedFactor };

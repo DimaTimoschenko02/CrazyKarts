@@ -383,6 +383,11 @@ function placeCell(rec: CellRecord): void {
   if (!template) return;
   const inst = template.clone(true);
   applyCellTransform(inst, rec);
+  // Tag the root instance so precise-delete (X held) can walk up from
+  // whatever child mesh the raycaster actually hits back to "which placed
+  // record does this belong to" — see raycastPreciseTarget().
+  inst.userData.mapKind = "cell";
+  inst.userData.mapKey = key;
   scene.add(inst);
   cells.set(key, rec);
   cellObjs.set(key, inst);
@@ -405,6 +410,10 @@ function addProp(rec: PropRecord): void {
   inst.position.set(rec.x - HALF, rec.y_level * LEVEL_HEIGHT, rec.z - HALF);
   inst.rotation.y = THREE.MathUtils.degToRad(rec.rot);
   inst.scale.setScalar(rec.scale);
+  // Same root tagging as placeCell — mapRec holds a direct reference to the
+  // record (not an index), matching removePropByRef's identity-based lookup.
+  inst.userData.mapKind = "prop";
+  inst.userData.mapRec = rec;
   scene.add(inst);
   props.push(rec);
   propObjs.push(inst);
@@ -614,12 +623,142 @@ function updatePlane(): void {
 }
 updatePlane();
 
+// ── Precise delete (X held) ──────────────────────────────────────────────
+// Regular right-click delete snaps to the grid cell under the cursor and
+// picks the top of that column — great for "I clicked the wrong tile,
+// undo/redo it" but useless for carving a tunnel through the *middle* of a
+// stacked wall (wall_block columns), because you can never aim at anything
+// but the topmost block in a column. Precise delete instead raycasts
+// against the actual placed meshes, so whatever the camera is looking
+// straight at — including a mid-stack block hidden behind ones "in front"
+// of it from the top-down grid's point of view, but not from this ray's —
+// is exactly what gets removed.
+type PreciseTarget =
+  | { kind: "cell"; key: string; root: THREE.Object3D }
+  | { kind: "prop"; rec: PropRecord; root: THREE.Object3D };
+
+let preciseDeleteMode = false;
+let preciseTarget: PreciseTarget | null = null;
+// Highlight is a wireframe AABB box, not a material/emissive tint. Every
+// placed instance is template.clone(true) — three.js clone() copies the
+// Object3D graph but keeps the SAME Material references across all clones
+// of one template (that's the whole point, it's what makes instancing
+// cheap). Mutating a hit mesh's material .emissive directly would therefore
+// recolor every OTHER copy of that same asset on the map too. A separate
+// Box3Helper line-box drawn around the target's world AABB sidesteps that
+// entirely — it owns its own tiny geometry/material, never touches the
+// target's own material, and costs one dispose() on cleanup.
+let deleteHighlight: THREE.Box3Helper | null = null;
+
+function clearDeleteHighlight(): void {
+  if (!deleteHighlight) return;
+  scene.remove(deleteHighlight);
+  deleteHighlight.geometry.dispose();
+  (deleteHighlight.material as THREE.Material).dispose();
+  deleteHighlight = null;
+}
+
+function setDeleteHighlight(root: THREE.Object3D | null): void {
+  clearDeleteHighlight();
+  if (!root) return;
+  const box = new THREE.Box3().setFromObject(root); // world-space AABB, handles mirror (scale.x=-1) and rotation fine
+  deleteHighlight = new THREE.Box3Helper(box, 0xff2222);
+  scene.add(deleteHighlight);
+}
+
+// Raycasts from the last known cursor position against every placed cell
+// and prop instance (recursive, so it hits child meshes of multi-mesh
+// templates), then walks up from whatever was hit to the tagged root
+// (see placeCell/addProp's userData.mapKind) so a 2-cell asset's second
+// mesh or a nested child still resolves to the ONE record it belongs to.
+function raycastPreciseTarget(): PreciseTarget | null {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const ndc = new THREE.Vector2(
+    ((lastClientX - rect.left) / rect.width) * 2 - 1,
+    -((lastClientY - rect.top) / rect.height) * 2 + 1
+  );
+  raycaster.setFromCamera(ndc, camera);
+  const candidates: THREE.Object3D[] = [...cellObjs.values(), ...propObjs];
+  const hits = raycaster.intersectObjects(candidates, true);
+  if (hits.length === 0) return null;
+  let obj: THREE.Object3D | null = hits[0].object;
+  while (obj && !obj.userData.mapKind) obj = obj.parent;
+  if (!obj) return null;
+  if (obj.userData.mapKind === "cell") {
+    return { kind: "cell", key: obj.userData.mapKey as string, root: obj };
+  }
+  if (obj.userData.mapKind === "prop") {
+    return { kind: "prop", rec: obj.userData.mapRec as PropRecord, root: obj };
+  }
+  return null;
+}
+
+function updatePreciseStatusBar(): void {
+  if (!preciseTarget) {
+    statusMain.textContent = "precise-delete (X): наведи на блок";
+    statusHint.textContent = "ЛКМ / ПКМ — удалить объект под курсором · отпусти X — выйти из режима";
+    return;
+  }
+  if (preciseTarget.kind === "cell") {
+    const rec = cells.get(preciseTarget.key);
+    statusMain.textContent = rec
+      ? `precise-delete: ${rec.asset}  cell: (${rec.x}, ${rec.z})  y_level: ${rec.y_level}`
+      : "precise-delete (X): наведи на блок";
+  } else {
+    const rec = preciseTarget.rec;
+    statusMain.textContent =
+      `precise-delete: ${rec.asset}  prop @ (${rec.x.toFixed(2)}, ${rec.z.toFixed(2)})  y_level: ${rec.y_level}`;
+  }
+  statusHint.textContent = "ЛКМ / ПКМ — удалить подсвеченный объект · отпусти X — выйти из режима";
+}
+
+// Called from refreshCursor whenever preciseDeleteMode is on, instead of
+// the normal ground-plane cell/ghost logic.
+function updatePreciseDeleteHover(): void {
+  preciseTarget = raycastPreciseTarget();
+  setDeleteHighlight(preciseTarget?.root ?? null);
+  updatePreciseStatusBar();
+}
+
+// Deletes exactly the currently-highlighted target (re-raycast at the
+// current cursor position happens beforehand, in pointerdown -> refreshCursor
+// -> updatePreciseDeleteHover, so this always acts on a fresh hit). Reuses
+// the same undo-entry shapes as the normal left/right-click handlers so
+// Ctrl+Z/Z-Y work identically for tunnel-digging as for any other edit.
+function deletePreciseTarget(): void {
+  if (!preciseTarget) return;
+  if (preciseTarget.kind === "cell") {
+    const before = cells.get(preciseTarget.key) ?? null;
+    if (!before) return;
+    if (removeCell(preciseTarget.key)) {
+      pushUndo({ kind: "cell", key: preciseTarget.key, before, after: null });
+      scheduleAutosave();
+    }
+  } else {
+    const rec = preciseTarget.rec;
+    if (removePropByRef(rec)) {
+      pushUndo({ kind: "prop", before: rec, after: null });
+      scheduleAutosave();
+    }
+  }
+  // Re-hover immediately at the same screen position — carving a tunnel is
+  // a rapid-fire sequence of clicks without moving the mouse, so the next
+  // block back should light up right away instead of waiting for a
+  // pointermove that may never come between clicks.
+  updatePreciseDeleteHover();
+}
+
 // Recomputes the cursor's cell-space position from a client (screen) point,
 // updates the ghost + status bar. Called on pointermove and whenever rot /
 // y_level / active asset change (using the last known cursor position).
 function refreshCursor(clientX: number, clientY: number): void {
   lastClientX = clientX;
   lastClientY = clientY;
+  if (preciseDeleteMode) {
+    if (ghost) ghost.visible = false; // no placement while carving/deleting precisely
+    updatePreciseDeleteHover();
+    return;
+  }
   const rect = renderer.domElement.getBoundingClientRect();
   const ndc = new THREE.Vector2(
     ((clientX - rect.left) / rect.width) * 2 - 1,
@@ -700,6 +839,13 @@ renderer.domElement.addEventListener("pointermove", e => {
 
 renderer.domElement.addEventListener("pointerdown", e => {
   refreshCursor(e.clientX, e.clientY);
+  if (preciseDeleteMode) {
+    // Both buttons delete in this mode — there's no "place" to distinguish
+    // between, and forcing the owner to remember which button does what
+    // while they're heads-down staring through a wall isn't worth it.
+    if (e.button === 0 || e.button === 2) deletePreciseTarget();
+    return;
+  }
   if (e.button === 0) {
     // Left click: place the active asset (no-op if nothing selected).
     if (!activeAsset) return;
@@ -779,6 +925,18 @@ addEventListener("keydown", e => {
     return;
   }
 
+  if (e.code === "KeyX") {
+    // Held-key mode toggle, not a one-shot action — guard against the flood
+    // of repeat keydown events the browser fires while a key stays down
+    // (e.repeat) so we don't redo the enter-mode work every ~30ms.
+    if (!preciseDeleteMode) {
+      preciseDeleteMode = true;
+      refreshCursor(lastClientX, lastClientY);
+    }
+    e.preventDefault();
+    return;
+  }
+
   if (e.code === "KeyR") {
     rotIndex = (rotIndex + 1) % ROT_CYCLE.length;
     refreshCursor(lastClientX, lastClientY);
@@ -807,12 +965,24 @@ addEventListener("keydown", e => {
 
 addEventListener("keyup", e => {
   pressedKeys.delete(e.code);
+  if (e.code === "KeyX") {
+    preciseDeleteMode = false;
+    preciseTarget = null;
+    clearDeleteHighlight();
+    refreshCursor(lastClientX, lastClientY); // restores ghost visibility + normal status bar
+  }
 });
 
 // If focus leaves the window mid-pan (alt-tab, devtools) the keyup never
-// fires — clear held keys so the camera doesn't drift forever.
+// fires — clear held keys (and exit precise-delete mode the same way) so
+// nothing gets stuck on when focus returns.
 addEventListener("blur", () => {
   pressedKeys.clear();
+  if (preciseDeleteMode) {
+    preciseDeleteMode = false;
+    preciseTarget = null;
+    clearDeleteHighlight();
+  }
 });
 
 btnUndo.addEventListener("click", () => undo());

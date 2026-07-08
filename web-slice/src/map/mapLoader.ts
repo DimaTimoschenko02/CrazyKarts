@@ -7,116 +7,22 @@
 // ../shared/heightfield.ts (extracted in the P3 combat slice so the Colyseus
 // match server can sample the exact same terrain for rocket collision without
 // duplicating the ascent tables — see server/config/arena.ts).
+//
+// Collision v2 (design/notes/collision-v2.md): static collision (wall_block*
+// cells + structural/natural-decor props) is now SAT convex polygons built by
+// shared/staticColliders.ts from the committed shared/collisionShapes.json
+// table, NOT the old per-prop collision circle. See kart/kart.ts step 8 for
+// the SAT resolution loop that consumes getStaticColliders() below.
 import * as THREE from "three";
 import type { AssetLibrary } from "./assetLoader";
 import { Heightfield, TWO_CELL_ASSETS, longAxis, type CellDef, type MapJson, type PropDef } from "../shared/heightfield";
-import type { KartObstacle } from "../physics/kartCollision";
+import { buildStaticColliders, type CollisionShapesTable } from "../shared/staticColliders";
+import type { ConvexPoly } from "../shared/collision2d";
+import collisionShapesTable from "../shared/collisionShapes.json";
 
 export type { MapJson };
 
-// A static (never-moving, always-alive) collision circle contributed by a
-// map prop — see LARGE_PROP_ASSETS below. Superset of KartObstacle so it can
-// be concatenated straight into the `obstacles` array Kart.update() already
-// accepts from net/remoteKarts.ts getObstacles() (see main.ts wiring).
-export interface StaticObstacle extends KartObstacle {
-  radius: number;
-}
-
-// Buildings/rockets/heavy machinery: UNCONDITIONALLY solid, always get a
-// collision circle sized from their footprint AABB regardless of raw
-// dimensions. Curated at the FAMILY level (not derived from measured size —
-// see NATURAL_DECOR_ASSETS below for the size-driven half of this module),
-// because plenty of walk-through Tech/Track and Structures pieces (platforms,
-// pipes, rails, monorails, desks/stairs/supports/weapons) have a comparable
-// or even larger footprint than these but read as track-level decor a kart
-// drives over, not a wall — that curation is a deliberate game-designer call,
-// unchanged by the P1.6 prop-collision rework (owner report, 2026-07-08) and
-// out of this pass's scope. See .claude/rules/map-building.md "Props".
-const STRUCTURAL_PROP_ASSETS = new Set([
-  // Buildings
-  "corridor", "corridor_corner", "corridor_cornerRound", "corridor_cornerRoundWindow",
-  "corridor_cross", "corridor_detailed", "corridor_end", "corridor_open", "corridor_roof",
-  "corridor_split", "corridor_wall", "corridor_wallCorner", "corridor_window", "corridor_windowClosed",
-  "hangar_largeA", "hangar_largeB", "hangar_roundA", "hangar_roundB", "hangar_roundGlass",
-  "hangar_smallA", "hangar_smallB",
-  "structure", "structure_closed", "structure_detailed", "structure_diagonal",
-  "gate_complex", "gate_simple",
-  // Rockets / craft
-  "craft_cargoA", "craft_cargoB", "craft_miner",
-  "craft_speederA", "craft_speederB", "craft_speederC", "craft_speederD",
-  "rocket_baseA", "rocket_baseB", "rocket_finsA", "rocket_finsB",
-  "rocket_fuelA", "rocket_fuelB", "rocket_sidesA", "rocket_sidesB",
-  "rocket_topA", "rocket_topB",
-  // Structures — only the visibly large solid pieces
-  "machine_barrel", "machine_barrelLarge", "machine_generator", "machine_generatorLarge",
-  "satelliteDish_large", "turret_single", "turret_double",
-  // Decor — vehicle-sized only
-  "rover",
-]);
-
-// Natural-terrain decor family (rocks/crystals/meteors/craters/bones) —
-// collision here is SIZE-DERIVED instead of a hand-maintained include/
-// exclude list. Owner report 2026-07-08: adding a rock and a meteor produced
-// inconsistent collision (some rocks solid, some not; a "micro" rock got a
-// whole-cell-sized circle) because the old LARGE_PROP_ASSETS set was picked
-// by eyeballing names, not measuring geometry — it had rock_largeA in but
-// rock_crystalsLargeA/B's near-identical-size sibling rock_largeB OUT, and
-// excluded the entire meteor family even though meteor/meteor_detailed are
-// the same scale as rock_largeA.
-//
-// Actual measured footprint (max(size.x,size.z)) / height (size.y), from
-// the real GLBs (tools/_tmp_glb_bbox2.ts, run once during this fix, numbers
-// recorded here since the script itself was a throwaway):
-//   rock                 diam=0.851 h=0.300  -> decor (below height floor)
-//   rocks_smallA         diam=0.937 h=0.105  -> decor (flat pebble scatter)
-//   rocks_smallB         diam=0.729 h=0.186  -> decor (flat pebble scatter)
-//   rock_crystals        diam=0.851 h=0.337  -> decor (below height floor)
-//   rock_largeA          diam=0.919 h=0.500  -> SOLID
-//   rock_largeB          diam=0.939 h=0.500  -> SOLID (bug fix: was missing)
-//   rock_crystalsLargeA  diam=0.919 h=0.541  -> SOLID
-//   rock_crystalsLargeB  diam=0.939 h=0.550  -> SOLID
-//   meteor               diam=0.866 h=0.735  -> SOLID (new)
-//   meteor_detailed      diam=0.866 h=0.735  -> SOLID (new)
-//   meteor_half          diam=0.866 h=0.367  -> SOLID (new)
-//   crater               diam=0.826 h=0.118  -> decor (flat ground decal)
-//   craterLarge          diam=0.886 h=0.120  -> decor (flat ground decal)
-//   bones                diam=0.861 h=0.442  -> decor, EXPLICIT exception
-//     (clears both thresholds on paper — a scattered bone PILE's bbox is
-//     tall because one bone juts up, but the pile has almost no actual
-//     blocking volume, same design call as crater/craterLarge — see
-//     DECOR_HEIGHT_EXCEPTIONS below)
-const NATURAL_DECOR_ASSETS = new Set([
-  "rock", "rocks_smallA", "rocks_smallB", "rock_crystals",
-  "rock_largeA", "rock_largeB", "rock_crystalsLargeA", "rock_crystalsLargeB",
-  "meteor", "meteor_detailed", "meteor_half",
-  "crater", "craterLarge", "bones",
-]);
-
-// Below this scaled footprint diameter, ANY prop (structural or natural
-// decor) is too small to plausibly block a kart's body regardless of shape —
-// the general "small object → collision sized or none" principle from the
-// owner's bug report. Comfortably below every structural asset's real size
-// (smallest is machine_barrel at 0.646m) and above every genuinely tiny
-// decor item Space Kit ships (furniture/weapons/characters top out around
-// 0.5m — see tools/_tmp_glb_bbox.ts sweep run during this fix).
-const MIN_OBSTACLE_DIAMETER = 0.6;
-
-// Below this scaled height, a NATURAL_DECOR_ASSETS prop stays walk-through
-// even if its footprint clears MIN_OBSTACLE_DIAMETER — a wide-but-flat prop
-// (crater, a loose pebble scatter) doesn't sit tall enough to actually
-// obstruct a kart's undercarriage. Only applied to the natural-decor family:
-// STRUCTURAL_PROP_ASSETS are always solid once past the diameter floor (a
-// building or rocket hull is never "too flat to block").
-const MIN_OBSTACLE_HEIGHT = 0.35;
-
-// Explicit override — see NATURAL_DECOR_ASSETS "bones" note above.
-const DECOR_HEIGHT_EXCEPTIONS = new Set(["bones"]);
-
-// Large props get a collision circle shrunk from their raw footprint AABB by
-// this factor — arcade standard so grazing the rock's rough/uneven visual
-// edge doesn't get treated as a hard hit (mirrors why KART_COLLISION_RADIUS
-// itself is smaller than the kart mesh's own footprint).
-const PROP_COLLISION_SHRINK = 0.8;
+const SHAPES_TABLE = collisionShapesTable as unknown as CollisionShapesTable;
 
 export class GameMap {
   readonly root = new THREE.Group();
@@ -124,19 +30,29 @@ export class GameMap {
   private tile = 1;
   private levelHeight = 0.5;
   private origin = new THREE.Vector3();
-  private staticObstacles: StaticObstacle[] = [];
+  private staticColliders: ConvexPoly[] = [];
 
-  // Static collision circles contributed by large decorative props (see
-  // LARGE_PROP_ASSETS) — concatenate with net.getObstacles() before passing
-  // to Kart.update() (see main.ts).
-  getStaticObstacles(): readonly StaticObstacle[] {
-    return this.staticObstacles;
+  // Static SAT collision polygons — wall_block* cells (AABB) + qualifying
+  // props (structural OBB / natural-decor hull), see shared/staticColliders.ts.
+  // Consumed by kart/kart.ts step 8 (resolveKartVsStatic), NOT by the old
+  // circle-push path — resolveKartPush (physics/kartCollision.ts) is now
+  // kart-vs-kart ONLY.
+  getStaticColliders(): readonly ConvexPoly[] {
+    return this.staticColliders;
   }
 
   // Ground height at a world XZ point, or null when there is no cell there
   // (off the map edge → the mover treats it as a wall).
   sampleHeight(wx: number, wz: number): number | null {
     return this.heightfield.sample(wx, wz);
+  }
+
+  // True if EITHER a walkable cell OR a wall_block* cell was authored here —
+  // see shared/heightfield.ts Heightfield.hasColumn doc. Used by
+  // physics/terrainWall.ts to tell a genuine off-map edge apart from a
+  // wall_block hole (which the SAT static-poly path above already owns).
+  hasColumn(wx: number, wz: number): boolean {
+    return this.heightfield.hasColumn(wx, wz);
   }
 
   // Fallback spawn point for when the authored SPAWN constant (main.ts) lands
@@ -216,29 +132,10 @@ export class GameMap {
     inst.rotation.y = THREE.MathUtils.degToRad(def.rot ?? 0);
     inst.scale.setScalar(def.scale ?? 1);
     this.root.add(inst);
-
-    const isStructural = STRUCTURAL_PROP_ASSETS.has(def.asset);
-    const isNaturalDecor = NATURAL_DECOR_ASSETS.has(def.asset) && !DECOR_HEIGHT_EXCEPTIONS.has(def.asset);
-    if (isStructural || isNaturalDecor) {
-      // Radius from the UNSCALED template's own footprint AABB (rotation
-      // around Y doesn't change the circle enclosing a centered footprint,
-      // so def.rot needs no compensation here — only def.scale does).
-      const box = new THREE.Box3().setFromObject(template);
-      const size = box.getSize(new THREE.Vector3());
-      const scale = def.scale ?? 1;
-      const scaledDiameter = Math.max(size.x, size.z) * scale;
-      const scaledHeight = size.y * scale;
-      // Size-driven gate (owner report 2026-07-08 — see NATURAL_DECOR_ASSETS
-      // doc above): too-small footprint never gets an obstacle regardless of
-      // family; the natural-decor family ALSO needs real height (not just a
-      // wide flat footprint) to count as blocking mass.
-      const passesDiameter = scaledDiameter >= MIN_OBSTACLE_DIAMETER;
-      const passesHeight = isStructural || scaledHeight >= MIN_OBSTACLE_HEIGHT;
-      if (passesDiameter && passesHeight) {
-        const radius = (scaledDiameter / 2) * PROP_COLLISION_SHRINK;
-        this.staticObstacles.push({ x: inst.position.x, z: inst.position.z, alive: true, radius });
-      }
-    }
+    // Collision shape (if any) is built once for the WHOLE map from the raw
+    // MapJson in fromJson() below (shared/staticColliders.ts) — not per-prop
+    // here, since that module needs the world_pos/rot/scale math anyway and
+    // this is purely the visual placement path.
   }
 
   static async load(url: string, lib: AssetLibrary): Promise<GameMap> {
@@ -252,6 +149,7 @@ export class GameMap {
     map.levelHeight = data.meta.level_height;
     map.origin.fromArray(data.meta.origin_offset);
     map.heightfield = Heightfield.fromMapJson(data);
+    map.staticColliders = buildStaticColliders(data, SHAPES_TABLE);
 
     for (const rect of data.rect_fills ?? []) {
       for (let x = rect.x_min; x <= rect.x_max; x++) {

@@ -11,7 +11,14 @@
 // targets below are built so "the ground is higher on side X" maps directly
 // to "that side of the body sits higher" — i.e. the body follows the
 // terrain, exactly like it already does vertically (kart.ts groundY).
-import type { GameMap } from "../map/mapLoader";
+//
+// P3 (design/notes/collision-v2.md §4): this now takes an ALREADY-SAMPLED
+// GroundProbes set (kart/groundProbe.ts) instead of re-sampling the
+// heightfield itself — the same center+F/B/R/L probe set also feeds the
+// I3 max-height ground-follow (kart.ts step 8b), so a substep never samples
+// the heightfield twice for what is conceptually one "where's the ground
+// under this body" question.
+import type { GroundProbes } from "./groundProbe";
 
 export interface AttitudeTarget {
   pitch: number; // radians, +up at the nose when climbing
@@ -31,42 +38,33 @@ export function smoothstep(lo: number, hi: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-// `fwd`/`right` are unit vectors in world XZ (y=0) at the body's current yaw
-// — same convention as kart/kart.ts forwardOf()/rightOf(). `halfWheelbase`/
-// `halfTrack` are the fore-aft / left-right probe half-distances (half the
-// axle geometry — see DEFAULT_AXLE_GEOMETRY).
+// `halfWheelbase`/`halfTrack` must be the SAME half-distances the caller
+// used to build `probes` (kart/groundProbe.ts sampleGroundProbes) — they're
+// only needed here for the atan2 denominator (probe separation), not for
+// re-sampling.
 //
 // NOTE on map-edge behavior: this returns LEVEL outright the instant the
-// KART'S OWN xz falls outside every defined heightfield cell (hHere===null).
-// That's a genuine discrete jump versus the real slope one step earlier (see
-// attitude.test.ts's reproduction of the exact size of that jump) — left
-// as-is here rather than papered over, because on its own this function has
-// no notion of "how far off the map" to grade the falloff by. Callers whose
-// input position can legitimately sit at/past the map edge (net/
-// remoteKarts.ts, where remote karts spawn and get pushed right up against
-// map boundaries) MUST NOT call this raw and apply its result directly —
-// they need to blend it continuously against LEVEL themselves, keyed off a
-// SEPARATE smoothed signal (computeAirborneFactor below), exactly the way
-// .claude/rules/smooth-values.md's rule #5 prescribes: smooth the blend
-// FACTOR once, then use it as a plain multiplier, rather than lerping toward
-// this function's own (still binary-at-the-edge) output.
-export function computeAttitudeTarget(
-  map: GameMap | null,
-  x: number,
-  z: number,
-  fwd: { x: number; z: number },
-  right: { x: number; z: number },
-  halfWheelbase: number,
-  halfTrack: number
-): AttitudeTarget {
-  if (!map) return LEVEL;
-  const hHere = map.sampleHeight(x, z);
-  if (hHere === null) return LEVEL;
-
-  const hF = map.sampleHeight(x + fwd.x * halfWheelbase, z + fwd.z * halfWheelbase) ?? hHere;
-  const hB = map.sampleHeight(x - fwd.x * halfWheelbase, z - fwd.z * halfWheelbase) ?? hHere;
-  const hR = map.sampleHeight(x + right.x * halfTrack, z + right.z * halfTrack) ?? hHere;
-  const hL = map.sampleHeight(x - right.x * halfTrack, z - right.z * halfTrack) ?? hHere;
+// KART'S OWN xz falls outside every defined heightfield cell
+// (probes.center===null). That's a genuine discrete jump versus the real
+// slope one step earlier (see attitude.test.ts's reproduction of the exact
+// size of that jump) — left as-is here rather than papered over, because on
+// its own this function has no notion of "how far off the map" to grade the
+// falloff by. Callers whose input position can legitimately sit at/past the
+// map edge (net/remoteKarts.ts, where remote karts spawn and get pushed
+// right up against map boundaries) MUST NOT call this raw and apply its
+// result directly — they need to blend it continuously against LEVEL
+// themselves, keyed off a SEPARATE smoothed signal (computeAirborneFactor
+// below), exactly the way .claude/rules/smooth-values.md's rule #5
+// prescribes: smooth the blend FACTOR once, then use it as a plain
+// multiplier, rather than lerping toward this function's own (still
+// binary-at-the-edge) output.
+export function computeAttitudeTarget(probes: GroundProbes, halfWheelbase: number, halfTrack: number): AttitudeTarget {
+  if (probes.center === null) return LEVEL;
+  const hHere = probes.center;
+  const hF = probes.hF ?? hHere;
+  const hB = probes.hB ?? hHere;
+  const hR = probes.hR ?? hHere;
+  const hL = probes.hL ?? hHere;
 
   return {
     pitch: Math.atan2(hF - hB, halfWheelbase * 2),

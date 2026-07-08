@@ -1,10 +1,9 @@
 // Reproduction + regression coverage for the "remote kart jitters at the map
-// edge" bug (2026-07-07 live playtest report). computeAttitudeTarget probes
-// four points around the kart's XZ to derive pitch/roll from the heightfield
-// (see file header). Those probe points — and the kart's own XZ — can land
-// OFF the map (no cell defined there) whenever the kart sits within one
-// probe-distance of the map boundary, which is exactly where every spawn
-// point is (see .claude/rules/map-building.md map layout notes).
+// edge" bug (2026-07-07 live playtest report). computeAttitudeTarget now
+// takes an already-sampled GroundProbes set (kart/groundProbe.ts P3 rework —
+// design/notes/collision-v2.md §4) instead of re-sampling the map itself;
+// this file builds probes via sampleGroundProbes(map.sampleHeight, ...) to
+// keep the SAME end-to-end reproduction as before.
 //
 // computeAttitudeTarget itself still has a hard "off the map -> LEVEL"
 // branch (documented, not hidden, by the first test below) — the actual fix
@@ -17,6 +16,7 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { GameMap, type MapJson } from "../map/mapLoader";
 import { computeAirborneFactor, computeAttitudeTarget } from "./attitude";
+import { sampleGroundProbes } from "./groundProbe";
 
 function stubLib(names: string[]): Map<string, THREE.Group> {
   return new Map(names.map(n => [n, new THREE.Group()]));
@@ -29,6 +29,19 @@ function makeMap(cells: MapJson["cells"]): GameMap {
     { meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] }, cells },
     LIB
   );
+}
+
+function attitudeAt(
+  map: GameMap,
+  x: number,
+  z: number,
+  fwd: { x: number; z: number },
+  right: { x: number; z: number },
+  halfWheelbase: number,
+  halfTrack: number
+) {
+  const probes = sampleGroundProbes((px, pz) => map.sampleHeight(px, pz), x, z, fwd, right, halfWheelbase, halfTrack);
+  return computeAttitudeTarget(probes, halfWheelbase, halfTrack);
 }
 
 describe("computeAttitudeTarget at the map edge (raw behavior, documented not hidden)", () => {
@@ -44,7 +57,7 @@ describe("computeAttitudeTarget at the map edge (raw behavior, documented not hi
 
     const pitches: { z: number; pitch: number }[] = [];
     for (let z = -0.05; z <= 0.1; z += 0.005) {
-      const t = computeAttitudeTarget(map, 0, z, fwd, right, halfWheelbase, halfTrack);
+      const t = attitudeAt(map, 0, z, fwd, right, halfWheelbase, halfTrack);
       pitches.push({ z, pitch: t.pitch });
     }
     let maxStep = 0;
@@ -63,8 +76,8 @@ describe("computeAttitudeTarget at the map edge (raw behavior, documented not hi
     const fwd = { x: 0, z: 1 };
     const right = { x: 1, z: 0 };
 
-    const justOn = computeAttitudeTarget(map, 0, 0.49, fwd, right, 0.3, 0.5);
-    const justOff = computeAttitudeTarget(map, 0, 0.51, fwd, right, 0.3, 0.5);
+    const justOn = attitudeAt(map, 0, 0.49, fwd, right, 0.3, 0.5);
+    const justOff = attitudeAt(map, 0, 0.51, fwd, right, 0.3, 0.5);
 
     // 0.02m of motion DOES snap the raw pitch most of the way to zero here
     // (~0.24 rad, ~14 degrees) — this is the exact discontinuity that used
@@ -134,8 +147,7 @@ describe("remote kart attitude blend at the map edge (integration, no THREE scen
       const groundHere = map.sampleHeight(x, z);
       const airborneRaw = computeAirborneFactor(groundHere, y, threshold, band);
       airborneSm += (airborneRaw - airborneSm) * (1 - Math.exp(-rate * dt));
-      const grounded =
-        groundHere === null ? { pitch: 0, roll: 0 } : computeAttitudeTarget(map, x, z, fwd, right, halfWheelbase, halfTrack);
+      const grounded = groundHere === null ? { pitch: 0, roll: 0 } : attitudeAt(map, x, z, fwd, right, halfWheelbase, halfTrack);
       const groundedFactor = 1 - airborneSm;
       const target = grounded.pitch * groundedFactor;
       const followAlpha = 1 - Math.exp(-15 * dt); // representative follow rate

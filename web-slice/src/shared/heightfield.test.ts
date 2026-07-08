@@ -310,6 +310,33 @@ describe("stacked columns (several assets sharing one XZ) — topmost solid wins
   });
 });
 
+describe("Heightfield.hasColumn — distinguishes wall_block holes from genuine off-map edges (collision-v2 §3.3)", () => {
+  it("true for a walkable cell", () => {
+    const hf = makeHeightfield([{ asset: "terrain", x: 0, z: 0, y_level: 0 }]);
+    expect(hf.hasColumn(0, 0)).toBe(true);
+  });
+
+  it("true for a wall_block cell even though sample() there is null", () => {
+    const hf = makeHeightfield([{ asset: "wall_block", x: 2, z: 3, y_level: 0 }]);
+    expect(hf.hasColumn(2, 3)).toBe(true);
+    expect(hf.sample(2, 3)).toBeNull();
+  });
+
+  it("false for a genuinely unauthored column (real off-map edge)", () => {
+    const hf = makeHeightfield([{ asset: "terrain", x: 0, z: 0, y_level: 0 }]);
+    expect(hf.hasColumn(50, 50)).toBe(false);
+  });
+
+  it("tracks wall_block rect_fills too, not just individual cells", () => {
+    const hf = Heightfield.fromMapJson({
+      meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
+      rect_fills: [{ asset: "wall_block", x_min: 0, x_max: 2, z_min: 0, z_max: 0, y_level: 0 }],
+    });
+    expect(hf.hasColumn(1, 0)).toBe(true);
+    expect(hf.sample(1, 0)).toBeNull();
+  });
+});
+
 describe("normRot / heightCellFor exports used directly by the diagnostic scan script", () => {
   it("normRot wraps to [0, 360)", () => {
     expect(normRot(-90)).toBe(270);

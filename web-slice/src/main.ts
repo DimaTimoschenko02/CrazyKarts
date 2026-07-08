@@ -206,10 +206,12 @@ let lastRawInput = { throttle: 0, steer: 0 };
 function physTick(): void {
   loop.tick(dt => {
     const raw = input.next(dt * 1000);
-    // Static rock props (map/mapLoader.ts GameMap.getStaticObstacles()) get
-    // the exact same push-out treatment as other players' karts — see
-    // kart.ts step 8c for how it tells the two apart via `radius`.
-    kart.update(dt, raw, map, [...net.getObstacles(), ...(map?.getStaticObstacles() ?? [])]);
+    // Static map props (rocks, buildings, wall_block*) are resolved via the
+    // SAT static-poly path now (Kart.update() step 8b reads map.
+    // getStaticColliders() directly) — see design/notes/collision-v2.md.
+    // `obstacles` here is only OTHER PLAYERS' karts (kart-vs-kart push
+    // circle, physics/kartCollision.ts — unchanged by that rework).
+    kart.update(dt, raw, map, net.getObstacles());
     telemetry.recordSubstep(dt, raw);
     lastRawInput = raw;
   });

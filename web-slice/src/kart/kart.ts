@@ -20,8 +20,11 @@ import { buildKartPhysicsParams, type KartStats } from "./stats";
 import type { RawInput } from "../core/input";
 import { KART_COLLISION_RADIUS, resolveKartPush, type KartObstacle } from "../physics/kartCollision";
 import { createVerticalState, stepVertical, type VerticalState } from "../physics/vertical";
-import { footprintHalfExtents, footprintHitsWall } from "../physics/footprintWall";
+import { footprintHalfExtents, footprintPoints, resolveTerrainSlide } from "../physics/terrainWall";
+import { resolveKartVsStatic } from "../physics/staticSlide";
+import { STATIC_COLLISION_SKIN } from "../shared/staticColliders";
 import { computeAttitudeTarget } from "./attitude";
+import { maxGroundHeight, sampleGroundProbes } from "./groundProbe";
 
 // Godot: forward = -Z rotated by yaw around +Y.
 export function forwardOf(yaw: number): THREE.Vector3 {
@@ -34,13 +37,15 @@ export function rightOf(yaw: number): THREE.Vector3 {
 // Max climbable rise per move — a full tile step is 0.5, ramps rise gradually.
 const MAX_STEP = 0.3;
 
-// `obstacles` (step 8c below) may mix two sources: other connected players'
-// rendered karts (net/remoteKarts.ts getObstacles(), no `radius` — always
-// treated as KART_COLLISION_RADIUS on both sides, unchanged from before) and
-// static map props (map/mapLoader.ts GameMap.getStaticObstacles(), which DO
-// carry their own per-asset `radius`). resolveKartPush only accepts one
-// shared radius for its whole obstacle list, so a rock's differently-sized
-// circle can't just be batched in — see the step 8c loop below.
+// `obstacles` (step 8c below) is now ONLY other connected players' rendered
+// karts (net/remoteKarts.ts getObstacles(), no `radius` — always treated as
+// KART_COLLISION_RADIUS on both sides). Static map props used to also ride
+// in this same list as differently-sized circles (map/mapLoader.ts
+// GameMap.getStaticObstacles()) — Collision v2 (design/notes/collision-v2.md)
+// moved those to the SAT static-poly path (step 8b above,
+// map.getStaticColliders()), so resolveKartPush is kart-vs-kart only now.
+// The optional `radius` field is kept on the type for forward-compat (a
+// future non-kart push-circle obstacle), not because anything sets it today.
 type ObstacleWithOptionalRadius = KartObstacle & { radius?: number };
 
 // Ground-slope sampling for the slope gravity assist (bicyclePhysics.ts
@@ -80,9 +85,9 @@ export class Kart {
 
   private readonly params: KartPhysicsParams;
   private readonly axle = DEFAULT_AXLE_GEOMETRY;
-  // Body-footprint probe half-extents for the wall-collision fix (see
-  // physics/footprintWall.ts) — derived once from the axle geometry, same
-  // half-wheelbase/half-track distances kart/attitude.ts already probes at.
+  // Body-footprint probe half-extents for the dynamic terrain-edge slide
+  // (see physics/terrainWall.ts) — derived once from the axle geometry, same
+  // half-wheelbase/half-track distances kart/groundProbe.ts already probes at.
   private readonly footprintHalf = footprintHalfExtents(this.axle);
   private readonly bicycle: BicyclePhysics;
   private readonly driftSM: ContinuousDrift;
@@ -361,39 +366,53 @@ export class Kart {
     // model since it didn't run; airborne/vy telemetry fields are still
     // refreshed unconditionally at the end of this method.
 
-    // 8. Integrate position with map collision: axis-separated point move.
-    // A rise taller than MAX_STEP — or leaving the map — is a wall: that axis
-    // component of velocity is cancelled, the other keeps sliding (poor man's
-    // move_and_slide, enough for axis-aligned cliffs and map borders). Same
-    // check reused whether grounded or airborne (a solid rise ahead blocks
-    // either way — this module doesn't model true 3D walls a flying kart
-    // could clear, only the heightfield).
-    //
-    // Wall test is FOOTPRINT-aware (physics/footprintWall.ts), not a single
-    // center-point sample — see that module's doc comment for the map_v2.json
-    // bug this fixes (kart corners clipping through terrain_sideCliff mesh
-    // in a tight corner/cliff maze while the center-point reading stayed
-    // clear). fwdNow/rightNow use the yaw AFTER this tick's rotation (step 6
-    // above already applied it) so the probed footprint matches the body's
-    // actual current facing.
+    // 8. Integrate position with map collision — Collision v2 (design/notes/
+    // collision-v2.md). Two collision primitives, chained in this order:
+    //   8a. Dynamic terrain-edge slide (physics/terrainWall.ts): handles
+    //       genuine off-map boundaries and any residual too-steep terrain
+    //       step (wall_block* holes are explicitly EXCLUDED, see that
+    //       module's doc — those are owned by 8b below). Integrates the
+    //       candidate XZ move itself and slides tangentially (I2) instead of
+    //       killing a whole world axis.
+    //   8b. Static SAT contact resolution (physics/staticSlide.ts) against
+    //       every wall_block*/prop collider (shared/staticColliders.ts,
+    //       shared/collision2d.ts SAT+MTV) — push-out by MTV depth + skin,
+    //       slide velocity's normal component (I2). This is what fixes the
+    //       old "half a meter of dead air in front of every wall" bug (P1)
+    //       and the "puffy circle around a rock" bug (P2): the kart's own
+    //       shape is now an OBB (owner-approved §2.1: halfWidth 0.42,
+    //       halfLength 0.83) tested against the REAL contour of the
+    //       obstacle, not a footprint-radius heightfield probe or a bloated
+    //       circle.
+    // Both reused whether grounded or airborne (this module doesn't model
+    // true 3D walls a flying kart could clear over, only XZ shapes).
     if (map) {
       const fwdNow = forwardOf(this.state.yaw);
       const rightNow = rightOf(this.state.yaw);
-      const sampleFn = (x: number, z: number) => map.sampleHeight(x, z);
-      const curX = this.state.pos.x;
-      const curZ = this.state.pos.z;
-      const nx = curX + this.state.vel.x * dt;
-      if (footprintHitsWall(sampleFn, curX, curZ, nx, curZ, fwdNow, rightNow, MAX_STEP, this.footprintHalf.halfLength, this.footprintHalf.halfWidth)) {
-        this.state.vel.x = 0;
-      } else {
-        this.state.pos.x = nx;
-      }
-      const nz = curZ + this.state.vel.z * dt;
-      if (footprintHitsWall(sampleFn, this.state.pos.x, curZ, this.state.pos.x, nz, fwdNow, rightNow, MAX_STEP, this.footprintHalf.halfLength, this.footprintHalf.halfWidth)) {
-        this.state.vel.z = 0;
-      } else {
-        this.state.pos.z = nz;
-      }
+      const terrainSampler = { sample: (x: number, z: number) => map.sampleHeight(x, z), hasColumn: (x: number, z: number) => map.hasColumn(x, z) };
+      const afterTerrain = resolveTerrainSlide(
+        terrainSampler,
+        { x: this.state.pos.x, z: this.state.pos.z },
+        { x: this.state.vel.x, z: this.state.vel.z },
+        dt,
+        { x: fwdNow.x, z: fwdNow.z },
+        { x: rightNow.x, z: rightNow.z },
+        this.footprintHalf.halfLength,
+        this.footprintHalf.halfWidth,
+        MAX_STEP
+      );
+      const afterStatic = resolveKartVsStatic(
+        map.getStaticColliders(),
+        afterTerrain.pos,
+        afterTerrain.vel,
+        { x: rightNow.x, z: rightNow.z },
+        { x: fwdNow.x, z: fwdNow.z },
+        STATIC_COLLISION_SKIN
+      );
+      this.state.pos.x = afterStatic.pos.x;
+      this.state.pos.z = afterStatic.pos.z;
+      this.state.vel.x = afterStatic.vel.x;
+      this.state.vel.z = afterStatic.vel.z;
     } else {
       this.state.pos.addScaledVector(this.state.vel, dt);
     }
@@ -402,24 +421,16 @@ export class Kart {
     // OTHER (alive) connected player. Client-side, symmetric-by-construction
     // — the other client runs this same resolution against OUR rendered
     // position independently, no server authority needed for the bump (see
-    // network-programmer brief). Must not shove the kart through a wall: the
-    // pushed position is re-validated against the map per-axis exactly like
-    // step 8 above, and rolled back on whichever axis lands somewhere
-    // unwalkable.
+    // network-programmer brief). `obstacles` is now ONLY other players'
+    // karts (map static props moved to the SAT path in 8b above — see
+    // main.ts wiring, map.getStaticColliders() replaces the old
+    // map.getStaticObstacles() circle list). Must not shove the kart through
+    // a wall/prop: the pushed position is re-validated against the SAME SAT
+    // static colliders (design doc §3.4 step 4 — "толчок не должен
+    // пропихнуть в стену").
     if (obstacles.length > 0) {
       const preX = this.state.pos.x;
       const preZ = this.state.pos.z;
-      // Resolved ONE obstacle at a time instead of a single batched
-      // resolveKartPush(pos, vel, obstacles) call: that call only takes one
-      // shared `radius` for every obstacle in the list, but a static rock's
-      // radius differs from KART_COLLISION_RADIUS (see ObstacleWithOptionalRadius
-      // above). resolveKartPush's own internal loop already resolves its list
-      // sequentially — each obstacle's push chaining off the previous one's
-      // already-corrected pos/vel — so looping externally one obstacle at a
-      // time here reproduces that exact chaining. For plain kart-vs-kart
-      // obstacles (no `radius`, effective radius = KART_COLLISION_RADIUS for
-      // every one of them) the result is byte-for-byte identical to the old
-      // single batched call.
       let pushedX = preX;
       let pushedZ = preZ;
       let pushedVelX = this.state.vel.x;
@@ -433,16 +444,28 @@ export class Kart {
         pushedVelZ = res.vel.z;
       }
       if (map) {
-        // Same footprint-aware wall test as step 8 above — a kart-kart shove
-        // must not be allowed to push a flank through terrain that a plain
-        // forward drive would have blocked.
         const fwdNow = forwardOf(this.state.yaw);
         const rightNow = rightOf(this.state.yaw);
-        const sampleFn = (x: number, z: number) => map.sampleHeight(x, z);
-        if (footprintHitsWall(sampleFn, preX, preZ, pushedX, preZ, fwdNow, rightNow, MAX_STEP, this.footprintHalf.halfLength, this.footprintHalf.halfWidth)) {
+        const reValidated = resolveKartVsStatic(
+          map.getStaticColliders(),
+          { x: pushedX, z: pushedZ },
+          { x: pushedVelX, z: pushedVelZ },
+          { x: rightNow.x, z: rightNow.z },
+          { x: fwdNow.x, z: fwdNow.z },
+          STATIC_COLLISION_SKIN
+        );
+        pushedX = reValidated.pos.x;
+        pushedZ = reValidated.pos.z;
+        pushedVelX = reValidated.vel.x;
+        pushedVelZ = reValidated.vel.z;
+        // Off-map guard: a kart-kart shove is rare and small (bounded by the
+        // 0.9m collision radius), so a single footprint-corner off-map check
+        // (not the full iterative terrain-slide) is enough to stop it from
+        // pushing a flank past a genuine map edge.
+        const pts = footprintPoints(pushedX, pushedZ, { x: fwdNow.x, z: fwdNow.z }, { x: rightNow.x, z: rightNow.z }, this.footprintHalf.halfLength, this.footprintHalf.halfWidth);
+        const offMap = pts.some(p => map.sampleHeight(p.x, p.z) === null && !map.hasColumn(p.x, p.z));
+        if (offMap) {
           pushedX = preX;
-        }
-        if (footprintHitsWall(sampleFn, pushedX, preZ, pushedX, pushedZ, fwdNow, rightNow, MAX_STEP, this.footprintHalf.halfLength, this.footprintHalf.halfWidth)) {
           pushedZ = preZ;
         }
       }
@@ -452,13 +475,29 @@ export class Kart {
       this.state.vel.z = pushedVelZ;
     }
 
-    // 8b. Vertical step (physics/vertical.ts) — grounded heightfield-follow
-    // vs. ballistic airborne, decided from the (already horizontally
-    // integrated) XZ position above. This is what actually launches the
-    // kart off a ramp lip; see that module's header comment for the launch
-    // detector's derivation. Feeds NEXT tick's `airborne` const at the top
-    // of this method (one-tick lag, same pattern as the drift signal).
-    const groundHeightNow = map?.sampleHeight(this.state.pos.x, this.state.pos.z) ?? null;
+    // 8b-vertical. Vertical step (physics/vertical.ts) — grounded
+    // heightfield-follow vs. ballistic airborne, decided from the (already
+    // horizontally integrated) XZ position above. This is what actually
+    // launches the kart off a ramp lip; see that module's header comment for
+    // the launch detector's derivation. Feeds NEXT tick's `airborne` const
+    // at the top of this method (one-tick lag, same pattern as the drift
+    // signal).
+    //
+    // P3 (design/notes/collision-v2.md §4, I3): groundHeight is now the MAX
+    // of the SAME center+F/B/R/L probe set attitude below also uses (one
+    // sample budget for both height and pitch/roll) — a rigid body resting
+    // in a V-groove or straddling a ridge "mounts" the highest contact point
+    // instead of sinking to whatever its own center happens to read.
+    const groundProbes = sampleGroundProbes(
+      (x, z) => map?.sampleHeight(x, z) ?? null,
+      this.state.pos.x,
+      this.state.pos.z,
+      fwdDir,
+      rightDir,
+      this.axle.wheelbase * 0.5,
+      this.axle.trackWidth * 0.5
+    );
+    const groundHeightNow = maxGroundHeight(groundProbes);
     this.vertical = stepVertical(this.vertical, { groundHeight: groundHeightNow, dt }, {
       gravity: this.params.verticalGravity,
       groundFollowRate: this.params.verticalGroundFollowRate,
@@ -472,9 +511,10 @@ export class Kart {
     // verified sign convention), relaxes to level while airborne. Two-rate
     // exp filter (grounded/airborne), same "different rate each side"
     // pattern as the drift engage/exit rates elsewhere in this codebase.
+    // Reuses the SAME groundProbes sampled above for the vertical step (P3).
     const attitudeTarget = this.vertical.airborne
       ? { pitch: 0, roll: 0 }
-      : computeAttitudeTarget(map, this.state.pos.x, this.state.pos.z, fwdDir, rightDir, this.axle.wheelbase * 0.5, this.axle.trackWidth * 0.5);
+      : computeAttitudeTarget(groundProbes, this.axle.wheelbase * 0.5, this.axle.trackWidth * 0.5);
     const attitudeRate = this.vertical.airborne ? this.params.attitudeAirborneRelaxRate : this.params.attitudeFollowRate;
     const attitudeAlpha = 1 - Math.exp(-attitudeRate * dt);
     this.pitchSm += (attitudeTarget.pitch - this.pitchSm) * attitudeAlpha;

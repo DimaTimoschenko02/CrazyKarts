@@ -293,6 +293,14 @@ export class Heightfield {
   // slope beneath it even where the slope's own peak (its far edge) ties the
   // cap's height.
   private readonly cells = new Map<string, HeightCell[]>();
+  // Grid coords of wall_block* cells (isWallOnlyAsset) — tracked SEPARATELY
+  // from `cells` (see design/notes/collision-v2.md §3.3): a wall_block column
+  // and a genuine off-map/unauthored column both sample() as null, but only
+  // the latter is a real "terrain edge" the dynamic terrain-slide path
+  // (src/physics/terrainWall.ts) should react to — wall_block collision is
+  // now fully owned by the SAT static-polygon path (shared/staticColliders.ts).
+  // hasColumn() below is the predicate that tells the two apart.
+  private readonly wallCells = new Set<string>();
   private tile = 1;
   private levelHeight = 0.5;
   private originX = 0;
@@ -306,7 +314,12 @@ export class Heightfield {
     hf.originZ = data.meta.origin_offset[2];
 
     for (const rect of data.rect_fills ?? []) {
-      if (isWallOnlyAsset(rect.asset)) continue; // visual-only — see isWallOnlyAsset doc
+      if (isWallOnlyAsset(rect.asset)) {
+        for (let x = rect.x_min; x <= rect.x_max; x++) {
+          for (let z = rect.z_min; z <= rect.z_max; z++) hf.wallCells.add(x + "," + z);
+        }
+        continue; // visual-only — see isWallOnlyAsset doc
+      }
       const rot = normRot(rect.rot);
       for (let x = rect.x_min; x <= rect.x_max; x++) {
         for (let z = rect.z_min; z <= rect.z_max; z++) {
@@ -317,7 +330,10 @@ export class Heightfield {
       }
     }
     for (const cell of data.cells ?? []) {
-      if (isWallOnlyAsset(cell.asset)) continue; // visual-only — see isWallOnlyAsset doc
+      if (isWallOnlyAsset(cell.asset)) {
+        hf.wallCells.add(cell.x + "," + cell.z);
+        continue; // visual-only — see isWallOnlyAsset doc
+      }
       const rot = normRot(cell.rot);
       if (TWO_CELL_ASSETS.has(cell.asset)) {
         // Expand a 2-cell ramp into two half-height ramp cells: the clicked
@@ -367,6 +383,23 @@ export class Heightfield {
       out.push({ x, z });
     }
     return out;
+  }
+
+  // True if EITHER a walkable cell OR a wall_block* cell was authored at this
+  // world XZ's grid column — i.e. "this spot is part of the map's authored
+  // footprint at all," regardless of whether sample() itself returns a
+  // height. See the wallCells doc comment above: this is what lets the
+  // terrain-slide path (src/physics/terrainWall.ts) distinguish a genuine
+  // off-map edge (hasColumn===false, terrain-slide should react) from a
+  // wall_block hole (hasColumn===true, sample()===null, but the SAT static-
+  // polygon path already owns that collision — terrain-slide must NOT also
+  // react there, or a kart would get shoved back a full footprint-radius
+  // away from the wall instead of the SAT system's flush skin margin).
+  hasColumn(wx: number, wz: number): boolean {
+    const cx = Math.round((wx - this.originX) / this.tile);
+    const cz = Math.round((wz - this.originZ) / this.tile);
+    const key = cx + "," + cz;
+    return this.cells.has(key) || this.wallCells.has(key);
   }
 
   // Ground height at a world XZ point, or null when there is no cell there
