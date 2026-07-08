@@ -1,0 +1,5017 @@
+{
+  "meta": {
+    "tile_size": 1,
+    "level_height": 0.5,
+    "origin_offset": [
+      -31.5,
+      0,
+      -31.5
+    ]
+  },
+  "cells": [
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 28,
+      "z": 38,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 28,
+      "z": 37,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCorner",
+      "x": 29,
+      "z": 38,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCorner",
+      "x": 29,
+      "z": 39,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 28,
+      "z": 39,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 38,
+      "y_level": 1,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 39,
+      "y_level": 1,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 39,
+      "y_level": 1,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 38,
+      "y_level": 1,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 25,
+      "z": 38,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 27,
+      "z": 37,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_side",
+      "x": 26,
+      "z": 37,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 25,
+      "z": 37,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 25,
+      "z": 39,
+      "y_level": 1,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 24,
+      "z": 39,
+      "y_level": 0,
+      "rot": 90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCorner",
+      "x": 24,
+      "z": 38,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 23,
+      "z": 40,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 24,
+      "z": 40,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 28,
+      "z": 40,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCorner",
+      "x": 29,
+      "z": 40,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 29,
+      "z": 41,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 29,
+      "z": 42,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 29,
+      "z": 43,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 30,
+      "z": 44,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 30,
+      "z": 46,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_side",
+      "x": 30,
+      "z": 45,
+      "y_level": 1,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 29,
+      "z": 44,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 28,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 27,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 26,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 29,
+      "z": 46,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideCorner",
+      "x": 29,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 45,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 45,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 45,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 45,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 44,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 44,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 44,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 43,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 43,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 43,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 42,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 42,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 42,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 41,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 41,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 40,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 40,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 41,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCorner",
+      "x": 25,
+      "z": 41,
+      "y_level": 1,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 25,
+      "z": 40,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCorner",
+      "x": 25,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 24,
+      "z": 41,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 23,
+      "z": 41,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 24,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 23,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 22,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 21,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 22,
+      "z": 40,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 22,
+      "z": 41,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 25,
+      "z": 45,
+      "y_level": 1,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 25,
+      "z": 44,
+      "y_level": 1,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 25,
+      "z": 43,
+      "y_level": 1,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 25,
+      "z": 42,
+      "y_level": 1,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_ramp",
+      "x": 21,
+      "z": 40,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_ramp",
+      "x": 21,
+      "z": 41,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCorner",
+      "x": 20,
+      "z": 41,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCorner",
+      "x": 20,
+      "z": 39,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 39,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 39,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 39,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 38,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 38,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 38,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 37,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 37,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 37,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 37,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 38,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 37,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 36,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 36,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 36,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 36,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 36,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 42,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 43,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 44,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 45,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 45,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 44,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 43,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 45,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 42,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 42,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 43,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 45,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 44,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 44,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 43,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 42,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 43,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 45,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 20,
+      "z": 42,
+      "y_level": 1,
+      "rot": 90
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 19,
+      "z": 42,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 40,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 25,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 24,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 23,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 22,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 21,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 20,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 19,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 18,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 20,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 19,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 18,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 19,
+      "z": 45,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 19,
+      "z": 43,
+      "y_level": 2,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 17,
+      "z": 43,
+      "y_level": 4,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 19,
+      "z": 44,
+      "y_level": 3,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_side",
+      "x": 18,
+      "z": 44,
+      "y_level": 4,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 35,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 35,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 35,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 35,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 35,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 25,
+      "z": 35,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 25,
+      "z": 36,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 36,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 36,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 36,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 35,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 35,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 35,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 34,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 34,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 25,
+      "z": 34,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 34,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 34,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 34,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 34,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 38,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 37,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 36,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 35,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 34,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 34,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 34,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 34,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 35,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 36,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 47,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 47,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 46,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 45,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 44,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 43,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 43,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 42,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 41,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 40,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 39,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 38,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 37,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 36,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 35,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 34,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 34,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 35,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 36,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 38,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 39,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 40,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 41,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 42,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 19,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 18,
+      "z": 43,
+      "y_level": 3,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 18,
+      "z": 42,
+      "y_level": 3,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 18,
+      "z": 43,
+      "y_level": 2,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 17,
+      "z": 43,
+      "y_level": 3,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 18,
+      "z": 42,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 17,
+      "z": 41,
+      "y_level": 2,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCorner",
+      "x": 17,
+      "z": 42,
+      "y_level": 3,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 16,
+      "z": 42,
+      "y_level": 3,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 16,
+      "z": 40,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 17,
+      "z": 40,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 17,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 16,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 18,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCorner",
+      "x": 18,
+      "z": 40,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 17,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 17,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "wall_block",
+      "x": 18,
+      "z": 45,
+      "y_level": 2,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 16,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 15,
+      "z": 47,
+      "y_level": 0,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 16,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 16,
+      "z": 43,
+      "y_level": 4,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 16,
+      "z": 41,
+      "y_level": 2,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 17,
+      "z": 44,
+      "y_level": 5,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 18,
+      "z": 45,
+      "y_level": 3,
+      "rot": -90
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 44,
+      "y_level": 2,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideCliff",
+      "x": 15,
+      "z": 46,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 16,
+      "z": 44,
+      "y_level": 5,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 17,
+      "z": 45,
+      "y_level": 4,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 20,
+      "z": 40,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCorner",
+      "x": 19,
+      "z": 41,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCorner",
+      "x": 18,
+      "z": 41,
+      "y_level": 2,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 18,
+      "z": 41,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 25,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 25,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 25,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 34,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 34,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 34,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 26,
+      "z": 28,
+      "y_level": 0,
+      "rot": 180
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 34,
+      "z": 28,
+      "y_level": 0,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 27,
+      "z": 28,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 28,
+      "z": 28,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 29,
+      "z": 28,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 30,
+      "z": 28,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 31,
+      "z": 28,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 32,
+      "z": 28,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 33,
+      "z": 28,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 25,
+      "z": 27,
+      "y_level": 0,
+      "rot": 90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 25,
+      "z": 22,
+      "y_level": 0,
+      "rot": 90
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 35,
+      "z": 27,
+      "y_level": 0,
+      "rot": -90
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 35,
+      "z": 22,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 35,
+      "z": 26,
+      "y_level": 1,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 35,
+      "z": 25,
+      "y_level": 1,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 35,
+      "z": 24,
+      "y_level": 1,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 35,
+      "z": 23,
+      "y_level": 1,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 25,
+      "z": 26,
+      "y_level": 1,
+      "rot": 90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 25,
+      "z": 25,
+      "y_level": 1,
+      "rot": 90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 25,
+      "z": 24,
+      "y_level": 1,
+      "rot": 90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 25,
+      "z": 23,
+      "y_level": 1,
+      "rot": 90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 26,
+      "z": 27,
+      "y_level": 0,
+      "rot": 90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 34,
+      "z": 27,
+      "y_level": 0,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 34,
+      "z": 22,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideCornerInner",
+      "x": 26,
+      "z": 22,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 34,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain_sideEnd",
+      "x": 26,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 33,
+      "z": 21,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 32,
+      "z": 21,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 31,
+      "z": 21,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 30,
+      "z": 21,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 29,
+      "z": 21,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 28,
+      "z": 21,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain_side",
+      "x": 27,
+      "z": 21,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 26,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 25,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 24,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 23,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 23,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 22,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 24,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 25,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 26,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 27,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 27,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 26,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 25,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 24,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 23,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 22,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 22,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 23,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 24,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 25,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 26,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 27,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 27,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 26,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 25,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 24,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 23,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 22,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 22,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 23,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 24,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 25,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 26,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 27,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 27,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 25,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 26,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 27,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 26,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 26,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 25,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 25,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 24,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 24,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 23,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 23,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 22,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 22,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 23,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 24,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 27,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 26,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 25,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 24,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 23,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 22,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 22,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 23,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 24,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 25,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 26,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 27,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 28,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 28,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 25,
+      "z": 28,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 25,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 25,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 28,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 28,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 27,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 26,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 25,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 24,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 23,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 22,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 22,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 23,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 24,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 25,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 26,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 27,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 28,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 31,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 28,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 28,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 27,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 27,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 26,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 26,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 25,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 25,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 24,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 24,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 23,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 23,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 22,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 22,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 25,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 21,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 22,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 23,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 25,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 26,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 24,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 28,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 27,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 34,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 36,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 35,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 37,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 38,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 40,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 41,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 42,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 43,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 44,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 45,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 46,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 46,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 46,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 46,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 46,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 47,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 47,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 47,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 47,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 47,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 47,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 37,
+      "z": 46,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 45,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 45,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 45,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 45,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 45,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 44,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 44,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 44,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 44,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 44,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 43,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 43,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 43,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 43,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 43,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 42,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 42,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 42,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 42,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 42,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 41,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 41,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 41,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 41,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 41,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 40,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 40,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 40,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 40,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 40,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "terrain",
+      "x": 30,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 34,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 34,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 35,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 35,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 36,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 36,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 36,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 35,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 35,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 35,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 36,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 38,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 36,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 38,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 38,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 35,
+      "z": 37,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 36,
+      "z": 37,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 38,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 34,
+      "z": 37,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 38,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 33,
+      "z": 37,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 32,
+      "z": 37,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 22,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 23,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 24,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 25,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 26,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 27,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 28,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 20,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 30,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 29,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 28,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 27,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 26,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 25,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 24,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 22,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 19,
+      "z": 23,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 18,
+      "z": 23,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 18,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 18,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 17,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 16,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 18,
+      "z": 22,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 17,
+      "z": 22,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 17,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 16,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 15,
+      "z": 20,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 15,
+      "z": 21,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 15,
+      "z": 22,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 16,
+      "z": 22,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 29,
+      "z": 37,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "terrain",
+      "x": 31,
+      "z": 37,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 15,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 14,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 13,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 12,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 11,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 10,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 9,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 8,
+      "z": 39,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 8,
+      "z": 40,
+      "y_level": 0,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block_round",
+      "x": 7,
+      "z": 39,
+      "y_level": 0,
+      "rot": 90
+    },
+    {
+      "asset": "wall_block",
+      "x": 15,
+      "z": 39,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 14,
+      "z": 39,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 13,
+      "z": 39,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 12,
+      "z": 39,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 11,
+      "z": 39,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 10,
+      "z": 39,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 9,
+      "z": 39,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 8,
+      "z": 39,
+      "y_level": 1,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 15,
+      "z": 39,
+      "y_level": 2,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 15,
+      "z": 39,
+      "y_level": 3,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 15,
+      "z": 39,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 15,
+      "z": 40,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 15,
+      "z": 41,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 15,
+      "z": 42,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 15,
+      "z": 43,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 15,
+      "z": 44,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 15,
+      "z": 45,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 16,
+      "z": 45,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 17,
+      "z": 45,
+      "y_level": 2,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 16,
+      "z": 45,
+      "y_level": 2,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 17,
+      "z": 45,
+      "y_level": 3,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 16,
+      "z": 45,
+      "y_level": 3,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 15,
+      "z": 45,
+      "y_level": 2,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 15,
+      "z": 45,
+      "y_level": 3,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 14,
+      "z": 45,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 14,
+      "z": 44,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 14,
+      "z": 43,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 14,
+      "z": 42,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 14,
+      "z": 41,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 14,
+      "z": 40,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 14,
+      "z": 39,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 13,
+      "z": 39,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 13,
+      "z": 40,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 13,
+      "z": 41,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 13,
+      "z": 42,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 13,
+      "z": 43,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 13,
+      "z": 44,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 13,
+      "z": 45,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 12,
+      "z": 45,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 12,
+      "z": 44,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 12,
+      "z": 43,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 12,
+      "z": 42,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 12,
+      "z": 41,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 12,
+      "z": 40,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 12,
+      "z": 39,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 11,
+      "z": 39,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 11,
+      "z": 41,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 11,
+      "z": 40,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 11,
+      "z": 45,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 11,
+      "z": 44,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 11,
+      "z": 43,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 11,
+      "z": 42,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 10,
+      "z": 45,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 10,
+      "z": 44,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 10,
+      "z": 43,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 10,
+      "z": 42,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 10,
+      "z": 41,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 10,
+      "z": 40,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 10,
+      "z": 39,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 9,
+      "z": 45,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 9,
+      "z": 44,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 9,
+      "z": 43,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 9,
+      "z": 42,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 9,
+      "z": 41,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 9,
+      "z": 40,
+      "y_level": 4,
+      "rot": 0
+    },
+    {
+      "asset": "wall_block",
+      "x": 9,
+      "z": 39,
+      "y_level": 4,
+      "rot": 0
+    }
+  ],
+  "props": [
+    {
+      "asset": "rock_largeB",
+      "x": 32.25,
+      "z": 44,
+      "y_level": 0,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "asset": "rock_largeA",
+      "x": 32,
+      "z": 32.25,
+      "y_level": 0,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "asset": "rock_crystalsLargeB",
+      "x": 26,
+      "z": 40.75,
+      "y_level": 0,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "asset": "meteor_detailed",
+      "x": 30.75,
+      "z": 36.75,
+      "y_level": 0,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "asset": "corridor_wall",
+      "x": 27.75,
+      "z": 35,
+      "y_level": 0,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "asset": "corridor_wall",
+      "x": 27.75,
+      "z": 34,
+      "y_level": 0,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "asset": "corridor_wall",
+      "x": 27.75,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "asset": "corridor_wall",
+      "x": 27.75,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "asset": "corridor_wall",
+      "x": 24.5,
+      "z": 35,
+      "y_level": 0,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "asset": "corridor_wall",
+      "x": 24.5,
+      "z": 34,
+      "y_level": 0,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "asset": "corridor_wall",
+      "x": 24.5,
+      "z": 33,
+      "y_level": 0,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "asset": "corridor_wall",
+      "x": 24.5,
+      "z": 32,
+      "y_level": 0,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "asset": "corridor_wallCorner",
+      "x": 24,
+      "z": 31,
+      "y_level": 0,
+      "rot": 90,
+      "scale": 1
+    },
+    {
+      "asset": "corridor_wallCorner",
+      "x": 28.25,
+      "z": 31,
+      "y_level": 0,
+      "rot": 180,
+      "scale": 1
+    }
+  ]
+}
