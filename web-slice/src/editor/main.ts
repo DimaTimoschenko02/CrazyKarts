@@ -807,6 +807,9 @@ function hintFor(asset: string | null): string {
   if (asset === "wall_block_corner") {
     return "угловая стена (два скруглённых верхних края + блендом в углу) — непроходимо. R крутит куда смотрит угол. y_level = низ блока";
   }
+  if (asset === "ground_block") {
+    return "ПРОЕЗЖАЕМЫЙ куб — верх куба = земля (y_level+1). Для гор/плато из кубиков, заезд через рампу или склон";
+  }
   // See .claude/rules/map-building.md — these two families use OPPOSITE
   // y_level conventions and mixing them up is the classic map-building bug.
   // terrain_sideCliff MUST be checked before the generic "terrain_side"

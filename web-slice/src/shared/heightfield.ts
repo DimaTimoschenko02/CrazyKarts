@@ -277,6 +277,16 @@ export function heightCellFor(
     const [ax, az] = SIDE_ASCENT[rot] ?? [0, 0]; // mirror: no-op, ax0=0 — see CellDef.mirror doc
     return { base: yLevel * lh - lh, rise: lh, ax, az }; // y_level = HIGH edge
   }
+  if (asset === "ground_block") {
+    // Drivable cube (map/assetLoader.ts — same visual as wall_block, opposite
+    // physics): the walkable surface is the cube's TOP face, one level above
+    // the pivot (the cube spans [y_level, y_level+1] * level_height). Stacked
+    // ground_blocks each add a flat layer; sample()'s per-point MAX picks the
+    // top of the stack. Sides block naturally: a full-level 0.5 step exceeds
+    // MAX_STEP, so terrainWall treats the cube face as a wall — drive onto it
+    // via a ramp/slope, exactly like a plateau edge.
+    return { base: (yLevel + 1) * lh, rise: 0, ax: 0, az: 0 };
+  }
   return { base: yLevel * lh, rise: 0, ax: 0, az: 0 }; // flat terrain / roads
 }
 

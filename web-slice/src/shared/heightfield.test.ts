@@ -30,6 +30,29 @@ describe("isWallOnlyAsset — walls are exclusively the wall_block* family", () 
     expect(isWallOnlyAsset("terrain_sideEnd")).toBe(false);
     expect(isWallOnlyAsset("terrain_ramp")).toBe(false);
     expect(isWallOnlyAsset("terrain")).toBe(false);
+    expect(isWallOnlyAsset("ground_block")).toBe(false); // drivable cube — NOT a wall despite sharing the visual
+  });
+});
+
+describe("ground_block: drivable cube — walkable surface is the cube TOP (y_level + 1)", () => {
+  it("samples the top face of the cube, one level above the pivot", () => {
+    const hf = makeHeightfield([{ asset: "ground_block", x: 0, z: 0, y_level: 0 }]);
+    expect(hf.sample(0, 0)).toBeCloseTo(0.5); // cube spans [0, 0.5], top = 0.5
+  });
+
+  it("stacked ground_blocks read as the top of the stack (MAX across layers)", () => {
+    const hf = makeHeightfield([
+      { asset: "ground_block", x: 0, z: 0, y_level: 0 },
+      { asset: "ground_block", x: 0, z: 0, y_level: 1 },
+    ]);
+    expect(hf.sample(0, 0)).toBeCloseTo(1.0); // second cube spans [0.5, 1.0]
+  });
+
+  it("is flat across the whole cell (no gradient) and counts as an authored column", () => {
+    const hf = makeHeightfield([{ asset: "ground_block", x: 0, z: 0, y_level: 2 }]);
+    expect(hf.sample(-0.49, -0.49)).toBeCloseTo(1.5);
+    expect(hf.sample(0.49, 0.49)).toBeCloseTo(1.5);
+    expect(hf.hasColumn(0, 0)).toBe(true);
   });
 });
 

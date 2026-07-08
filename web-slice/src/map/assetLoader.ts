@@ -43,7 +43,11 @@ export type AssetLibrary = ReadonlyMap<string, THREE.Group>;
 // from the same heightfield "wall cell" path as terrain_sideCliff (see
 // isWallOnlyAsset in shared/heightfield.ts — a wall_block* cell contributes
 // no height → sample() returns null → kart.ts step 8 treats it as solid).
-const PROCEDURAL_ASSETS = new Set<string>(["wall_block", "wall_block_round", "wall_block_corner"]);
+// ground_block reuses the exact wall_block cube VISUAL but is drivable: its
+// top face contributes walkable height (heightCellFor "ground_block" branch)
+// instead of the wall-only null. Owner request: building mountains out of
+// stacked cubes — wall_block looked identical but bounced the kart off.
+const PROCEDURAL_ASSETS = new Set<string>(["wall_block", "wall_block_round", "wall_block_corner", "ground_block"]);
 
 // A wall block is 1×1 in plan (exactly one grid cell). LEVEL_HEIGHT is 0.5m
 // (see .claude/rules/map-building.md) — a single block is exactly one level,
@@ -287,6 +291,7 @@ export async function loadAssetLibrary(names: readonly string[]): Promise<AssetL
       if (name === "wall_block") lib.set(name, buildWallBlock(mat));
       else if (name === "wall_block_round") lib.set(name, buildWallBlockRound(mat));
       else if (name === "wall_block_corner") lib.set(name, buildWallBlockCorner(mat));
+      else if (name === "ground_block") lib.set(name, buildWallBlock(mat)); // same cube, drivable physics — see PROCEDURAL_ASSETS doc
     }
   }
   return lib;

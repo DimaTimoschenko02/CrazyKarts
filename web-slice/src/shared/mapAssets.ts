@@ -41,6 +41,9 @@ export const PALETTE: PaletteCategory[] = [
     { asset: "wall_block", label: "Wall Block" },
     { asset: "wall_block_round", label: "Wall Round" },
     { asset: "wall_block_corner", label: "Wall Corner" },
+    // Same cube visual as wall_block but DRIVABLE on top (mountains/plateaus
+    // out of stacked cubes) — see assetLoader PROCEDURAL_ASSETS doc.
+    { asset: "ground_block", label: "Ground Block (проезжаемый)" },
   ] },
   { category: "Props", isProp: true, items: [
     { asset: "rock", label: "Rock" },
