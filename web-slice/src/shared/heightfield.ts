@@ -189,7 +189,13 @@ export function heightCellFor(asset: string, yLevel: number, rot: number, levelH
 // asset loading — safe to import from both the browser bundle and the
 // Colyseus (Node) match server.
 export class Heightfield {
-  private readonly cells = new Map<string, HeightCell>();
+  // One column can hold SEVERAL stacked layers (the editor allows multiple
+  // assets in one XZ footprint at different y_levels — e.g. two sideCliffs
+  // forming a 2-level wall, optionally capped by a flat top). sample() returns
+  // the MAX height across all layers AT THE QUERIED POINT — so the kart stands
+  // on the topmost solid, and a flat cap correctly wins over a slope beneath it
+  // even where the slope's own peak (its far edge) ties the cap's height.
+  private readonly cells = new Map<string, HeightCell[]>();
   private tile = 1;
   private levelHeight = 0.5;
   private originX = 0;
@@ -231,7 +237,12 @@ export class Heightfield {
   }
 
   private setCell(cx: number, cz: number, cell: HeightCell): void {
-    this.cells.set(cx + "," + cz, cell);
+    // Append a layer to this column (see the cells map doc). Single-layer maps
+    // get a 1-element array and behave exactly as before.
+    const key = cx + "," + cz;
+    const stack = this.cells.get(key);
+    if (stack) stack.push(cell);
+    else this.cells.set(key, [cell]);
   }
 
   // World XZ → grid cell coordinates (float, not rounded) — exposed so callers
@@ -248,16 +259,21 @@ export class Heightfield {
     const fz = (wz - this.originZ) / this.tile;
     const cx = Math.round(fx);
     const cz = Math.round(fz);
-    const cell = this.cells.get(cx + "," + cz);
-    if (!cell) return null;
+    const stack = this.cells.get(cx + "," + cz);
+    if (!stack) return null;
     const lx = fx - cx;
     const lz = fz - cz;
-    let t = clamp(0.5 + lx * cell.ax + lz * cell.az, 0, 1);
-    if (cell.ax2 !== undefined || cell.az2 !== undefined) {
-      const t2 = clamp(0.5 + lx * (cell.ax2 ?? 0) + lz * (cell.az2 ?? 0), 0, 1);
-      t = Math.max(t, t2);
+    let best = -Infinity;
+    for (const cell of stack) {
+      let t = clamp(0.5 + lx * cell.ax + lz * cell.az, 0, 1);
+      if (cell.ax2 !== undefined || cell.az2 !== undefined) {
+        const t2 = clamp(0.5 + lx * (cell.ax2 ?? 0) + lz * (cell.az2 ?? 0), 0, 1);
+        t = Math.max(t, t2);
+      }
+      const h = cell.base + cell.rise * t;
+      if (h > best) best = h;
     }
-    return cell.base + cell.rise * t;
+    return best;
   }
 }
 

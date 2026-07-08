@@ -187,8 +187,46 @@ let lastCellZ = 0;
 let lastFloatX = 0;
 let lastFloatZ = 0;
 
-function cellKey(x: number, z: number): string {
-  return x + "," + z;
+// Stacked columns: a cell is addressed by (x, z, y_level), so several assets
+// can share one XZ footprint at different heights — e.g. two sideCliffs on top
+// of each other forming a 2-level wall, which the Kenney kit has no single
+// asset for. Same (x, z, y_level) still means "replace" (swap the asset at that
+// exact layer).
+function cellKey(x: number, z: number, yLevel: number): string {
+  return x + "," + z + "," + yLevel;
+}
+
+// Which stacked layer a right-click removes: the one at the active y_level if
+// something is placed there (surgical — Q/E to a layer, then erase it), else
+// the topmost layer in that column (forgiving, so you don't have to match the
+// height exactly to delete a mistake). Returns null if the column is empty.
+function cellKeyToDelete(x: number, z: number, activeY: number): string | null {
+  const exact = cellKey(x, z, activeY);
+  if (cells.has(exact)) return exact;
+  let topKey: string | null = null;
+  let topY = -Infinity;
+  for (const [key, rec] of cells) {
+    if (rec.x === x && rec.z === z && rec.y_level > topY) {
+      topY = rec.y_level;
+      topKey = key;
+    }
+  }
+  return topKey;
+}
+
+// Position + rotation + mirror for a placed cell object, in one place so the
+// initial placement and the grid-resize reposition (rebuildAllPlacements) can
+// never drift apart — the resize path used to reset position without the
+// 2-cell offset or the mirror, silently misplacing ramps on grid change.
+function applyCellTransform(inst: THREE.Object3D, rec: CellRecord): void {
+  inst.position.set(rec.x - HALF, rec.y_level * LEVEL_HEIGHT, rec.z - HALF);
+  if (TWO_CELL_ASSETS.has(rec.asset)) {
+    const [dx, dz] = longAxis(rec.rot);
+    inst.position.x += dx * 0.5;
+    inst.position.z += dz * 0.5; // sit on 2 whole cells, not straddling — matches mapLoader
+  }
+  inst.rotation.y = THREE.MathUtils.degToRad(rec.rot);
+  inst.scale.x = rec.mirror ? -1 : 1; // reflect-then-rotate, matches mapLoader
 }
 
 // ── Palette UI ───────────────────────────────────────────────────────────
@@ -329,20 +367,13 @@ function rebuildGhost(): void {
 // ── Cell / prop placement ────────────────────────────────────────────────
 function placeCell(rec: CellRecord): void {
   if (!lib) return;
-  const key = cellKey(rec.x, rec.z);
+  const key = cellKey(rec.x, rec.z, rec.y_level);
   const existing = cellObjs.get(key);
   if (existing) scene.remove(existing);
   const template = lib.get(rec.asset);
   if (!template) return;
   const inst = template.clone(true);
-  inst.position.set(rec.x - HALF, rec.y_level * LEVEL_HEIGHT, rec.z - HALF);
-  if (TWO_CELL_ASSETS.has(rec.asset)) {
-    const [dx, dz] = longAxis(rec.rot);
-    inst.position.x += dx * 0.5;
-    inst.position.z += dz * 0.5; // sit on 2 whole cells, not straddling — matches mapLoader
-  }
-  inst.rotation.y = THREE.MathUtils.degToRad(rec.rot);
-  if (rec.mirror) inst.scale.x = -1; // reflect-then-rotate, matches mapLoader
+  applyCellTransform(inst, rec);
   scene.add(inst);
   cells.set(key, rec);
   cellObjs.set(key, inst);
@@ -456,7 +487,7 @@ function redo(): void {
 function rebuildAllPlacements(): void {
   for (const [key, rec] of cells) {
     const obj = cellObjs.get(key);
-    if (obj) obj.position.set(rec.x - HALF, rec.y_level * LEVEL_HEIGHT, rec.z - HALF);
+    if (obj) applyCellTransform(obj, rec);
   }
   for (let i = 0; i < props.length; i++) {
     propObjs[i].position.set(props[i].x - HALF, props[i].y_level * LEVEL_HEIGHT, props[i].z - HALF);
@@ -586,7 +617,7 @@ renderer.domElement.addEventListener("pointerdown", e => {
       addProp(rec);
       pushUndo({ kind: "prop", before: null, after: rec });
     } else {
-      const key = cellKey(lastCellX, lastCellZ);
+      const key = cellKey(lastCellX, lastCellZ, yLevel);
       const before = cells.get(key) ?? null;
       const rec: CellRecord = { asset: activeAsset, x: lastCellX, z: lastCellZ, y_level: yLevel, rot };
       if (mirrorState) rec.mirror = true;
@@ -597,10 +628,10 @@ renderer.domElement.addEventListener("pointerdown", e => {
   } else if (e.button === 2) {
     // Right click: delete whatever is under the cursor — a snapped cell tile
     // first, then the nearest prop, regardless of the currently active asset.
-    const key = cellKey(lastCellX, lastCellZ);
-    const cellBefore = cells.get(key) ?? null;
-    const removedCell = removeCell(key);
-    if (removedCell) {
+    const key = cellKeyToDelete(lastCellX, lastCellZ, yLevel);
+    const cellBefore = key ? cells.get(key) ?? null : null;
+    const removedCell = key ? removeCell(key) : false;
+    if (removedCell && key) {
       pushUndo({ kind: "cell", key, before: cellBefore, after: null });
       scheduleAutosave();
       return;

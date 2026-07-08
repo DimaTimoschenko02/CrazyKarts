@@ -155,6 +155,30 @@ describe("2-cell ramps (terrain_rampLarge*) expand to two half-height ramp cells
   });
 });
 
+describe("stacked columns (several assets sharing one XZ) — topmost solid wins the walkable sample", () => {
+  it("a flat top at y_level 2 shadows a cliff piece below it in the same column, regardless of JSON order", () => {
+    // Two sideCliffs (y0, y1) form the 2-level vertical face; a flat terrain at
+    // y2 is the walkable top of that column. The kart must stand on the top
+    // (1.0), never on a cliff peak below it (0.5).
+    const top = makeHeightfield([
+      { asset: "terrain_sideCliff", x: 0, z: 0, y_level: 0, rot: 0 },
+      { asset: "terrain_sideCliff", x: 0, z: 0, y_level: 1, rot: 0 },
+      { asset: "terrain", x: 0, z: 0, y_level: 2, rot: 0 },
+    ]);
+    expect(top.sample(0, 0)).toBeCloseTo(1.0, 6);
+  });
+
+  it("order-independent: the lower layer listed LAST still does not shadow the higher one", () => {
+    const highFirst = makeHeightfield([
+      { asset: "terrain", x: 3, z: 3, y_level: 2, rot: 0 },
+      { asset: "terrain_sideCliff", x: 3, z: 3, y_level: 0, rot: 0 },
+    ]);
+    // Without the keep-max rule this would be the cliff's peak (0.5); with it,
+    // the flat y2 top (1.0) survives even though it was written first.
+    expect(highFirst.sample(3, 3)).toBeCloseTo(1.0, 6);
+  });
+});
+
 describe("normRot / heightCellFor exports used directly by the diagnostic scan script", () => {
   it("normRot wraps to [0, 360)", () => {
     expect(normRot(-90)).toBe(270);
