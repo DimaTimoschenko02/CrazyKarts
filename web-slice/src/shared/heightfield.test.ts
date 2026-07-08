@@ -20,6 +20,7 @@ describe("isWallOnlyAsset prefix trap (terrain_sideCliff vs. the generic terrain
     // the predicate must not accidentally net the whole terrain_side family,
     // which is required to stay drivable (ramps/roads).
     expect(isWallOnlyAsset("terrain_sideCliff")).toBe(true);
+    expect(isWallOnlyAsset("wall_block")).toBe(true);
     expect(isWallOnlyAsset("terrain_side")).toBe(false);
     expect(isWallOnlyAsset("terrain_sideCorner")).toBe(false);
     expect(isWallOnlyAsset("terrain_sideCornerInner")).toBe(false);
@@ -60,6 +61,12 @@ describe("terrain_sideCliff: visual-only, contributes no walkable height", () =>
     const hf = makeHeightfield([{ asset: "terrain_sideCliff", x: 0, z: 0, y_level: 0, rot: 90 }]);
     expect(hf.sample(-0.4, 0)).toBeNull();
     expect(hf.sample(0.4, 0)).toBeNull();
+  });
+
+  it("wall_block is likewise a solid wall — its cell samples null at any y_level", () => {
+    const hf = makeHeightfield([{ asset: "wall_block", x: 2, z: 3, y_level: 1, rot: 0 }]);
+    expect(hf.sample(2, 3)).toBeNull();
+    expect(hf.sample(2.3, 3)).toBeNull();
   });
 });
 

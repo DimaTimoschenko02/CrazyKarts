@@ -15,6 +15,40 @@ const ASSET_BASE = "/assets/space-kit/";
 
 export type AssetLibrary = ReadonlyMap<string, THREE.Group>;
 
+// Procedural (non-GLB) assets built in code rather than loaded from a file.
+// The Kenney terrain kit has NO straight vertical wall piece (only slanted
+// side/cliff faces), so `wall_block` is a plain box the map author drops to get
+// a straight, grid-aligned solid wall. Its collision comes from the same
+// heightfield "wall cell" path as terrain_sideCliff (see isWallOnlyAsset in
+// shared/heightfield.ts — a wall_block cell contributes no height → sample()
+// returns null → kart.ts step 8 treats it as solid).
+const PROCEDURAL_ASSETS = new Set<string>(["wall_block"]);
+
+// A wall block is 1×1 in plan (exactly one grid cell) and this tall in world
+// units — ~a two-level plateau, so a single placed block reads clearly as a
+// wall the kart can't see over. Its bottom sits on the cell's y_level (place()
+// sets the group Y); the top is at +WALL_BLOCK_HEIGHT above that.
+const WALL_BLOCK_HEIGHT = 1.0;
+
+function buildWallBlock(lib: Map<string, THREE.Group>): THREE.Group {
+  const geom = new THREE.BoxGeometry(1, WALL_BLOCK_HEIGHT, 1);
+  // Reuse the terrain tile's material so the wall matches the map's look;
+  // fall back to a mars-terrain colour if terrain isn't in this library.
+  let sampled: THREE.Material | undefined;
+  lib.get("terrain")?.traverse(o => {
+    const mesh = o as THREE.Mesh;
+    if (!sampled && mesh.isMesh) sampled = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+  });
+  const mat = sampled ? sampled.clone() : new THREE.MeshStandardMaterial({ color: 0x9c5a3c, roughness: 0.9 });
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.position.y = WALL_BLOCK_HEIGHT / 2; // box is centred → drop its bottom onto y=0
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  const group = new THREE.Group();
+  group.add(mesh);
+  return group;
+}
+
 function recenterXZ(root: THREE.Object3D): void {
   const box = new THREE.Box3().setFromObject(root);
   const center = box.getCenter(new THREE.Vector3());
@@ -31,12 +65,17 @@ export async function loadAssetLibrary(names: readonly string[]): Promise<AssetL
   const loader = new GLTFLoader();
   const lib = new Map<string, THREE.Group>();
   await Promise.all(
-    names.map(async name => {
+    names.filter(name => !PROCEDURAL_ASSETS.has(name)).map(async name => {
       const gltf = await loader.loadAsync(ASSET_BASE + name + ".glb");
       recenterXZ(gltf.scene);
       lib.set(name, gltf.scene);
     })
   );
+  // Build procedural assets AFTER the GLBs so they can reuse loaded materials
+  // (e.g. wall_block borrows the terrain tile's material).
+  for (const name of names) {
+    if (name === "wall_block") lib.set(name, buildWallBlock(lib));
+  }
   return lib;
 }
 

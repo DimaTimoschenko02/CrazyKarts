@@ -51,6 +51,9 @@ const PALETTE: PaletteCategory[] = [
     { asset: "terrain_sideEnd", label: "Side End" },
     { asset: "terrain_sideCliff", label: "Side Cliff" },
   ] },
+  { category: "Walls", isProp: false, items: [
+    { asset: "wall_block", label: "Wall Block" },
+  ] },
   { category: "Props", isProp: true, items: [
     { asset: "rock", label: "Rock" },
     { asset: "rock_largeA", label: "Rock Large A" },
@@ -582,6 +585,9 @@ function refreshCursor(clientX: number, clientY: number): void {
 
 function hintFor(asset: string | null): string {
   if (!asset) return "";
+  if (asset === "wall_block") {
+    return "стена — непроходимо. y_level = низ блока (растёт вверх). Ставь по краю плато / стакай по высоте";
+  }
   // See .claude/rules/map-building.md — these two families use OPPOSITE
   // y_level conventions and mixing them up is the classic map-building bug.
   // terrain_sideCliff MUST be checked before the generic "terrain_side"

@@ -153,7 +153,9 @@ export function longAxis(rot: number): [number, number] {
 // true, so this predicate (and any future branch) must never be confused
 // with the generic terrain_side family, which stays fully drivable.
 export function isWallOnlyAsset(asset: string): boolean {
-  return asset.startsWith("terrain_sideCliff");
+  // `wall_block` is the procedural straight vertical wall (map/assetLoader.ts) —
+  // same "no walkable height → null → solid" treatment as the cliff face.
+  return asset === "wall_block" || asset.startsWith("terrain_sideCliff");
 }
 
 export function heightCellFor(asset: string, yLevel: number, rot: number, levelHeight: number): HeightCell {

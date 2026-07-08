@@ -29,6 +29,7 @@ const MAP_ASSETS = [
   "terrain_roadEnd", "terrain_roadSplit",
   "terrain_side", "terrain_sideCorner", "terrain_sideCornerInner",
   "terrain_sideEnd", "terrain_sideCliff",
+  "wall_block",
   "rock", "rock_largeA", "rock_largeB", "rock_crystals",
   "rock_crystalsLargeA", "rock_crystalsLargeB", "rocks_smallA", "rocks_smallB",
 ] as const;
