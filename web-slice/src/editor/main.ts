@@ -1117,13 +1117,13 @@ function refreshCursor(clientX: number, clientY: number): void {
 function hintFor(asset: string | null): string {
   if (!asset) return "";
   if (asset === "wall_block") {
-    return "стена — непроходимо. y_level = низ блока (растёт вверх). Ставь по краю плато / стакай по высоте";
+    return "куб: сбоку непроходимо (ступень 0.5), сверху проезжаемо (верх = y_level+1). Стакай по высоте, заезд через рампу";
   }
   if (asset === "wall_block_round") {
-    return "стена со скруглённым верхним краем — непроходимо. R крутит куда смотрит скруглённая сторона. y_level = низ блока";
+    return "куб со скруглённым верхним краем — сбоку непроходимо, сверху проезжаемо. R крутит куда смотрит скруглённая сторона. y_level = низ блока";
   }
   if (asset === "wall_block_corner") {
-    return "угловая стена (два скруглённых верхних края + блендом в углу) — непроходимо. R крутит куда смотрит угол. y_level = низ блока";
+    return "угловой куб (два скруглённых верхних края) — сбоку непроходимо, сверху проезжаемо. R крутит куда смотрит угол. y_level = низ блока";
   }
   if (asset === "ground_block") {
     return "ПРОЕЗЖАЕМЫЙ куб — верх куба = земля (y_level+1). Для гор/плато из кубиков, заезд через рампу или склон";
@@ -1134,8 +1134,8 @@ function hintFor(asset: string | null): string {
   // check below — "terrain_sideCliff".startsWith("terrain_side") is true,
   // and cliff's mesh is ramp-like ABOVE the pivot (same as sideCorner/ramp),
   // so its y_level means the LOW edge, not the HIGH edge like plain side.
-  // (Physics no longer reads cliff's y_level at all — see shared/heightfield.ts
-  // isWallOnlyAsset — but this still controls where the VISUAL mesh sits.)
+  // (Stale note about wall-only cliffs removed — sideCliff is a drivable
+  // slope and its y_level = LOW edge in physics too, see heightCellFor.)
   if (asset.startsWith("terrain_sideCorner") || asset === "terrain_ramp" || asset.startsWith("terrain_sideCliff")) {
     return "y_level = НИЖНИЙ уровень (плитка поднимается вверх от него)";
   }
@@ -1531,9 +1531,14 @@ let loadedMapName: string | null = null;
 
 // Reflects loadedMapName in the topbar so "which map am I editing, and will
 // Save silently overwrite it or ask me for a name" is always visible —
-// see Save/Save As wiring further down.
+// see Save/Save As wiring further down. Also persists the name alongside the
+// content autosave (every loadedMapName mutation site already calls this):
+// without it a page reload restored the MAP but forgot the NAME, so plain
+// Save started asking for a name again — owner bug report 2026-07-08.
 function updateMapNameLabel(): void {
   mapNameLabel.textContent = loadedMapName ? `Map: ${loadedMapName}` : "Map: (unsaved)";
+  if (loadedMapName) localStorage.setItem("editor-map-name", loadedMapName);
+  else localStorage.removeItem("editor-map-name");
 }
 
 function showServerStatus(text: string, kind: "ok" | "error"): void {
@@ -1771,11 +1776,18 @@ function scheduleAutosave(): void {
       const data = JSON.parse(saved) as MapJson;
       loadMapJson(data);
       fitGridToMap(data);
+      // Restore the map NAME together with its content — the two are saved
+      // by the same editing session (scheduleAutosave + updateMapNameLabel),
+      // so plain Save keeps overwriting the same map across page reloads
+      // instead of asking for a name again. Only meaningful when content
+      // restored too: a name without its map would make Save clobber that
+      // map with whatever (possibly blank) scene is actually on screen.
+      loadedMapName = localStorage.getItem("editor-map-name");
     }
     catch (err) { console.error("[editor] autosave restore failed:", err); }
   }
   statusMain.textContent = "asset: (none)  rot: 0  y_level: 0  cell: (—, —)";
-  updateMapNameLabel(); // autosave restore never sets loadedMapName -> shows "(unsaved)" until Load/Save
+  updateMapNameLabel();
   refreshCursor(lastClientX, lastClientY);
 })();
 
