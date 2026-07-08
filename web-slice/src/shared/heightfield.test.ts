@@ -1,9 +1,10 @@
-// Regression tests for the terrain_sideCliff / terrain_sideCornerInner
-// branches in heightCellFor (see docs/space-kit-terrain-catalog.md for the
-// vertex-verified facts these encode). Uses Heightfield.fromMapJson directly
-// — no THREE, no asset templates needed, since this module is pure math
-// shared between the client renderer (map/mapLoader.ts wraps it) and the
-// Colyseus match server (server/config/arena.ts).
+// Regression tests for the terrain_sideCliff / terrain_sideCornerInner /
+// terrain_sideEnd branches and the mirror-flag handling in heightCellFor
+// (see docs/space-kit-terrain-catalog.md for the vertex-verified facts these
+// encode). Uses Heightfield.fromMapJson directly — no THREE, no asset
+// templates needed, since this module is pure math shared between the
+// client renderer (map/mapLoader.ts wraps it) and the Colyseus match server
+// (server/config/arena.ts).
 import { describe, expect, it } from "vitest";
 import { Heightfield, heightCellFor, isWallOnlyAsset, normRot, type MapJson } from "./heightfield";
 
@@ -14,15 +15,15 @@ function makeHeightfield(cells: MapJson["cells"]): Heightfield {
   });
 }
 
-describe("isWallOnlyAsset prefix trap (terrain_sideCliff vs. the generic terrain_side family)", () => {
-  it("matches terrain_sideCliff only — every other Edges asset stays drivable", () => {
-    // Regression for the "terrain_sideCliff".startsWith("terrain_side") trap:
-    // the predicate must not accidentally net the whole terrain_side family,
-    // which is required to stay drivable (ramps/roads).
-    expect(isWallOnlyAsset("terrain_sideCliff")).toBe(true);
+describe("isWallOnlyAsset — walls are exclusively the wall_block* family", () => {
+  it("matches wall_block* only — every Edges-family terrain asset (sideCliff included) stays drivable", () => {
+    // Game-designer decision (2026-07): terrain_sideCliff was briefly made
+    // wall-only, then reverted to a drivable steep slope — walls are now
+    // ONLY the wall_block* procedural family (map/assetLoader.ts).
     expect(isWallOnlyAsset("wall_block")).toBe(true);
     expect(isWallOnlyAsset("wall_block_round")).toBe(true);
     expect(isWallOnlyAsset("wall_block_corner")).toBe(true);
+    expect(isWallOnlyAsset("terrain_sideCliff")).toBe(false);
     expect(isWallOnlyAsset("terrain_side")).toBe(false);
     expect(isWallOnlyAsset("terrain_sideCorner")).toBe(false);
     expect(isWallOnlyAsset("terrain_sideCornerInner")).toBe(false);
@@ -49,23 +50,54 @@ describe("heightCellFor branch ordering (startsWith prefix traps)", () => {
     expect(Math.abs(innerCell.ax)).toBeCloseTo(1, 6);
     expect(Math.abs(outerCell.ax)).toBeCloseTo(Math.SQRT1_2, 6);
   });
+
+  it("terrain_sideCliff does NOT fall into the generic terrain_side branch", () => {
+    // "terrain_sideCliff".startsWith("terrain_side") is true — must resolve
+    // to the CLIFF y_level=LOW/above-pivot semantics, not plain side's
+    // y_level=HIGH/below-pivot semantics (a full level_height offset apart).
+    const cliff = heightCellFor("terrain_sideCliff", 1, 0, 0.5);
+    const side = heightCellFor("terrain_side", 1, 0, 0.5);
+    expect(cliff.base).toBeCloseTo(0.5, 6); // y_level(1) * lh — LOW edge
+    expect(side.base).toBeCloseTo(0.0, 6); // y_level(1) * lh - lh — HIGH edge semantics
+  });
+
+  it("terrain_sideEnd does NOT fall into the generic terrain_side branch", () => {
+    // "terrain_sideEnd".startsWith("terrain_side") is true — same trap as
+    // sideCliff. sideEnd's real Y-span sits above the pivot (ramp-like), so
+    // it needs the y_level=LOW/above-pivot semantics too, not plain side's.
+    const end = heightCellFor("terrain_sideEnd", 1, 0, 0.5);
+    const side = heightCellFor("terrain_side", 1, 0, 0.5);
+    expect(end.base).toBeCloseTo(0.5, 6); // y_level(1) * lh — LOW edge
+    expect(side.base).toBeCloseTo(0.0, 6); // y_level(1) * lh - lh — HIGH edge semantics
+  });
 });
 
-describe("terrain_sideCliff: visual-only, contributes no walkable height", () => {
-  it("a lone sideCliff column samples null (wall for the mover) at center and both near-edges", () => {
+describe("terrain_sideCliff: drivable steep slope (reverted from wall-only)", () => {
+  it("rot=0..270 ascend +Z/+X/-Z/-X — same rotation table as terrain_side, y_level=LOW edge", () => {
+    const cases: Array<{ rot: number; lowProbe: [number, number]; highProbe: [number, number] }> = [
+      { rot: 0, lowProbe: [0, -0.4], highProbe: [0, 0.4] },
+      { rot: 90, lowProbe: [-0.4, 0], highProbe: [0.4, 0] },
+      { rot: 180, lowProbe: [0, 0.4], highProbe: [0, -0.4] },
+      { rot: 270, lowProbe: [0.4, 0], highProbe: [-0.4, 0] },
+    ];
+    for (const c of cases) {
+      const hf = makeHeightfield([{ asset: "terrain_sideCliff", x: 0, z: 0, y_level: 0, rot: c.rot }]);
+      const low = hf.sample(...c.lowProbe)!;
+      const high = hf.sample(...c.highProbe)!;
+      expect(low).toBeLessThan(high);
+      expect(low).toBeCloseTo(0.05, 1); // near-zero, low edge
+      expect(high).toBeCloseTo(0.45, 1); // near-full rise, high edge
+    }
+  });
+
+  it("a lone sideCliff column is fully walkable (no longer a wall)", () => {
     const hf = makeHeightfield([{ asset: "terrain_sideCliff", x: 0, z: 0, y_level: 0, rot: 0 }]);
-    expect(hf.sample(0, -0.4)).toBeNull(); // near low edge (-Z)
-    expect(hf.sample(0, 0)).toBeNull(); // mid
-    expect(hf.sample(0, 0.4)).toBeNull(); // near high edge (+Z)
+    expect(hf.sample(0, -0.4)).not.toBeNull();
+    expect(hf.sample(0, 0)).not.toBeNull();
+    expect(hf.sample(0, 0.4)).not.toBeNull();
   });
 
-  it("rotation does not matter — every orientation still contributes nothing", () => {
-    const hf = makeHeightfield([{ asset: "terrain_sideCliff", x: 0, z: 0, y_level: 0, rot: 90 }]);
-    expect(hf.sample(-0.4, 0)).toBeNull();
-    expect(hf.sample(0.4, 0)).toBeNull();
-  });
-
-  it("wall_block is likewise a solid wall — its cell samples null at any y_level", () => {
+  it("wall_block is still a solid wall — its cell samples null at any y_level", () => {
     const hf = makeHeightfield([{ asset: "wall_block", x: 2, z: 3, y_level: 1, rot: 0 }]);
     expect(hf.sample(2, 3)).toBeNull();
     expect(hf.sample(2.3, 3)).toBeNull();
@@ -78,6 +110,16 @@ describe("terrain_sideCliff: visual-only, contributes no walkable height", () =>
     ]);
     expect(hf.sample(0, 0)).toBeNull();
     expect(hf.sample(1, 0)).toBeNull();
+  });
+});
+
+describe("terrain_sideEnd: approximated as a straight axial ramp (y_level = LOW edge)", () => {
+  it("rot=0 ascends +Z like terrain_side/sideCliff — low near Z=-0.5, high near Z=+0.5", () => {
+    const hf = makeHeightfield([{ asset: "terrain_sideEnd", x: 0, z: 0, y_level: 0, rot: 0 }]);
+    const low = hf.sample(0, -0.4)!;
+    const high = hf.sample(0, 0.4)!;
+    expect(low).toBeLessThan(high);
+    expect(hf.sample(0, -0.4)).not.toBeNull();
   });
 });
 
@@ -142,6 +184,68 @@ describe("terrain_sideCornerInner: two-gradient MAX shape, y_level = LOW corner"
   });
 });
 
+describe("mirror flag: reflect-then-rotate ascent gradient (CellDef.mirror)", () => {
+  it("straight-axis families (ramp/side/sideCliff/sideEnd) are unaffected by mirror — base vector has ax0=0", () => {
+    for (const asset of ["terrain_ramp", "terrain_side", "terrain_sideCliff", "terrain_sideEnd"]) {
+      for (const rot of [0, 90, 180, 270]) {
+        const withMirror = heightCellFor(asset, 0, rot, 0.5, true);
+        const withoutMirror = heightCellFor(asset, 0, rot, 0.5, false);
+        expect(withMirror.ax).toBeCloseTo(withoutMirror.ax, 10);
+        expect(withMirror.az).toBeCloseTo(withoutMirror.az, 10);
+      }
+    }
+  });
+
+  it("terrain_sideCorner: mirror at rot=R equals the UNMIRRORED gradient at rot=R+90 (diagonal-shape identity)", () => {
+    // Hand-derived: reflecting CORNER_ASCENT[0]=(-D,D) across local X gives
+    // (D,D), which rotated by rot lands on a DIFFERENT tile corner than the
+    // unmirrored rot=R gradient — specifically the one the unmirrored table
+    // reaches at rot=R+90. This is the actual mismatch the old (mirror-
+    // ignoring) code produced: a mirrored sideCorner cell physically raises
+    // one corner while the old physics gradient pointed at another.
+    const rotPairs: Array<[number, number]> = [[0, 90], [90, 180], [180, 270], [270, 0]];
+    for (const [mirroredRot, equivalentUnmirroredRot] of rotPairs) {
+      const mirrored = heightCellFor("terrain_sideCorner", 0, mirroredRot, 0.5, true);
+      const equivalent = heightCellFor("terrain_sideCorner", 0, equivalentUnmirroredRot, 0.5, false);
+      expect(mirrored.ax).toBeCloseTo(equivalent.ax, 10);
+      expect(mirrored.az).toBeCloseTo(equivalent.az, 10);
+    }
+  });
+
+  it("terrain_sideCorner: mirror genuinely changes the gradient vs. ignoring it (the bug this fixes)", () => {
+    const cell = { asset: "terrain_sideCorner", x: 0, z: 0, y_level: 0, rot: 0, mirror: true };
+    const mirrored = heightCellFor(cell.asset, cell.y_level, cell.rot, 0.5, true);
+    const unmirrored = heightCellFor(cell.asset, cell.y_level, cell.rot, 0.5, false);
+    expect(mirrored.ax).not.toBeCloseTo(unmirrored.ax, 5);
+  });
+
+  it("terrain_sideCornerInner: mirror reflects the ax0≠0 gradient, leaves the ax0=0 second gradient's ax2 untouched", () => {
+    // Base at rot=0: (ax0,az0)=(-1,0) [first gradient], (ax20,az20)=(0,1)
+    // [second gradient]. Reflecting negates only the first (ax0=-1 -> +1);
+    // the second (ax0=0) is unaffected, matching the straight-axis no-op
+    // rule above.
+    const mirrored = heightCellFor("terrain_sideCornerInner", 0, 0, 0.5, true);
+    const unmirrored = heightCellFor("terrain_sideCornerInner", 0, 0, 0.5, false);
+    expect(mirrored.ax).toBeCloseTo(-unmirrored.ax, 10);
+    expect(mirrored.az).toBeCloseTo(unmirrored.az, 10);
+    expect(mirrored.ax2).toBeCloseTo(unmirrored.ax2 ?? 0, 10);
+    expect(mirrored.az2).toBeCloseTo(unmirrored.az2 ?? 0, 10);
+  });
+
+  it("Heightfield.fromMapJson wires cell.mirror through to heightCellFor for sideCorner", () => {
+    // End-to-end: a mirrored sideCorner cell at rot=0 must sample like the
+    // UNMIRRORED rot=90 shape (per the rot+90 identity above), not like its
+    // own unmirrored rot=0 shape.
+    const mirroredHf = makeHeightfield([
+      { asset: "terrain_sideCorner", x: 0, z: 0, y_level: 0, rot: 0, mirror: true },
+    ]);
+    const equivalentHf = makeHeightfield([{ asset: "terrain_sideCorner", x: 0, z: 0, y_level: 0, rot: 90 }]);
+    // Near the +X+Z corner, both should agree (that's where rot=90's high
+    // corner sits, and where the mirrored rot=0 cell's high corner now sits).
+    expect(mirroredHf.sample(0.4, 0.4)).toBeCloseTo(equivalentHf.sample(0.4, 0.4)!, 5);
+  });
+});
+
 describe("2-cell ramps (terrain_rampLarge*) expand to two half-height ramp cells", () => {
   it("rot=0 spans one full level over cells z and z+1 (low half then high half)", () => {
     const hf = makeHeightfield([{ asset: "terrain_rampLarge", x: 0, z: 0, y_level: 0, rot: 0 }]);
@@ -166,13 +270,13 @@ describe("2-cell ramps (terrain_rampLarge*) expand to two half-height ramp cells
 });
 
 describe("stacked columns (several assets sharing one XZ) — topmost solid wins the walkable sample", () => {
-  it("a flat top at y_level 2 shadows a cliff piece below it in the same column, regardless of JSON order", () => {
-    // Two sideCliffs (y0, y1) form the 2-level vertical face; a flat terrain at
-    // y2 is the walkable top of that column. The kart must stand on the top
-    // (1.0), never on a cliff peak below it (0.5).
+  it("a flat top at y_level 2 shadows a slope below it in the same column, regardless of JSON order", () => {
+    // Two ramps (y0, y1) form a 2-level slope; a flat terrain at y2 is the
+    // walkable top of that column. The kart must stand on the top (1.0),
+    // never on the lower ramp's own peak (0.5).
     const top = makeHeightfield([
-      { asset: "terrain_sideCliff", x: 0, z: 0, y_level: 0, rot: 0 },
-      { asset: "terrain_sideCliff", x: 0, z: 0, y_level: 1, rot: 0 },
+      { asset: "terrain_ramp", x: 0, z: 0, y_level: 0, rot: 0 },
+      { asset: "terrain_ramp", x: 0, z: 0, y_level: 1, rot: 0 },
       { asset: "terrain", x: 0, z: 0, y_level: 2, rot: 0 },
     ]);
     expect(top.sample(0, 0)).toBeCloseTo(1.0, 6);
@@ -181,11 +285,28 @@ describe("stacked columns (several assets sharing one XZ) — topmost solid wins
   it("order-independent: the lower layer listed LAST still does not shadow the higher one", () => {
     const highFirst = makeHeightfield([
       { asset: "terrain", x: 3, z: 3, y_level: 2, rot: 0 },
-      { asset: "terrain_sideCliff", x: 3, z: 3, y_level: 0, rot: 0 },
+      { asset: "terrain_ramp", x: 3, z: 3, y_level: 0, rot: 0 },
     ]);
-    // Without the keep-max rule this would be the cliff's peak (0.5); with it,
+    // Without the keep-max rule this would be the ramp's peak (0.5); with it,
     // the flat y2 top (1.0) survives even though it was written first.
     expect(highFirst.sample(3, 3)).toBeCloseTo(1.0, 6);
+  });
+
+  it("wall_block sharing a column with flat terrain contributes nothing — terrain's flat height wins either JSON order", () => {
+    // wall_block is skipped entirely by fromMapJson (isWallOnlyAsset), so it
+    // never becomes a layer in this column — there's nothing to "shadow",
+    // this just proves the skip doesn't accidentally drop/corrupt the real
+    // terrain layer regardless of which one is authored first.
+    const wallFirst = makeHeightfield([
+      { asset: "wall_block", x: 0, z: 0, y_level: 3, rot: 0 },
+      { asset: "terrain", x: 0, z: 0, y_level: 1, rot: 0 },
+    ]);
+    const terrainFirst = makeHeightfield([
+      { asset: "terrain", x: 0, z: 0, y_level: 1, rot: 0 },
+      { asset: "wall_block", x: 0, z: 0, y_level: 3, rot: 0 },
+    ]);
+    expect(wallFirst.sample(0, 0)).toBeCloseTo(0.5, 6);
+    expect(terrainFirst.sample(0, 0)).toBeCloseTo(0.5, 6);
   });
 });
 

@@ -46,9 +46,9 @@ const MATCH_DURATION_MS = Number.parseInt(process.env.MATCH_DURATION_MS ?? "", 1
 const MATCH_RESTART_DELAY_MS = 15_000;
 
 // UNCONFIRMED vs the Godot muzzle socket offsets (kart_controller.gd sockets
-// carry their own local transform we don't have — our craft_racer model has
-// no launcher meshes at all, see src/weapons/stats.ts volleyCount comment).
-// Tune by feel.
+// carry their own local transform we don't have — our race.glb model
+// (kart/stats.ts KART_TYPES.racer, formerly craft_racer) has no launcher
+// meshes at all, see src/weapons/stats.ts volleyCount comment). Tune by feel.
 const MUZZLE_FORWARD_OFFSET_M = 1.2;
 const MUZZLE_HEIGHT_OFFSET_M = 0.5;
 

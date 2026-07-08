@@ -23,11 +23,42 @@ export interface StaticObstacle extends KartObstacle {
 }
 
 // Which prop asset names get a physical collision circle — everything else
-// (rock, rocks_smallA/B, rock_crystals) is pure decoration the kart drives
-// straight through. See .claude/rules/map-building.md "Props" section for
-// the asset catalog this mirrors. Keep this in sync if new big rock/crystal
+// (rock, rocks_smallA/B, rock_crystals, and all "small decor" from the full
+// Space Kit added in shared/mapAssets.ts — barrels, chimneys, craters,
+// meteors, astronauts...) is pure decoration the kart drives straight
+// through. See .claude/rules/map-building.md "Props" section for the asset
+// catalog this mirrors. Keep this in sync if new big rock/crystal/building
 // props are added to the Space Kit prop set.
-const LARGE_PROP_ASSETS = new Set(["rock_largeA", "rock_crystalsLargeA", "rock_crystalsLargeB"]);
+//
+// Full-kit additions included here: buildings (corridor/hangar/structure/
+// gate — solid rooms/walls) and rockets/craft (large solid hulls) get
+// collision unconditionally; from Structures only the visibly large solid
+// pieces (generators, big satellite dish, turrets) do — desks/stairs/
+// supports/weapons stay walk-through, matching a small/thin-decor call.
+// Tech/Track (pipe/platform/monorail/rail) is left walk-through everywhere:
+// it reads as track/ground-level decor a kart drives over, not a wall.
+const LARGE_PROP_ASSETS = new Set([
+  "rock_largeA", "rock_crystalsLargeA", "rock_crystalsLargeB",
+  // Buildings
+  "corridor", "corridor_corner", "corridor_cornerRound", "corridor_cornerRoundWindow",
+  "corridor_cross", "corridor_detailed", "corridor_end", "corridor_open", "corridor_roof",
+  "corridor_split", "corridor_wall", "corridor_wallCorner", "corridor_window", "corridor_windowClosed",
+  "hangar_largeA", "hangar_largeB", "hangar_roundA", "hangar_roundB", "hangar_roundGlass",
+  "hangar_smallA", "hangar_smallB",
+  "structure", "structure_closed", "structure_detailed", "structure_diagonal",
+  "gate_complex", "gate_simple",
+  // Rockets / craft
+  "craft_cargoA", "craft_cargoB", "craft_miner",
+  "craft_speederA", "craft_speederB", "craft_speederC", "craft_speederD",
+  "rocket_baseA", "rocket_baseB", "rocket_finsA", "rocket_finsB",
+  "rocket_fuelA", "rocket_fuelB", "rocket_sidesA", "rocket_sidesB",
+  "rocket_topA", "rocket_topB",
+  // Structures — only the visibly large solid pieces
+  "machine_barrel", "machine_barrelLarge", "machine_generator", "machine_generatorLarge",
+  "satelliteDish_large", "turret_single", "turret_double",
+  // Decor — vehicle-sized only
+  "rover",
+]);
 
 // Large props get a collision circle shrunk from their raw footprint AABB by
 // this factor — arcade standard so grazing the rock's rough/uneven visual

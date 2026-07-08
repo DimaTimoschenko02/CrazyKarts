@@ -15,6 +15,9 @@ import { loadAssetLibrary } from "../map/assetLoader";
 import type { AssetLibrary } from "../map/assetLoader";
 import type { MapJson } from "../map/mapLoader";
 import { TWO_CELL_ASSETS, longAxis } from "../shared/heightfield";
+// Palette data (categories/items/isProp) is shared with the game's preload
+// list (src/main.ts) — see shared/mapAssets.ts header comment for why.
+import { PALETTE, ASSET_NAMES, isPropAsset, DEFAULT_COLLAPSED_CATEGORIES } from "../shared/mapAssets";
 
 const MIN_GRID_SIZE = 16;
 const MAX_GRID_SIZE = 96;
@@ -27,53 +30,6 @@ const MAX_Y_LEVEL = 6;
 const ROT_CYCLE = [0, 90, 180, -90] as const;
 const PROP_STEP = 0.25;
 
-interface PaletteItem { asset: string; label: string }
-interface PaletteCategory { category: string; isProp: boolean; items: PaletteItem[] }
-
-const PALETTE: PaletteCategory[] = [
-  { category: "Terrain", isProp: false, items: [
-    { asset: "terrain", label: "Terrain" },
-    { asset: "terrain_ramp", label: "Ramp" },
-    { asset: "terrain_rampLarge", label: "Ramp Large (2x)" },
-    { asset: "terrain_rampLarge_detailed", label: "Ramp Large Detailed (2x)" },
-  ] },
-  { category: "Roads", isProp: false, items: [
-    { asset: "terrain_roadStraight", label: "Road Straight" },
-    { asset: "terrain_roadCorner", label: "Road Corner" },
-    { asset: "terrain_roadCross", label: "Road Cross" },
-    { asset: "terrain_roadEnd", label: "Road End" },
-    { asset: "terrain_roadSplit", label: "Road Split" },
-  ] },
-  { category: "Edges", isProp: false, items: [
-    { asset: "terrain_side", label: "Side" },
-    { asset: "terrain_sideCorner", label: "Side Corner" },
-    { asset: "terrain_sideCornerInner", label: "Side Corner Inner" },
-    { asset: "terrain_sideEnd", label: "Side End" },
-    { asset: "terrain_sideCliff", label: "Side Cliff" },
-  ] },
-  { category: "Walls", isProp: false, items: [
-    { asset: "wall_block", label: "Wall Block" },
-    { asset: "wall_block_round", label: "Wall Round" },
-    { asset: "wall_block_corner", label: "Wall Corner" },
-  ] },
-  { category: "Props", isProp: true, items: [
-    { asset: "rock", label: "Rock" },
-    { asset: "rock_largeA", label: "Rock Large A" },
-    { asset: "rock_largeB", label: "Rock Large B" },
-    { asset: "rock_crystals", label: "Rock Crystals" },
-    { asset: "rock_crystalsLargeA", label: "Rock Crystals Large A" },
-    { asset: "rock_crystalsLargeB", label: "Rock Crystals Large B" },
-    { asset: "rocks_smallA", label: "Rocks Small A" },
-    { asset: "rocks_smallB", label: "Rocks Small B" },
-  ] },
-];
-
-const ASSET_NAMES = PALETTE.flatMap(cat => cat.items.map(i => i.asset));
-const PROP_ASSETS = new Set(PALETTE.find(c => c.isProp)!.items.map(i => i.asset));
-function isPropAsset(asset: string): boolean {
-  return PROP_ASSETS.has(asset);
-}
-
 // ── DOM scaffolding ──────────────────────────────────────────────────────
 const canvasContainer = document.getElementById("canvas-container")!;
 const sidebar = document.getElementById("sidebar")!;
@@ -84,6 +40,7 @@ const selLoad = document.getElementById("selLoad") as HTMLSelectElement;
 const serverStatus = document.getElementById("serverStatus")!;
 const btnUndo = document.getElementById("btnUndo") as HTMLButtonElement;
 const btnCenterMap = document.getElementById("btnCenterMap") as HTMLButtonElement;
+const mapNameLabel = document.getElementById("mapNameLabel")!;
 
 // ── Scene ──────────────────────────────────────────────────────────────
 const scene = new THREE.Scene();
@@ -238,12 +195,50 @@ function applyCellTransform(inst: THREE.Object3D, rec: CellRecord): void {
 // ── Palette UI ───────────────────────────────────────────────────────────
 const paletteButtons = new Map<string, HTMLButtonElement>();
 
+// Collapsible categories: which ones are collapsed persists across reloads
+// (localStorage), so the owner's sidebar layout stays put session to
+// session. Falls back to DEFAULT_COLLAPSED_CATEGORIES (shared/mapAssets.ts)
+// the first time, or if the stored value is missing/corrupt.
+const COLLAPSE_STORAGE_KEY = "editor-palette-collapsed";
+
+function loadCollapsedCategories(): Set<string> {
+  try {
+    const raw = localStorage.getItem(COLLAPSE_STORAGE_KEY);
+    if (raw) return new Set(JSON.parse(raw) as string[]);
+  } catch (err) {
+    console.error("[editor] failed to parse collapsed-category state, using defaults:", err);
+  }
+  return new Set(DEFAULT_COLLAPSED_CATEGORIES);
+}
+
+const collapsedCategories = loadCollapsedCategories();
+
+function saveCollapsedCategories(): void {
+  localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify([...collapsedCategories]));
+}
+
+// Applies the current collapsed/expanded state to one category's DOM (arrow
+// glyph on the label + item buttons hidden/shown) without touching the
+// persisted set — used both by the click toggle and by the initial build.
+function applyCategoryCollapse(category: string, labelEl: HTMLDivElement, itemEls: readonly HTMLButtonElement[]): void {
+  const collapsed = collapsedCategories.has(category);
+  labelEl.textContent = (collapsed ? "▸ " : "▾ ") + category; // ▸ / ▾
+  for (const btn of itemEls) btn.style.display = collapsed ? "none" : "";
+}
+
+function toggleCategory(category: string, labelEl: HTMLDivElement, itemEls: readonly HTMLButtonElement[]): void {
+  if (collapsedCategories.has(category)) collapsedCategories.delete(category);
+  else collapsedCategories.add(category);
+  applyCategoryCollapse(category, labelEl, itemEls);
+  saveCollapsedCategories();
+}
+
 function buildPalette(): void {
   for (const cat of PALETTE) {
     const label = document.createElement("div");
     label.className = "category-label";
-    label.textContent = cat.category;
     sidebar.appendChild(label);
+    const itemEls: HTMLButtonElement[] = [];
     for (const item of cat.items) {
       const btn = document.createElement("button");
       btn.className = "palette-btn";
@@ -256,7 +251,10 @@ function buildPalette(): void {
       btn.addEventListener("click", () => selectAsset(item.asset));
       sidebar.appendChild(btn);
       paletteButtons.set(item.asset, btn);
+      itemEls.push(btn);
     }
+    label.addEventListener("click", () => toggleCategory(cat.category, label, itemEls));
+    applyCategoryCollapse(cat.category, label, itemEls);
   }
 }
 
@@ -878,6 +876,7 @@ document.getElementById("fileImport")!.addEventListener("change", e => {
     loadMapJson(data);
     fitGridToMap(data);
     loadedMapName = file.name.replace(/\.json$/i, "");
+    updateMapNameLabel();
     scheduleAutosave();
   }).catch(err => console.error("[editor] import failed:", err));
   input.value = ""; // allow re-importing the same filename later
@@ -899,6 +898,7 @@ document.getElementById("btnNew")!.addEventListener("click", () => {
   }
   clearAll();
   loadedMapName = null;
+  updateMapNameLabel();
   scheduleAutosave();
   showServerStatus("new blank map", "ok");
 });
@@ -925,6 +925,13 @@ gridSizeInput.addEventListener("change", () => {
 // buttons only touch the browser's local filesystem, which is useless when
 // the editor is opened from a laptop other than the one the repo lives on.
 let loadedMapName: string | null = null;
+
+// Reflects loadedMapName in the topbar so "which map am I editing, and will
+// Save silently overwrite it or ask me for a name" is always visible —
+// see Save/Save As wiring further down.
+function updateMapNameLabel(): void {
+  mapNameLabel.textContent = loadedMapName ? `Map: ${loadedMapName}` : "Map: (unsaved)";
+}
 
 function showServerStatus(text: string, kind: "ok" | "error"): void {
   serverStatus.textContent = text;
@@ -967,6 +974,7 @@ selLoad.addEventListener("change", () => {
       loadMapJson(data);
       fitGridToMap(data);
       loadedMapName = name;
+      updateMapNameLabel();
       scheduleAutosave();
       showServerStatus(`loaded ${name}`, "ok");
     })
@@ -977,9 +985,20 @@ selLoad.addEventListener("change", () => {
     .finally(() => { selLoad.value = ""; });
 });
 
-document.getElementById("btnSaveServer")!.addEventListener("click", () => {
-  const name = prompt("Save as (letters/digits/-/_ only):", loadedMapName ?? "map");
-  if (!name) return;
+// Save writes straight to the currently-loaded map name — no prompt, no
+// confirmation, just overwrite (matches every other "Save" button anywhere).
+// Save As always asks for a name via the inline panel below, never
+// window.prompt() (prompt() blocks agent-driven browser automation and
+// looks out of place next to the rest of this UI). A brand-new/unnamed map
+// has nothing to silently overwrite, so plain Save falls through to the
+// Save As panel too in that case.
+const MAP_NAME_RE = /^[a-z0-9_-]+$/i;
+const btnSave = document.getElementById("btnSave") as HTMLButtonElement;
+const btnSaveAs = document.getElementById("btnSaveAs") as HTMLButtonElement;
+const saveAsPanel = document.getElementById("saveAsPanel")!;
+const saveAsInput = document.getElementById("saveAsInput") as HTMLInputElement;
+
+function saveToServer(name: string): void {
   fetch("/__editor-maps", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -988,6 +1007,7 @@ document.getElementById("btnSaveServer")!.addEventListener("click", () => {
     .then(res => {
       if (!res.ok) return res.text().then(msg => { throw new Error(msg || String(res.status)); });
       loadedMapName = name;
+      updateMapNameLabel();
       showServerStatus(`saved ${name}.json`, "ok");
       return refreshServerMapList();
     })
@@ -995,6 +1015,42 @@ document.getElementById("btnSaveServer")!.addEventListener("click", () => {
       console.error("[editor] save to server failed:", err);
       showServerStatus(`save failed: ${String(err)}`, "error");
     });
+}
+
+function openSaveAsPanel(): void {
+  saveAsInput.value = loadedMapName ?? "map";
+  saveAsPanel.classList.remove("hidden");
+  saveAsInput.focus();
+  saveAsInput.select();
+}
+
+function closeSaveAsPanel(): void {
+  saveAsPanel.classList.add("hidden");
+}
+
+function confirmSaveAs(): void {
+  const name = saveAsInput.value.trim();
+  if (!name || !MAP_NAME_RE.test(name)) {
+    showServerStatus("invalid name (letters/digits/-/_ only)", "error");
+    return;
+  }
+  closeSaveAsPanel();
+  saveToServer(name);
+}
+
+btnSave.addEventListener("click", () => {
+  if (loadedMapName) saveToServer(loadedMapName);
+  else openSaveAsPanel();
+});
+btnSaveAs.addEventListener("click", () => openSaveAsPanel());
+document.getElementById("saveAsConfirm")!.addEventListener("click", () => confirmSaveAs());
+document.getElementById("saveAsCancel")!.addEventListener("click", () => closeSaveAsPanel());
+saveAsInput.addEventListener("keydown", e => {
+  // Own handler, not the global WASD/undo one — isTextInputFocused() makes
+  // that one bail out entirely while this input is focused (see its guard),
+  // so Enter/Escape need to be wired here instead.
+  if (e.key === "Enter") { e.preventDefault(); confirmSaveAs(); }
+  else if (e.key === "Escape") { e.preventDefault(); closeSaveAsPanel(); }
 });
 
 // ── Autosave (debounced) ─────────────────────────────────────────────────
@@ -1022,6 +1078,7 @@ function scheduleAutosave(): void {
     catch (err) { console.error("[editor] autosave restore failed:", err); }
   }
   statusMain.textContent = "asset: (none)  rot: 0  y_level: 0  cell: (—, —)";
+  updateMapNameLabel(); // autosave restore never sets loadedMapName -> shows "(unsaved)" until Load/Save
   refreshCursor(lastClientX, lastClientY);
 })();
 

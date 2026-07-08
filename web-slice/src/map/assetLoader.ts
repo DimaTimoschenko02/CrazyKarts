@@ -14,6 +14,26 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 const ASSET_BASE = "/assets/space-kit/";
 
+// Kart/car bodies live in a separate Kenney pack ("Blocky Cars"), not the
+// terrain space-kit — the old craft_racer.glb (space-kit) scaled to a 1x1m
+// tile read as visibly too wide for a single map lane, see kart/stats.ts.
+// Every model in this pack shares one external "Textures/colormap.png" (NOT
+// embedded in the .glb despite the extension — Kenney kept a relative image
+// URI even inside the binary container), so the folder layout under public/
+// must keep that relative Textures/ subfolder alongside the .glb files for
+// GLTFLoader to resolve it.
+const CAR_ASSET_BASE = "/assets/cars/";
+
+// This car pack's own local +Z is each model's FRONT (confirmed by reading
+// wheel-front-*/wheel-back-* node translations straight out of the glTF JSON
+// for race.glb, sedan.glb, police.glb, kart-oobi.glb — front wheels always
+// sit at positive Z). kart.ts's forward convention is the opposite: nose at
+// -Z (see kart.ts forwardOf()). Rotate every loaded car model 180° around Y
+// once at load time so "front wheel" lines up with the engine's forward axis
+// — this is a property of the WHOLE pack (verified across 4 different
+// models), not a one-off fix for the current default kart.
+const CAR_FRONT_IS_PLUS_Z = true;
+
 export type AssetLibrary = ReadonlyMap<string, THREE.Group>;
 
 // Procedural (non-GLB) assets built in code rather than loaded from a file.
@@ -229,13 +249,16 @@ export async function loadAssetLibrary(names: readonly string[]): Promise<AssetL
 }
 
 // Kart model: recentered on XZ like tiles, then additionally floored (bottom
-// of the AABB moved to y=0) and uniformly scaled to the requested length
-// along Z, so it drops into the physics rig regardless of authored size.
+// of the AABB moved to y=0), yaw-corrected to the engine's nose-at--Z
+// convention (see CAR_FRONT_IS_PLUS_Z above), and uniformly scaled to the
+// requested length along Z, so it drops into the physics rig regardless of
+// authored size or source pack.
 export async function loadKartModel(name: string, targetLength: number): Promise<THREE.Group> {
   const loader = new GLTFLoader();
-  const gltf = await loader.loadAsync(ASSET_BASE + name + ".glb");
+  const gltf = await loader.loadAsync(CAR_ASSET_BASE + name + ".glb");
   const root = gltf.scene;
   recenterXZ(root);
+  if (CAR_FRONT_IS_PLUS_Z) root.rotation.y = Math.PI;
   const box = new THREE.Box3().setFromObject(root);
   const size = box.getSize(new THREE.Vector3());
   const scale = targetLength / Math.max(size.z, 1e-3);

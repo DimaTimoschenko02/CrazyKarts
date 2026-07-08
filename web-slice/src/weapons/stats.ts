@@ -18,8 +18,9 @@ export interface ProjectileStats {
   readonly selfDamage: boolean; // rocket_config.tres:12 — false: shooter excluded from its own blast
   readonly spreadDeg: number; // kart_controller.gd:60 ROCKET_SPREAD_DEG — fan angle for the side rockets
   readonly volleyCount: number; // how many rockets fire per shot (reference: 1-3 depending on launcher
-  // sockets present on the kart model; our craft_racer has no socket meshes,
-  // so we always fire the full 3-rocket fan from a single muzzle point to
+  // sockets present on the kart model; our race.glb (kart/stats.ts
+  // KART_TYPES.racer, formerly craft_racer) has no socket meshes either, so
+  // we always fire the full 3-rocket fan from a single muzzle point to
   // preserve the reference's "feel" — see decision in the combat-slice plan)
   // UNCONFIRMED vs the Godot .tscn Area3D shape (not read this session) —
   // tune by feel, not a spec value:

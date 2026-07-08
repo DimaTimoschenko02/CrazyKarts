@@ -47,12 +47,45 @@ export interface Arena {
   heightfield: Heightfield;
   spawnPoints: readonly WorldPoint[];
   boxPoints: readonly WorldPoint[];
-  // Ground height at any XZ point (falls back to 0 if somehow off the
-  // heightfield — shouldn't happen for the hand-picked spawn/box points
-  // above). Used both for box hover placement and for setting a respawned
-  // player's y before their client resumes reporting its own heightfield-
-  // sampled pose.
+  // Ground height at any XZ point. spawnPoints/boxPoints are DERIVED from
+  // findFlatSpawnCandidates (autoSpawn.ts), which only ever returns cells
+  // clear of the island's edges, so this should always hit a real sample —
+  // this fallback is defense-in-depth for the scenario that actually bit a
+  // player: an old server process still holding a STALE Arena built from a
+  // map that got redesigned/replaced underneath it (per-room arenas are
+  // cached forever, see the `cache` map below — a redeploy that swaps the
+  // map file without restarting the process would leave a running room on
+  // spawn coordinates that used to be flat ground and now aren't). Falling
+  // back to a flat 0 in that case teleports the respawning player's Y
+  // straight through the actual (changed) terrain; instead this walks
+  // outward from the queried point to the NEAREST walkable column and uses
+  // its real height — same idea as the client's GameMap.findFallbackSpawn()
+  // (src/map/mapLoader.ts), just anchored to the point being sampled
+  // instead of the map's bounding-box center, since here we're recovering a
+  // single Y value, not relocating the player's XZ.
   groundHeightAt: (p: WorldPoint) => number;
+}
+
+// Nearest-walkable-column height fallback for groundHeightAt — see the Arena
+// doc above for why this exists (stale-arena / off-heightfield defense, not
+// expected to trigger for spawn/box points on a live, correctly-loaded map).
+// O(cells) linear scan: only runs on the rare null-sample path, and arenas
+// top out at a few thousand cells, so this is not a hot-path concern.
+function nearestWalkableHeight(heightfield: Heightfield, p: WorldPoint): number {
+  const coords = heightfield.listCellCoords();
+  if (coords.length === 0) return 0; // no walkable cell exists at all — nothing better to fall back to
+  let best = coords[0];
+  let bestDistSq = Infinity;
+  for (const c of coords) {
+    const world = heightfield.gridToWorld(c.x, c.z);
+    const distSq = (world.x - p.x) ** 2 + (world.z - p.z) ** 2;
+    if (distSq < bestDistSq) {
+      bestDistSq = distSq;
+      best = c;
+    }
+  }
+  const world = heightfield.gridToWorld(best.x, best.z);
+  return heightfield.sample(world.x, world.z) ?? 0;
 }
 
 function mapPathFor(name: string): string {
@@ -92,7 +125,7 @@ export function loadArena(name?: string): Arena {
     heightfield,
     spawnPoints: toWorldPoints(spawnGrid),
     boxPoints: toWorldPoints(boxGrid),
-    groundHeightAt: p => heightfield.sample(p.x, p.z) ?? 0,
+    groundHeightAt: p => heightfield.sample(p.x, p.z) ?? nearestWalkableHeight(heightfield, p),
   };
   cache.set(safeName, arena);
   return arena;

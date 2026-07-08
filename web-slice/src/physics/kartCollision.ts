@@ -25,8 +25,9 @@ export interface KartObstacle {
 }
 
 // Tune by feel — not derived from the visual mesh bounds (kart body is
-// roughly 1.4m wide x 2.4m long). A circle this size gives a bit of grace
-// for grazing side-by-side driving before it starts shoving.
+// roughly 0.86m wide x 1.7m long, see kart/stats.ts KART_TYPES.racer). A
+// circle this size gives a bit of grace for grazing side-by-side driving
+// before it starts shoving.
 export const KART_COLLISION_RADIUS = 0.9;
 
 // Fraction of closing speed reflected back as bounce (0 = fully inelastic

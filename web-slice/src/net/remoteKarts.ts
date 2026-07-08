@@ -10,14 +10,23 @@ import type { GameMap } from "../map/mapLoader";
 import { forwardOf, rightOf } from "../kart/kart";
 import { computeAirborneFactor, computeAttitudeTarget, LEVEL as LEVEL_ATTITUDE } from "../kart/attitude";
 import { DEFAULT_AXLE_GEOMETRY, DEFAULT_KART_PHYSICS_PARAMS } from "../physics/types";
+import { KART_TYPES } from "../kart/stats";
 
 // Adaptive render delay, jitter buffering, and post-interpolation smoothing
 // all live in RemoteInterpolator (snapshotBuffer.ts) now — see that file's
 // header comment for why a from-scratch synthetic clock (the old
 // JitterResampler) was the actual cause of the periodic rush-then-stall
 // judder, and why raw arrival timestamps + an adaptive delay replaced it.
-const KART_MODEL = "craft_racer";
-const KART_LENGTH = 2.2;
+//
+// Pulled straight from KART_TYPES.racer (kart/stats.ts) rather than
+// duplicated literals — the net protocol doesn't send a per-model kartType
+// yet (every remote kart is the same racer type, see netClient.ts
+// RemotePlayerState), but when it does, swapping this for a per-player
+// KART_TYPES[player.kartType] lookup is a one-line change with no risk of
+// the local and remote model/length drifting out of sync the way two
+// independent literal copies could.
+const KART_MODEL = KART_TYPES.racer.model;
+const KART_LENGTH = KART_TYPES.racer.modelLength;
 
 // A remote kart is treated as "airborne" (body levels toward flat instead of
 // following the heightfield slope) once its synced Y sits this far above the

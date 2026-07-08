@@ -40,7 +40,9 @@
   .category-label {
     font-size: 11px; letter-spacing: 1px; color: #00ffee99;
     margin: 14px 0 4px; text-transform: uppercase;
+    cursor: pointer; user-select: none;
   }
+  .category-label:hover { color: #00ffee; }
   .category-label:first-child { margin-top: 0; }
   .palette-btn {
     display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; margin-bottom: 4px;
@@ -72,6 +74,22 @@
     font-size: 12px; white-space: pre; overflow: hidden;
   }
   #statusHint { color: #ffcc00; }
+
+  #mapNameLabel { font-size: 12px; color: #ffcc00; margin-left: 2px; white-space: nowrap; }
+
+  /* Inline Save As panel — replaces window.prompt() (blocks automation, ugly). */
+  #saveAsPanel {
+    position: fixed; top: 52px; left: 50%; transform: translateX(-50%); z-index: 30;
+    background: #1a1a3a; border: 1px solid #00ffee88; border-radius: 6px;
+    padding: 10px 14px; display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 4px 18px #000a;
+  }
+  #saveAsPanel.hidden { display: none; }
+  #saveAsPanel span { font-size: 12px; color: #00ffee99; }
+  #saveAsInput {
+    background: #12122a; color: #00ffee; border: 1px solid #00ffee88;
+    padding: 5px 8px; font-family: inherit; font-size: 13px; border-radius: 4px; width: 200px;
+  }
 </style>
 </head>
 <body>
@@ -85,7 +103,9 @@
     <select id="selLoad" title="Load a map from the dev server (public/maps/)">
       <option value="">Load ▾</option>
     </select>
-    <button id="btnSaveServer">Save to server</button>
+    <button id="btnSave" title="Save over the currently-loaded map (asks for a name if none is loaded)">Save</button>
+    <button id="btnSaveAs" title="Save as a new name, never overwriting the current map">Save As</button>
+    <span id="mapNameLabel">Map: (unsaved)</span>
     <span id="serverStatus"></span>
     <button id="btnUndo" title="Undo (Z or Cmd/Ctrl+Z)" disabled>Undo</button>
     <button id="btnCenterMap" title="Shift everything so the map's bounding box is centered on the grid">Center Map</button>
@@ -94,6 +114,12 @@
     <label class="inline" for="gridSizeInput">Grid size
       <input type="number" id="gridSizeInput" min="16" max="96" step="16" value="32">
     </label>
+  </div>
+  <div id="saveAsPanel" class="hidden">
+    <span>Save as:</span>
+    <input type="text" id="saveAsInput" placeholder="map-name">
+    <button id="saveAsConfirm">Save</button>
+    <button id="saveAsCancel">Cancel</button>
   </div>
   <div id="main">
     <div id="sidebar"></div>

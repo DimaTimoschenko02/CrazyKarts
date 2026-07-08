@@ -7,8 +7,8 @@ describe("buildKartPhysicsParams", () => {
     const stats: KartStats = {
       id: "test",
       displayName: "Test Kart",
-      model: "craft_racer",
-      modelLength: 2.2,
+      model: "race",
+      modelLength: 1.7,
       maxHp: 100,
       physics: { maxSpeed: 999 },
     };
@@ -23,8 +23,8 @@ describe("buildKartPhysicsParams", () => {
     const stats: KartStats = {
       id: "test",
       displayName: "Test Kart",
-      model: "craft_racer",
-      modelLength: 2.2,
+      model: "race",
+      modelLength: 1.7,
       maxHp: 100,
       physics: {},
     };

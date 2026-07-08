@@ -20,19 +20,12 @@ import { InputOverlay } from "./debug/inputOverlay";
 import { initParamPanel } from "./debug/paramPanel";
 import { initNet } from "./net";
 import { createCombat } from "./combat";
+import { ASSET_NAMES } from "./shared/mapAssets";
 
-// Keep in sync with the editor palette (src/editor/main.ts) — a map driven
-// from the editor must not silently drop tiles the game never preloaded.
-const MAP_ASSETS = [
-  "terrain", "terrain_ramp", "terrain_rampLarge", "terrain_rampLarge_detailed",
-  "terrain_roadStraight", "terrain_roadCorner", "terrain_roadCross",
-  "terrain_roadEnd", "terrain_roadSplit",
-  "terrain_side", "terrain_sideCorner", "terrain_sideCornerInner",
-  "terrain_sideEnd", "terrain_sideCliff",
-  "wall_block", "wall_block_round", "wall_block_corner",
-  "rock", "rock_largeA", "rock_largeB", "rock_crystals",
-  "rock_crystalsLargeA", "rock_crystalsLargeB", "rocks_smallA", "rocks_smallB",
-] as const;
+// Single source of truth lives in shared/mapAssets.ts (PALETTE) — the editor
+// palette and this preload list are derived from the same data so they can
+// never drift apart again (see that module's header comment for why).
+const MAP_ASSETS = ASSET_NAMES;
 
 // ── Scene ──────────────────────────────────────────────────────────────
 const scene = new THREE.Scene();

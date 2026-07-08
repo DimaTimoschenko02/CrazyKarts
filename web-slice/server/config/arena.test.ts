@@ -27,4 +27,41 @@ describe("loadArena", () => {
   it("falls back to ACTIVE_MAP when no name is given", () => {
     expect(loadArena()).toBe(loadArena(ACTIVE_MAP));
   });
+
+  it("groundHeightAt falls back to the NEAREST walkable cell's real height, not a flat 0, when queried off the heightfield", () => {
+    // Regression for the "respawn into the void" report: a stale Arena (old
+    // server process still holding a cached instance for a map that got
+    // replaced underneath it) or any other off-heightfield query must not
+    // silently return 0 — on a map with elevated terrain that teleports the
+    // player's Y straight through solid ground below them. Verified against
+    // an independently-computed nearest-cell height so this doesn't just
+    // re-assert the implementation.
+    const arena = loadArena("mars_base");
+    const farPoint = { x: 9999, z: 9999 }; // guaranteed off any real map footprint
+    expect(arena.heightfield.sample(farPoint.x, farPoint.z)).toBeNull(); // sanity: this point IS off the heightfield
+
+    const coords = arena.heightfield.listCellCoords();
+    let nearest = coords[0];
+    let bestDistSq = Infinity;
+    for (const c of coords) {
+      const world = arena.heightfield.gridToWorld(c.x, c.z);
+      const distSq = (world.x - farPoint.x) ** 2 + (world.z - farPoint.z) ** 2;
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq;
+        nearest = c;
+      }
+    }
+    const nearestWorld = arena.heightfield.gridToWorld(nearest.x, nearest.z);
+    const expectedHeight = arena.heightfield.sample(nearestWorld.x, nearestWorld.z);
+
+    expect(arena.groundHeightAt(farPoint)).toBeCloseTo(expectedHeight!, 6);
+  });
+
+  it("groundHeightAt still returns the direct sample for an on-heightfield point (fallback path not taken)", () => {
+    const arena = loadArena("arena_slice");
+    const onMap = arena.spawnPoints[0];
+    const direct = arena.heightfield.sample(onMap.x, onMap.z);
+    expect(direct).not.toBeNull();
+    expect(arena.groundHeightAt(onMap)).toBeCloseTo(direct!, 6);
+  });
 });
