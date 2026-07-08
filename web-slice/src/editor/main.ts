@@ -613,6 +613,18 @@ addEventListener("keydown", e => {
     redo();
     return;
   }
+  // Bare Z / Y — modifier-free undo/redo. Cmd+Z works too (metaKey above), but
+  // Dima is on a Mac and wanted plain keys; the placement keys are all mouse +
+  // R/Q/E, so bare Z/Y don't collide with anything (text inputs already bail
+  // out at the top via isTextInputFocused).
+  if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === "KeyZ") {
+    undo();
+    return;
+  }
+  if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === "KeyY") {
+    redo();
+    return;
+  }
 
   if (e.code === "KeyR") {
     rotIndex = (rotIndex + 1) % ROT_CYCLE.length;
@@ -730,6 +742,20 @@ document.getElementById("btnClear")!.addEventListener("click", () => {
   if (!confirm("Clear the whole map?")) return;
   clearAll();
   scheduleAutosave();
+});
+
+// New: blank canvas from scratch. Unlike Clear (which just empties the current
+// map keeping its name), New also forgets the loaded name so a later "Save to
+// server" prompts for a fresh filename instead of silently overwriting the map
+// you started from — the natural "I want to build a brand-new example" flow.
+document.getElementById("btnNew")!.addEventListener("click", () => {
+  if (cells.size > 0 || props.length > 0) {
+    if (!confirm("Start a new blank map? Unsaved changes will be lost.")) return;
+  }
+  clearAll();
+  loadedMapName = null;
+  scheduleAutosave();
+  showServerStatus("new blank map", "ok");
 });
 
 document.getElementById("btnDrive")!.addEventListener("click", () => {
