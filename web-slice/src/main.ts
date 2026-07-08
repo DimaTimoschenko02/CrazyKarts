@@ -93,6 +93,23 @@ const net = initNet({
   combat: combat.netCallbacks,
 });
 
+// Corner badge shown when driving a FROZEN editor snapshot (?map=editor) so a
+// stale snapshot can't be mistaken for the live disk map (see editor Drive
+// handler). Reads editor-drive-meta {name, ts} stamped at Drive time.
+function showEditorSnapshotBadge(): void {
+  let name = "unsaved", ageMin = 0;
+  try {
+    const meta = JSON.parse(localStorage.getItem("editor-drive-meta") ?? "{}");
+    if (typeof meta.name === "string") name = meta.name;
+    if (typeof meta.ts === "number") ageMin = Math.round((Date.now() - meta.ts) / 60000);
+  } catch { /* no/old meta — show generic badge */ }
+  const el = document.createElement("div");
+  el.textContent = `⚠ EDITOR SNAPSHOT · ${name} · ${ageMin}m ago (not the live map)`;
+  el.style.cssText = "position:fixed;bottom:8px;left:8px;z-index:50;padding:4px 9px;"
+    + "font:12px/1.4 monospace;color:#0a0a1a;background:#ffd54a;border-radius:5px;opacity:0.92;";
+  document.body.appendChild(el);
+}
+
 // Map + kart model load async: physics runs from frame one on a flat
 // fallback (height 0) and switches to the map heightfield when it arrives.
 // __ready flips only after everything is in — agent-driven tests wait on it.
@@ -106,6 +123,7 @@ let map: GameMap | null = null;
       ? localStorage.getItem("editor-drive-map")
       : null;
     map = driveJson ? GameMap.fromJson(JSON.parse(driveJson), lib) : await GameMap.load(`/maps/${ACTIVE_MAP}.json`, lib);
+    if (driveJson) showEditorSnapshotBadge(); // this is a FROZEN editor snapshot, not the live disk map — make that unmissable
     scene.add(map.root);
     telemetry.setMapHandles(map, scene);
     net.setMap(map); // remote-kart body tilt (src/net/remoteKarts.ts) needs the heightfield too

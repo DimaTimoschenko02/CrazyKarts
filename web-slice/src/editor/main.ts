@@ -733,7 +733,15 @@ document.getElementById("btnClear")!.addEventListener("click", () => {
 });
 
 document.getElementById("btnDrive")!.addEventListener("click", () => {
+  // Stamp WHICH map + WHEN alongside the snapshot. The game route (?map=editor)
+  // drives this frozen snapshot, NOT the live disk map — so if the disk copy
+  // changes later, Drive still shows the old bits until re-loaded here. The
+  // meta lets the game show an "editor snapshot · name · age" badge so a stale
+  // snapshot can never masquerade as the live map again (the bug where a
+  // pre-edit mars_base kept rendering after the disk map was regenerated).
   localStorage.setItem("editor-drive-map", JSON.stringify(buildMapJson()));
+  localStorage.setItem("editor-drive-meta",
+    JSON.stringify({ name: loadedMapName ?? "unsaved", ts: Date.now() }));
   window.open("/?map=editor", "_blank");
 });
 
