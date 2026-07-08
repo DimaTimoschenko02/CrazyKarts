@@ -584,7 +584,13 @@ function hintFor(asset: string | null): string {
   if (!asset) return "";
   // See .claude/rules/map-building.md — these two families use OPPOSITE
   // y_level conventions and mixing them up is the classic map-building bug.
-  if (asset.startsWith("terrain_sideCorner") || asset === "terrain_ramp") {
+  // terrain_sideCliff MUST be checked before the generic "terrain_side"
+  // check below — "terrain_sideCliff".startsWith("terrain_side") is true,
+  // and cliff's mesh is ramp-like ABOVE the pivot (same as sideCorner/ramp),
+  // so its y_level means the LOW edge, not the HIGH edge like plain side.
+  // (Physics no longer reads cliff's y_level at all — see shared/heightfield.ts
+  // isWallOnlyAsset — but this still controls where the VISUAL mesh sits.)
+  if (asset.startsWith("terrain_sideCorner") || asset === "terrain_ramp" || asset.startsWith("terrain_sideCliff")) {
     return "y_level = НИЖНИЙ уровень (плитка поднимается вверх от него)";
   }
   if (asset.startsWith("terrain_side")) {

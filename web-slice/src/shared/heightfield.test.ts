@@ -5,7 +5,7 @@
 // shared between the client renderer (map/mapLoader.ts wraps it) and the
 // Colyseus match server (server/config/arena.ts).
 import { describe, expect, it } from "vitest";
-import { Heightfield, heightCellFor, normRot, type MapJson } from "./heightfield";
+import { Heightfield, heightCellFor, isWallOnlyAsset, normRot, type MapJson } from "./heightfield";
 
 function makeHeightfield(cells: MapJson["cells"]): Heightfield {
   return Heightfield.fromMapJson({
@@ -14,19 +14,22 @@ function makeHeightfield(cells: MapJson["cells"]): Heightfield {
   });
 }
 
-describe("heightCellFor branch ordering (startsWith prefix traps)", () => {
-  it("terrain_sideCliff does NOT fall into the generic terrain_side branch", () => {
-    // Regression for the documented latent bug: "terrain_sideCliff".startsWith
-    // ("terrain_side") is true, so a naive branch order would give it the
-    // HIGH-edge (y_level*lh - lh) base formula instead of the correct
-    // LOW-edge (y_level*lh) one — a full level_height (0.5) height error.
-    const cliffCell = heightCellFor("terrain_sideCliff", 2, 0, 0.5);
-    const plainSideCell = heightCellFor("terrain_side", 2, 0, 0.5);
-    expect(cliffCell.base).toBeCloseTo(1.0, 6); // y_level * lh = LOW edge
-    expect(plainSideCell.base).toBeCloseTo(0.5, 6); // y_level * lh - lh = HIGH edge
-    expect(cliffCell.base).not.toBeCloseTo(plainSideCell.base, 1);
+describe("isWallOnlyAsset prefix trap (terrain_sideCliff vs. the generic terrain_side family)", () => {
+  it("matches terrain_sideCliff only — every other Edges asset stays drivable", () => {
+    // Regression for the "terrain_sideCliff".startsWith("terrain_side") trap:
+    // the predicate must not accidentally net the whole terrain_side family,
+    // which is required to stay drivable (ramps/roads).
+    expect(isWallOnlyAsset("terrain_sideCliff")).toBe(true);
+    expect(isWallOnlyAsset("terrain_side")).toBe(false);
+    expect(isWallOnlyAsset("terrain_sideCorner")).toBe(false);
+    expect(isWallOnlyAsset("terrain_sideCornerInner")).toBe(false);
+    expect(isWallOnlyAsset("terrain_sideEnd")).toBe(false);
+    expect(isWallOnlyAsset("terrain_ramp")).toBe(false);
+    expect(isWallOnlyAsset("terrain")).toBe(false);
   });
+});
 
+describe("heightCellFor branch ordering (startsWith prefix traps)", () => {
   it("terrain_sideCornerInner does NOT fall into the generic terrain_sideCorner branch", () => {
     // "terrain_sideCornerInner".startsWith("terrain_sideCorner") is true —
     // must resolve to the two-gradient (ax2/az2) MAX shape, not the plain
@@ -45,29 +48,18 @@ describe("heightCellFor branch ordering (startsWith prefix traps)", () => {
   });
 });
 
-describe("terrain_sideCliff: axial ascent like side, but y_level = LOW edge", () => {
-  it("rot=0 profile (base=0, ascends +Z) matches plain side's rot=0 profile shifted one y_level down", () => {
-    // side y_level=1 rot=0 (HIGH edge semantics) gives the exact same absolute
-    // height numbers as cliff y_level=0 rot=0 (LOW edge semantics) — this is
-    // the "shifted by one level_height" relationship documented in the catalog.
+describe("terrain_sideCliff: visual-only, contributes no walkable height", () => {
+  it("a lone sideCliff column samples null (wall for the mover) at center and both near-edges", () => {
     const hf = makeHeightfield([{ asset: "terrain_sideCliff", x: 0, z: 0, y_level: 0, rot: 0 }]);
-    expect(hf.sample(0, -0.4)).toBeCloseTo(0.05, 5); // near low edge (-Z)
-    expect(hf.sample(0, 0)).toBeCloseTo(0.25, 5); // mid
-    expect(hf.sample(0, 0.4)).toBeCloseTo(0.45, 5); // near high edge (+Z)
+    expect(hf.sample(0, -0.4)).toBeNull(); // near low edge (-Z)
+    expect(hf.sample(0, 0)).toBeNull(); // mid
+    expect(hf.sample(0, 0.4)).toBeNull(); // near high edge (+Z)
   });
 
-  it("rot=0 exact low edge (z=-0.5) is exactly base, no rise", () => {
-    // wz=-0.5 rounds (JS round-half-towards-+Inf on -0.5 → -0 → cell 0) into
-    // this same cell rather than the (empty) neighbor, so this is an exact
-    // boundary sample, not an approximation.
-    const hf = makeHeightfield([{ asset: "terrain_sideCliff", x: 0, z: 0, y_level: 0, rot: 0 }]);
-    expect(hf.sample(0, -0.5)).toBeCloseTo(0, 10);
-  });
-
-  it("rot=90 ascends +X (same table as terrain_side)", () => {
+  it("rotation does not matter — every orientation still contributes nothing", () => {
     const hf = makeHeightfield([{ asset: "terrain_sideCliff", x: 0, z: 0, y_level: 0, rot: 90 }]);
-    expect(hf.sample(-0.4, 0)).toBeCloseTo(0.05, 5); // near low edge (-X)
-    expect(hf.sample(0.4, 0)).toBeCloseTo(0.45, 5); // near high edge (+X)
+    expect(hf.sample(-0.4, 0)).toBeNull();
+    expect(hf.sample(0.4, 0)).toBeNull();
   });
 });
 

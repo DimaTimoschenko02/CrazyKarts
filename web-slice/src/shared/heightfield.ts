@@ -103,16 +103,6 @@ const D = Math.SQRT1_2;
 const CORNER_ASCENT: Record<number, [number, number]> = {
   0: [-D, D], 90: [D, D], 180: [D, -D], 270: [-D, -D],
 };
-// sideCliff: same axial ascent basis as terrain_side (low edge -Z at rot=0,
-// straight not diagonal — verified by vertex read, docs/space-kit-terrain-
-// catalog.md "terrain_sideCliff"), but the mesh's Y-span sits ABOVE the pivot
-// like a ramp, so y_level means the LOW edge here (unlike plain side, where
-// y_level means the HIGH edge). Kept as its own named alias (rather than
-// reusing SIDE_ASCENT directly) so the two tables can diverge later without a
-// silent shared-object edit.
-const CLIFF_ASCENT: Record<number, [number, number]> = {
-  0: [0, 1], 90: [1, 0], 180: [0, -1], 270: [-1, 0],
-};
 // sideCornerInner: inversion of sideCorner — almost the whole tile is HIGH,
 // only a small wedge near one corner is low. rot table below is the LOW
 // corner's (x,z) sign per docs/space-kit-terrain-catalog.md. Each entry holds
@@ -145,6 +135,27 @@ export function longAxis(rot: number): [number, number] {
   return [Math.round(Math.sin(r)), Math.round(Math.cos(r))];
 }
 
+// terrain_sideCliff ("крутой обрыв" — steep dropoff) is VISUAL ONLY: it
+// deliberately contributes NO walkable height to the heightfield, unlike
+// every other Edges-family asset (terrain_side/sideCorner/sideCornerInner/
+// sideEnd), which all remain smooth drivable ramps. Heightfield.fromMapJson
+// skips setCell() entirely for cells matching this predicate, so sample()
+// on a lone cliff column returns null — the SAME "off-map" wall sentinel
+// kart.ts step 8 and rocketSim.isBlockedByTerrain already treat as solid,
+// with no new contract needed. A flat cap tile stacked in the same column
+// (same x,z, higher y_level) still works exactly as before — it dominates
+// via sample()'s per-column MAX regardless of what the cliff layer(s)
+// contribute — so "cliff face + flat walkable rim" remains an available
+// authoring pattern, just no longer required for solidity.
+//
+// MUST be checked with the same ordering care as the (now-removed)
+// heightCellFor branch: "terrain_sideCliff".startsWith("terrain_side") is
+// true, so this predicate (and any future branch) must never be confused
+// with the generic terrain_side family, which stays fully drivable.
+export function isWallOnlyAsset(asset: string): boolean {
+  return asset.startsWith("terrain_sideCliff");
+}
+
 export function heightCellFor(asset: string, yLevel: number, rot: number, levelHeight: number): HeightCell {
   const lh = levelHeight;
   if (asset.startsWith("terrain_ramp")) {
@@ -162,14 +173,6 @@ export function heightCellFor(asset: string, yLevel: number, rot: number, levelH
   if (asset.startsWith("terrain_sideCorner")) {
     // Ramp-like vertically: geometry spans [0, +level_height] above pivot.
     const [ax, az] = CORNER_ASCENT[rot] ?? [0, 0];
-    return { base: yLevel * lh, rise: lh, ax, az }; // y_level = LOW edge
-  }
-  if (asset.startsWith("terrain_sideCliff")) {
-    // MUST be checked before the generic "terrain_side" branch below —
-    // "terrain_sideCliff".startsWith("terrain_side") is true. Axial ascent
-    // basis identical to plain side, but Y-span sits ABOVE the pivot like a
-    // ramp, so y_level means the LOW edge (not the HIGH edge like plain side).
-    const [ax, az] = CLIFF_ASCENT[rot] ?? [0, 0];
     return { base: yLevel * lh, rise: lh, ax, az }; // y_level = LOW edge
   }
   if (asset.startsWith("terrain_side")) {
@@ -209,6 +212,7 @@ export class Heightfield {
     hf.originZ = data.meta.origin_offset[2];
 
     for (const rect of data.rect_fills ?? []) {
+      if (isWallOnlyAsset(rect.asset)) continue; // visual-only — see isWallOnlyAsset doc
       const rot = normRot(rect.rot);
       for (let x = rect.x_min; x <= rect.x_max; x++) {
         for (let z = rect.z_min; z <= rect.z_max; z++) {
@@ -217,6 +221,7 @@ export class Heightfield {
       }
     }
     for (const cell of data.cells ?? []) {
+      if (isWallOnlyAsset(cell.asset)) continue; // visual-only — see isWallOnlyAsset doc
       const rot = normRot(cell.rot);
       if (TWO_CELL_ASSETS.has(cell.asset)) {
         // Expand a 2-cell ramp into two half-height ramp cells: the clicked

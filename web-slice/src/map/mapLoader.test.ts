@@ -12,7 +12,7 @@ function stubLib(names: string[]): Map<string, THREE.Group> {
 }
 
 const LIB = stubLib([
-  "terrain", "terrain_ramp", "terrain_side", "terrain_sideCorner", "terrain_roadStraight",
+  "terrain", "terrain_ramp", "terrain_side", "terrain_sideCorner", "terrain_roadStraight", "terrain_sideCliff",
 ]);
 
 function makeMap(cells: MapJson["cells"], rects: MapJson["rect_fills"] = []): GameMap {
@@ -90,6 +90,33 @@ describe("GameMap heightfield", () => {
     );
     expect(map.sampleHeight(0, 2)).toBe(0); // rect ground
     expect(map.sampleHeight(1, 1)).toBe(1.0); // overridden by the cell
+  });
+
+  // terrain_sideCliff ("крутой обрыв") is visual-only — see
+  // shared/heightfield.ts isWallOnlyAsset doc. Unlike terrain_side (a
+  // drivable ramp skirt), a cliff column contributes no height at all, so
+  // sample() returns null there — the exact same "wall for the mover"
+  // sentinel kart.ts step 8 already treats as solid (no code change needed
+  // in kart.ts/vertical.ts to make this block movement).
+  it("terrain_sideCliff is a solid wall: contributes no height even next to a flat plateau", () => {
+    const map = makeMap([
+      { asset: "terrain", x: 1, z: 0, y_level: 1 },
+      { asset: "terrain_sideCliff", x: 0, z: 0, y_level: 0, rot: 90 },
+    ]);
+    expect(map.sampleHeight(0, 0)).toBeNull();
+    expect(map.sampleHeight(1, 0)).toBeCloseTo(0.5, 6); // the plateau top itself is unaffected
+  });
+
+  it("terrain_sideCliff + a flat cap in the SAME column is still walkable, at the cap's height", () => {
+    // Optional authoring pattern (see .claude/rules/map-building.md /
+    // isWallOnlyAsset doc): stacking a flat "terrain" layer on top of a
+    // cliff still works — sample()'s per-column MAX means the cap wins
+    // regardless of what the (now non-contributing) cliff layer does.
+    const map = makeMap([
+      { asset: "terrain_sideCliff", x: 0, z: 0, y_level: 0, rot: 0 },
+      { asset: "terrain", x: 0, z: 0, y_level: 1 },
+    ]);
+    expect(map.sampleHeight(0, 0)).toBeCloseTo(0.5, 6);
   });
 });
 
