@@ -117,9 +117,39 @@
   }
   .maps-menu-del:hover { background: #ff556622; border-color: #ff5566; }
   .maps-menu-del.confirm { background: #ff5566; color: #12122a; border-color: #ff5566; font-weight: bold; }
+
+  /* Shift+drag marquee-select rectangle — screen-space overlay, positioned/
+     sized in JS from the drag's start/current client coordinates. */
+  #marqueeBox {
+    position: absolute; border: 1px dashed #00eaff; background: #00eaff22;
+    pointer-events: none; z-index: 6;
+  }
+  #marqueeBox.hidden { display: none; }
+
+  /* Dev-only "code changed" banner — shown instead of letting Vite's default
+     full-page reload fire while the owner is mid-edit (see the
+     vite:beforeFullReload suppression in editor/main.ts). Never appears in
+     a production build (import.meta.hot is undefined there). */
+  #reloadBanner {
+    position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 50;
+    background: #ffcc00; color: #12122a; font-family: "Courier New", monospace;
+    font-size: 13px; padding: 8px 16px; display: flex; align-items: center; gap: 12px;
+    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+    box-shadow: 0 4px 14px #0008;
+  }
+  #reloadBanner.hidden { display: none; }
+  #reloadBanner button {
+    background: #12122a; color: #ffcc00; border: 1px solid #12122a; padding: 4px 10px;
+    cursor: pointer; font-family: inherit; font-size: 12px; border-radius: 4px;
+  }
+  #reloadBanner button:hover { background: #12122a22; }
 </style>
 </head>
 <body>
+<div id="reloadBanner" class="hidden">
+  <span>Код обновился — перезагрузи страницу когда удобно (F5)</span>
+  <button id="btnReloadNow">Reload</button>
+</div>
 <div id="app">
   <div id="topbar">
     <span class="title">MAP EDITOR</span>
@@ -157,8 +187,11 @@
         <b>R</b> — повернуть · <b>Пробел</b> — зеркалить · <b>Q</b>/<b>E</b> — уровень (стек в одну клетку)<br>
         <b>WASD</b> / стрелки — камера · колесо — зум<br>
         <b>Z</b> — отмена · <b>Y</b> — повтор (или Cmd/Ctrl+Z)<br>
-        <b>X</b> (держать) — точное удаление: курсор целится в конкретный блок под мышкой (не по клетке сверху) — для тоннелей в стене
+        <b>X</b> (держать) — точное удаление: курсор целится в конкретный блок под мышкой (не по клетке сверху) — для тоннелей в стене<br>
+        <b>Shift</b>+ЛКМ — выделить объект (клик) / выделить рамкой (тащить по пустому месту)<br>
+        <b>G</b> — двигать выделенное: ЛКМ фиксирует, Esc отменяет, Q/E — уровень группы
       </div>
+      <div id="marqueeBox" class="hidden"></div>
     </div>
   </div>
   <div id="statusbar">

@@ -43,6 +43,32 @@ const serverStatus = document.getElementById("serverStatus")!;
 const btnUndo = document.getElementById("btnUndo") as HTMLButtonElement;
 const btnCenterMap = document.getElementById("btnCenterMap") as HTMLButtonElement;
 const mapNameLabel = document.getElementById("mapNameLabel")!;
+const marqueeBox = document.getElementById("marqueeBox") as HTMLDivElement;
+const reloadBanner = document.getElementById("reloadBanner") as HTMLDivElement | null;
+
+// ── Dev-only: suppress full-page reloads while mid-edit ────────────────────
+// AI agents editing src/ while the owner has the editor open trigger Vite's
+// default full-reload on structural changes (new/removed exports, edits
+// outside a module's own HMR-accepted boundary, etc.) — that silently
+// reloads editor.html mid-session. The map itself survives (autosave, see
+// scheduleAutosave below), but in-progress *editor UI* state doesn't
+// (current tool, camera framing, an in-flight Shift-selection or G-grab).
+// Throwing inside the 'vite:beforeFullReload' handler is Vite's documented
+// hook for cancelling that reload — the client's own listener dispatch is a
+// plain synchronous for-loop, so an uncaught throw here aborts before the
+// reload code runs. We show a banner instead so the owner reloads on their
+// own terms (F5 / the button). import.meta.hot is undefined in a `vite
+// build` bundle, so this whole block is a no-op in prod.
+function showReloadBanner(): void {
+  reloadBanner?.classList.remove("hidden");
+}
+if (import.meta.hot) {
+  import.meta.hot.on("vite:beforeFullReload", () => {
+    showReloadBanner();
+    throw new Error("[editor] suppressed vite full reload — see reload banner");
+  });
+}
+document.getElementById("btnReloadNow")?.addEventListener("click", () => location.reload());
 
 // ── Scene ──────────────────────────────────────────────────────────────
 // Lighting/background kept consistent with the game (src/main.ts) so a map
@@ -373,6 +399,16 @@ function rebuildGhost(): void {
   scene.add(ghost);
 }
 
+// Position + rotation + scale for a placed prop object — mirrors
+// applyCellTransform above. Factored out so the grab-move ghost preview (see
+// updateGrabGhostTransforms) can reuse the exact same transform logic
+// addProp uses, instead of re-deriving it and risking drift between the two.
+function applyPropTransform(inst: THREE.Object3D, rec: PropRecord): void {
+  inst.position.set(rec.x - HALF, rec.y_level * LEVEL_HEIGHT, rec.z - HALF);
+  inst.rotation.y = THREE.MathUtils.degToRad(rec.rot);
+  inst.scale.setScalar(rec.scale);
+}
+
 // ── Cell / prop placement ────────────────────────────────────────────────
 function placeCell(rec: CellRecord): void {
   if (!lib) return;
@@ -407,9 +443,7 @@ function addProp(rec: PropRecord): void {
   const template = lib.get(rec.asset);
   if (!template) return;
   const inst = template.clone(true);
-  inst.position.set(rec.x - HALF, rec.y_level * LEVEL_HEIGHT, rec.z - HALF);
-  inst.rotation.y = THREE.MathUtils.degToRad(rec.rot);
-  inst.scale.setScalar(rec.scale);
+  applyPropTransform(inst, rec);
   // Same root tagging as placeCell — mapRec holds a direct reference to the
   // record (not an index), matching removePropByRef's identity-based lookup.
   inst.userData.mapKind = "prop";
@@ -600,6 +634,11 @@ function centerMap(): void {
 }
 
 function clearAll(): void {
+  // A bulk clear/import/load invalidates any in-progress selection or grab
+  // too — the objects a grab's ghosts/hidden-originals refer to are about to
+  // be wiped out from under it.
+  if (grabMode) exitGrabMode(true);
+  clearSelection();
   for (const obj of cellObjs.values()) scene.remove(obj);
   cells.clear();
   cellObjs.clear();
@@ -748,6 +787,279 @@ function deletePreciseTarget(): void {
   updatePreciseDeleteHover();
 }
 
+// ── Group selection (Shift) + grab-move (G) ────────────────────────────────
+// Selection is pure editor UI state — it never touches cells/props/undo by
+// itself. Cells are keyed the same way the model already keys them (cellKey);
+// props have no stable key, so they're tracked by object identity (the same
+// pattern removePropByRef already relies on).
+const selectedCellKeys = new Set<string>();
+const selectedProps = new Set<PropRecord>();
+const selectionHighlights: THREE.Box3Helper[] = [];
+
+function clearSelectionHighlights(): void {
+  for (const h of selectionHighlights) {
+    scene.remove(h);
+    h.geometry.dispose();
+    (h.material as THREE.Material).dispose();
+  }
+  selectionHighlights.length = 0;
+}
+
+// Rebuilds every selection highlight box from scratch on any selection
+// change — selections are small (a handful of objects at most), so this is
+// simpler and safer than diffing than tracking per-object add/remove.
+function refreshSelectionHighlights(): void {
+  clearSelectionHighlights();
+  for (const key of selectedCellKeys) {
+    const obj = cellObjs.get(key);
+    if (!obj) continue;
+    const box = new THREE.Box3().setFromObject(obj);
+    const h = new THREE.Box3Helper(box, 0x00eaff); // cyan — distinct from precise-delete's red
+    scene.add(h);
+    selectionHighlights.push(h);
+  }
+  for (const rec of selectedProps) {
+    const idx = props.indexOf(rec);
+    if (idx < 0) continue;
+    const box = new THREE.Box3().setFromObject(propObjs[idx]);
+    const h = new THREE.Box3Helper(box, 0x00eaff);
+    scene.add(h);
+    selectionHighlights.push(h);
+  }
+}
+
+function clearSelection(): void {
+  if (selectedCellKeys.size === 0 && selectedProps.size === 0) return;
+  selectedCellKeys.clear();
+  selectedProps.clear();
+  clearSelectionHighlights();
+}
+
+function toggleSelectTarget(target: PreciseTarget): void {
+  if (target.kind === "cell") {
+    if (selectedCellKeys.has(target.key)) selectedCellKeys.delete(target.key);
+    else selectedCellKeys.add(target.key);
+  } else {
+    if (selectedProps.has(target.rec)) selectedProps.delete(target.rec);
+    else selectedProps.add(target.rec);
+  }
+  refreshSelectionHighlights();
+}
+
+// Converts a client (screen) point to the same cell-space XZ used elsewhere
+// (hit.x/z + HALF), via the current ground plane — used only by marquee
+// selection, which needs both drag endpoints independent of refreshCursor's
+// other side effects (ghost/status updates).
+function clientToCellSpace(clientX: number, clientY: number): { x: number; z: number } | null {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const ndc = new THREE.Vector2(
+    ((clientX - rect.left) / rect.width) * 2 - 1,
+    -((clientY - rect.top) / rect.height) * 2 + 1
+  );
+  raycaster.setFromCamera(ndc, camera);
+  const hit = raycaster.ray.intersectPlane(groundPlane, hitPoint);
+  if (!hit) return null;
+  return { x: hit.x + HALF, z: hit.z + HALF };
+}
+
+function showMarqueeBox(x1: number, y1: number, x2: number, y2: number): void {
+  const rect = canvasContainer.getBoundingClientRect();
+  marqueeBox.style.left = `${Math.min(x1, x2) - rect.left}px`;
+  marqueeBox.style.top = `${Math.min(y1, y2) - rect.top}px`;
+  marqueeBox.style.width = `${Math.abs(x2 - x1)}px`;
+  marqueeBox.style.height = `${Math.abs(y2 - y1)}px`;
+  marqueeBox.classList.remove("hidden");
+}
+
+function hideMarqueeBox(): void {
+  marqueeBox.classList.add("hidden");
+}
+
+// Selects every cell (any y_level) and prop whose XZ footprint falls inside
+// the drag rectangle. The ±0.5 pad turns the two cell-space corner points
+// (which land at cell CENTERS) into a rectangle covering the cells'
+// footprints, and is generous enough to catch props anywhere within a cell.
+function marqueeSelect(x1: number, y1: number, x2: number, y2: number): void {
+  const c1 = clientToCellSpace(x1, y1);
+  const c2 = clientToCellSpace(x2, y2);
+  if (!c1 || !c2) return;
+  const minX = Math.min(c1.x, c2.x) - 0.5;
+  const maxX = Math.max(c1.x, c2.x) + 0.5;
+  const minZ = Math.min(c1.z, c2.z) - 0.5;
+  const maxZ = Math.max(c1.z, c2.z) + 0.5;
+  for (const [key, rec] of cells) {
+    if (rec.x >= minX && rec.x <= maxX && rec.z >= minZ && rec.z <= maxZ) selectedCellKeys.add(key);
+  }
+  for (const rec of props) {
+    if (rec.x >= minX && rec.x <= maxX && rec.z >= minZ && rec.z <= maxZ) selectedProps.add(rec);
+  }
+  refreshSelectionHighlights();
+}
+
+// ── Grab-move (G) ───────────────────────────────────────────────────────
+// While grabbing, the selected objects' REAL instances are hidden (not
+// removed — cells/props/undo stay untouched) and a semi-transparent ghost
+// per item follows the cursor's integer cell offset instead. Nothing is
+// committed to the model until confirmGrabMove() fires on left-click; Esc
+// cancels and simply un-hides the originals. This mirrors how the palette's
+// own ghost preview (rebuildGhost/makeGhostFrom) works, just for a group.
+type GrabItem =
+  | { kind: "cell"; rec: CellRecord; ghost: THREE.Object3D }
+  | { kind: "prop"; rec: PropRecord; ghost: THREE.Object3D };
+
+let grabMode = false;
+let grabStartCellX = 0;
+let grabStartCellZ = 0;
+let grabDx = 0;
+let grabDz = 0;
+let grabDy = 0;
+let grabItems: GrabItem[] = [];
+
+function updateGrabStatusBar(): void {
+  statusMain.textContent =
+    `grab: ${grabItems.length} объект(ов)  смещение: (${grabDx >= 0 ? "+" : ""}${grabDx}, ${grabDz >= 0 ? "+" : ""}${grabDz})  y_level: ${grabDy >= 0 ? "+" : ""}${grabDy}`;
+  statusHint.textContent = "ЛКМ — зафиксировать · Q/E — уровень группы · Esc — отменить";
+}
+
+function updateGrabGhostTransforms(): void {
+  for (const item of grabItems) {
+    if (item.kind === "cell") {
+      const virtual: CellRecord = {
+        ...item.rec, x: item.rec.x + grabDx, z: item.rec.z + grabDz, y_level: item.rec.y_level + grabDy,
+      };
+      applyCellTransform(item.ghost, virtual);
+    } else {
+      const virtual: PropRecord = {
+        ...item.rec, x: item.rec.x + grabDx, z: item.rec.z + grabDz, y_level: item.rec.y_level + grabDy,
+      };
+      applyPropTransform(item.ghost, virtual);
+    }
+  }
+}
+
+// Called from refreshCursor (after lastCellX/lastCellZ are recomputed)
+// whenever grabMode is on. Only rebuilds ghost transforms when the integer
+// offset actually changed, to avoid redoing work on every sub-cell mouse
+// jiggle.
+function updateGrabPreviewFromCursor(): void {
+  const dx = lastCellX - grabStartCellX;
+  const dz = lastCellZ - grabStartCellZ;
+  if (dx === grabDx && dz === grabDz) return;
+  grabDx = dx;
+  grabDz = dz;
+  updateGrabGhostTransforms();
+  updateGrabStatusBar();
+}
+
+function enterGrabMode(): void {
+  if (selectedCellKeys.size === 0 && selectedProps.size === 0) return;
+  if (!lib) return;
+  grabMode = true;
+  grabStartCellX = lastCellX;
+  grabStartCellZ = lastCellZ;
+  grabDx = 0;
+  grabDz = 0;
+  grabDy = 0;
+  grabItems = [];
+  clearSelectionHighlights(); // the ghosts stand in for the highlight while grabbing
+  for (const key of selectedCellKeys) {
+    const rec = cells.get(key);
+    const template = rec ? lib.get(rec.asset) : null;
+    if (!rec || !template) continue;
+    const ghost = makeGhostFrom(template);
+    scene.add(ghost);
+    grabItems.push({ kind: "cell", rec, ghost });
+    const obj = cellObjs.get(key);
+    if (obj) obj.visible = false;
+  }
+  for (const rec of selectedProps) {
+    const template = lib.get(rec.asset);
+    if (!template) continue;
+    const ghost = makeGhostFrom(template);
+    scene.add(ghost);
+    grabItems.push({ kind: "prop", rec, ghost });
+    const idx = props.indexOf(rec);
+    if (idx >= 0) propObjs[idx].visible = false;
+  }
+  updateGrabGhostTransforms();
+  updateGrabStatusBar();
+}
+
+// cancelled=true (Esc): un-hides the original instances, nothing else
+// changed since nothing was ever removed from the model.
+// cancelled=false (confirm): originals were already removed by
+// confirmGrabMove before this runs, so there's nothing to restore.
+function exitGrabMode(cancelled: boolean): void {
+  for (const item of grabItems) scene.remove(item.ghost);
+  grabItems = [];
+  if (cancelled) {
+    for (const key of selectedCellKeys) {
+      const obj = cellObjs.get(key);
+      if (obj) obj.visible = true;
+    }
+    for (const rec of selectedProps) {
+      const idx = props.indexOf(rec);
+      if (idx >= 0) propObjs[idx].visible = true;
+    }
+    refreshSelectionHighlights();
+  }
+  grabMode = false;
+  refreshCursor(lastClientX, lastClientY);
+}
+
+// Commits the whole group's move as one BatchUndoEntry (same pattern as
+// centerMap): every original is removed first, THEN every moved copy is
+// placed — doing it interleaved risks a shifted record's key colliding with
+// a not-yet-processed original when the group moves by (0, z) or (x, 0).
+// A moved cell landing on a FOREIGN (non-selected) cell overwrites it, same
+// as any normal placement — that foreign cell's prior value is captured as
+// `before` so undo restores it too.
+function confirmGrabMove(): void {
+  if (!grabMode) return;
+  const cellRecs = grabItems.filter((i): i is Extract<GrabItem, { kind: "cell" }> => i.kind === "cell").map(i => i.rec);
+  const propRecs = grabItems.filter((i): i is Extract<GrabItem, { kind: "prop" }> => i.kind === "prop").map(i => i.rec);
+  const batch: UndoEntry[] = [];
+
+  for (const rec of cellRecs) {
+    const oldKey = cellKey(rec.x, rec.z, rec.y_level);
+    removeCell(oldKey);
+    batch.push({ kind: "cell", key: oldKey, before: rec, after: null });
+  }
+  for (const rec of propRecs) {
+    removePropByRef(rec);
+    batch.push({ kind: "prop", before: rec, after: null });
+  }
+
+  const movedCellKeys: string[] = [];
+  for (const rec of cellRecs) {
+    const moved: CellRecord = { ...rec, x: rec.x + grabDx, z: rec.z + grabDz, y_level: rec.y_level + grabDy };
+    const newKey = cellKey(moved.x, moved.z, moved.y_level);
+    const before = cells.get(newKey) ?? null; // a foreign cell this move overwrites, if any
+    placeCell(moved);
+    batch.push({ kind: "cell", key: newKey, before, after: moved });
+    movedCellKeys.push(newKey);
+  }
+  const movedProps: PropRecord[] = [];
+  for (const rec of propRecs) {
+    const moved: PropRecord = { ...rec, x: rec.x + grabDx, z: rec.z + grabDz, y_level: rec.y_level + grabDy };
+    addProp(moved);
+    batch.push({ kind: "prop", before: null, after: moved });
+    movedProps.push(moved);
+  }
+
+  pushUndo({ kind: "batch", entries: batch });
+  exitGrabMode(false);
+
+  // Keep the group selected at its new position, so a follow-up G-grab (or
+  // just seeing what's still selected) doesn't require re-selecting.
+  selectedCellKeys.clear();
+  for (const k of movedCellKeys) selectedCellKeys.add(k);
+  selectedProps.clear();
+  for (const p of movedProps) selectedProps.add(p);
+  refreshSelectionHighlights();
+  scheduleAutosave();
+}
+
 // Recomputes the cursor's cell-space position from a client (screen) point,
 // updates the ghost + status bar. Called on pointermove and whenever rot /
 // y_level / active asset change (using the last known cursor position).
@@ -775,6 +1087,12 @@ function refreshCursor(clientX: number, clientY: number): void {
     lastCellZ = THREE.MathUtils.clamp(Math.round(cellSpaceZ), 0, GRID_SIZE - 1);
     lastFloatX = THREE.MathUtils.clamp(Math.round(cellSpaceX / PROP_STEP) * PROP_STEP, 0, GRID_SIZE - 1);
     lastFloatZ = THREE.MathUtils.clamp(Math.round(cellSpaceZ / PROP_STEP) * PROP_STEP, 0, GRID_SIZE - 1);
+  }
+
+  if (grabMode) {
+    if (ghost) ghost.visible = false; // palette ghost stays hidden — the grab ghosts are the preview now
+    updateGrabPreviewFromCursor();
+    return;
   }
 
   if (ghost && activeAsset) {
@@ -835,13 +1153,38 @@ function updateStatusBar(rot: number): void {
   statusHint.textContent = hintFor(activeAsset);
 }
 
-// ── Pointer input: LEFT place, RIGHT delete ─────────────────────────────
+// ── Pointer input: LEFT place, RIGHT delete, Shift+LEFT select, G-grab ──
+// Shift+LMB is ambiguous until pointerup: a plain click toggles one
+// object's selection, a drag becomes a marquee-select rectangle. Resolved by
+// tracking whether the pointer moved past a small pixel threshold between
+// down and up (shiftDragMoved) — see the pointerup handler below.
+let shiftDragActive = false;
+let shiftDragMoved = false;
+let shiftDragStartClientX = 0;
+let shiftDragStartClientY = 0;
+const MARQUEE_CLICK_THRESHOLD_PX = 5;
+
 renderer.domElement.addEventListener("pointermove", e => {
   refreshCursor(e.clientX, e.clientY);
+  if (shiftDragActive) {
+    const dist = Math.hypot(e.clientX - shiftDragStartClientX, e.clientY - shiftDragStartClientY);
+    if (dist > MARQUEE_CLICK_THRESHOLD_PX) shiftDragMoved = true;
+    if (shiftDragMoved) showMarqueeBox(shiftDragStartClientX, shiftDragStartClientY, e.clientX, e.clientY);
+  }
 });
 
 renderer.domElement.addEventListener("pointerdown", e => {
   refreshCursor(e.clientX, e.clientY);
+
+  if (grabMode) {
+    // Both buttons are swallowed while grabbing: left confirms the move at
+    // the current offset, right is a deliberate no-op (no "delete" concept
+    // makes sense mid-grab, and silently ignoring it beats an accidental
+    // delete-through if the owner's muscle memory reaches for RMB).
+    if (e.button === 0) confirmGrabMove();
+    return;
+  }
+
   if (preciseDeleteMode) {
     // Both buttons delete in this mode — there's no "place" to distinguish
     // between, and forcing the owner to remember which button does what
@@ -849,8 +1192,23 @@ renderer.domElement.addEventListener("pointerdown", e => {
     if (e.button === 0 || e.button === 2) deletePreciseTarget();
     return;
   }
+
+  if (e.button === 0 && e.shiftKey) {
+    shiftDragActive = true;
+    shiftDragMoved = false;
+    shiftDragStartClientX = e.clientX;
+    shiftDragStartClientY = e.clientY;
+    renderer.domElement.setPointerCapture(e.pointerId); // keep tracking even if the drag leaves the canvas
+    return;
+  }
+
   if (e.button === 0) {
-    // Left click: place the active asset (no-op if nothing selected).
+    // Left click (no Shift): clicking anywhere without Shift drops any
+    // active selection first — "outside the selection" per the spec, kept
+    // simple as "any plain click" rather than hit-testing whether it landed
+    // on a currently-selected object.
+    if (selectedCellKeys.size > 0 || selectedProps.size > 0) clearSelection();
+    // Then place the active asset (no-op if nothing selected).
     if (!activeAsset) return;
     const rot = ROT_CYCLE[rotIndex];
     if (isPropAsset(activeAsset)) {
@@ -901,6 +1259,19 @@ renderer.domElement.addEventListener("pointerdown", e => {
   }
 });
 
+renderer.domElement.addEventListener("pointerup", e => {
+  if (!shiftDragActive || e.button !== 0) return;
+  shiftDragActive = false;
+  hideMarqueeBox();
+  if (shiftDragMoved) {
+    marqueeSelect(shiftDragStartClientX, shiftDragStartClientY, e.clientX, e.clientY);
+  } else {
+    const target = raycastPreciseTarget();
+    if (target) toggleSelectTarget(target);
+  }
+  shiftDragMoved = false;
+});
+
 // ── Keyboard: R rotate, Q/E y_level, WASD/arrows pan, Ctrl+Z undo, Esc ──
 addEventListener("keydown", e => {
   if (isTextInputFocused()) return;
@@ -931,11 +1302,22 @@ addEventListener("keydown", e => {
   if (e.code === "KeyX") {
     // Held-key mode toggle, not a one-shot action — guard against the flood
     // of repeat keydown events the browser fires while a key stays down
-    // (e.repeat) so we don't redo the enter-mode work every ~30ms.
-    if (!preciseDeleteMode) {
+    // (e.repeat) so we don't redo the enter-mode work every ~30ms. Ignored
+    // entirely while grabbing — two overlapping ghost-preview modes at once
+    // would be confusing, and grab has no delete concept anyway.
+    if (!preciseDeleteMode && !grabMode) {
       preciseDeleteMode = true;
       refreshCursor(lastClientX, lastClientY);
     }
+    e.preventDefault();
+    return;
+  }
+
+  if (e.code === "KeyG") {
+    // Held-mode-style toggle guard (see KeyX above) — repeat keydowns while
+    // G stays physically down must not re-run enterGrabMode and reset the
+    // in-progress offset back to zero.
+    if (!grabMode) enterGrabMode();
     e.preventDefault();
     return;
   }
@@ -950,15 +1332,35 @@ addEventListener("keydown", e => {
     mirrorState = !mirrorState;
     refreshCursor(lastClientX, lastClientY);
   } else if (e.code === "KeyQ") {
-    yLevel = THREE.MathUtils.clamp(yLevel - 1, 0, MAX_Y_LEVEL);
-    updatePlane();
-    refreshCursor(lastClientX, lastClientY);
+    if (grabMode) {
+      grabDy -= 1;
+      updateGrabGhostTransforms();
+      updateGrabStatusBar();
+    } else {
+      yLevel = THREE.MathUtils.clamp(yLevel - 1, 0, MAX_Y_LEVEL);
+      updatePlane();
+      refreshCursor(lastClientX, lastClientY);
+    }
   } else if (e.code === "KeyE") {
-    yLevel = THREE.MathUtils.clamp(yLevel + 1, 0, MAX_Y_LEVEL);
-    updatePlane();
-    refreshCursor(lastClientX, lastClientY);
+    if (grabMode) {
+      grabDy += 1;
+      updateGrabGhostTransforms();
+      updateGrabStatusBar();
+    } else {
+      yLevel = THREE.MathUtils.clamp(yLevel + 1, 0, MAX_Y_LEVEL);
+      updatePlane();
+      refreshCursor(lastClientX, lastClientY);
+    }
   } else if (e.code === "Escape") {
+    if (grabMode) {
+      exitGrabMode(true);
+      return;
+    }
     closeMapsMenu();
+    if (selectedCellKeys.size > 0 || selectedProps.size > 0) {
+      clearSelection();
+      return;
+    }
     deselectAsset();
   } else if (CAMERA_PAN_KEYS.has(e.code)) {
     pressedKeys.add(e.code);
@@ -978,13 +1380,21 @@ addEventListener("keyup", e => {
 
 // If focus leaves the window mid-pan (alt-tab, devtools) the keyup never
 // fires — clear held keys (and exit precise-delete mode the same way) so
-// nothing gets stuck on when focus returns.
+// nothing gets stuck on when focus returns. Also bail out of an in-progress
+// grab or shift-drag for the same reason (a mouseup that happens while
+// unfocused wouldn't otherwise reach our pointerup handler).
 addEventListener("blur", () => {
   pressedKeys.clear();
   if (preciseDeleteMode) {
     preciseDeleteMode = false;
     preciseTarget = null;
     clearDeleteHighlight();
+  }
+  if (grabMode) exitGrabMode(true);
+  if (shiftDragActive) {
+    shiftDragActive = false;
+    shiftDragMoved = false;
+    hideMarqueeBox();
   }
 });
 
