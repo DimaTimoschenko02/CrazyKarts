@@ -24,11 +24,15 @@ export interface KartObstacle {
   alive: boolean;
 }
 
+import { KART_VISUAL_SCALE } from "./types";
+
 // Tune by feel — not derived from the visual mesh bounds (kart body is
-// roughly 0.86m wide x 1.7m long, see kart/stats.ts KART_TYPES.racer). A
-// circle this size gives a bit of grace for grazing side-by-side driving
-// before it starts shoving.
-export const KART_COLLISION_RADIUS = 0.9;
+// roughly 0.86m wide x 1.7m long BEFORE scaling, see kart/stats.ts
+// KART_TYPES.racer). A circle this size gives a bit of grace for grazing
+// side-by-side driving before it starts shoving. Scaled by KART_VISUAL_SCALE
+// (physics/types.ts) so the collision circle keeps the same visual grace
+// margin relative to the bigger kart body — see that constant's doc comment.
+export const KART_COLLISION_RADIUS = 0.9 * KART_VISUAL_SCALE;
 
 // Fraction of closing speed reflected back as bounce (0 = fully inelastic
 // stop along the normal, 1 = perfectly elastic). Low value reads as "karts

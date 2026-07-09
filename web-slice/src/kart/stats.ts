@@ -1,7 +1,7 @@
 // Data-driven kart catalogue. A new kart type (small+fast / large+tanky) is
 // a new KART_TYPES entry with physics overrides — zero changes to Kart or
 // the physics modules. See design/gdd (kart types) once that spec lands.
-import { DEFAULT_KART_PHYSICS_PARAMS, type KartPhysicsParams } from "../physics/types";
+import { DEFAULT_KART_PHYSICS_PARAMS, KART_VISUAL_SCALE, type KartPhysicsParams } from "../physics/types";
 
 export interface KartStats {
   readonly id: string;
@@ -27,12 +27,17 @@ export const KART_TYPES: Readonly<Record<string, KartStats>> = {
     // race.glb's raw AABB is 1.3m wide x 2.56m long x 0.73m tall (measured
     // from the glTF accessor bounds, see project memory). loadKartModel
     // scales uniformly by this target / raw Z length, so every dimension
-    // scales together: 1.7 -> ~0.86m wide, ~0.49m tall — fits inside a 1m
-    // tile with clearance on both sides (SmashKarts-style proportions)
-    // while still a moderate trim from the old 2.2 (not halved, so the
-    // kart doesn't shrink into a toy relative to KART_COLLISION_RADIUS=0.9m
-    // and the 1.2m/0.9m wheelbase/trackWidth the physics rig is tuned for).
-    modelLength: 1.7,
+    // scales together: base 1.7 -> ~0.86m wide, ~0.49m tall — fits inside a
+    // 1m tile with clearance on both sides (SmashKarts-style proportions).
+    // Scaled by KART_VISUAL_SCALE (physics/types.ts, 1.5x — owner request
+    // 2026-07-09: "too small for the 3m-tile road map") to 2.55m body length
+    // / ~1.29m wide / ~0.74m tall. Collision footprint/probes (kart/kart.ts
+    // COLLISION_AXLE_GEOMETRY) and kart-vs-kart radius (physics/kartCollision.ts
+    // KART_COLLISION_RADIUS) scale by the same constant so the body stays in
+    // the same visual proportion to its own collision shape as before —
+    // dynamics (wheelbase/trackWidth fed into BicyclePhysics) are
+    // deliberately NOT scaled, see KART_VISUAL_SCALE's doc comment.
+    modelLength: 1.7 * KART_VISUAL_SCALE,
     maxHp: 100,
     physics: {},
   },

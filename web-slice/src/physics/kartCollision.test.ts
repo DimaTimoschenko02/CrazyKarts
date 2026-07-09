@@ -22,8 +22,9 @@ describe("resolveKartPush", () => {
   });
 
   it("pushes the local kart fully outside the combined radius on overlap", () => {
-    // Obstacle sits 1m away along +X, combined radius is 2*0.9=1.8 — deep
-    // overlap (0.8m penetration).
+    // Obstacle sits 1m away along +X, combined radius is 2*KART_COLLISION_RADIUS
+    // (deep overlap either way) — read the constant, not a hardcoded number,
+    // so this test stays correct across KART_VISUAL_SCALE changes.
     const res = resolveKartPush({ x: 0, z: 0 }, { x: 0, z: 0 }, [{ x: 1, z: 0, alive: true }]);
     const dist = Math.hypot(res.pos.x - 1, res.pos.z - 0);
     expect(dist).toBeCloseTo(KART_COLLISION_RADIUS * 2, 6);

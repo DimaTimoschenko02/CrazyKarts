@@ -574,6 +574,26 @@ export const DEFAULT_AXLE_GEOMETRY: AxleGeometry = {
   trackWidth: 0.9,
 };
 
+// Kart visual/collision scale (owner request 2026-07-09: "machine too small
+// for this 3m-tile map, scale up 1.5x without touching handling"). Single
+// source of truth for every SIZE (model length, collision footprint,
+// kart-vs-kart radius) — deliberately NOT applied to DEFAULT_AXLE_GEOMETRY
+// above, which BicyclePhysics reads directly for the tuned dynamics
+// (yaw-rate/kinematic-omega/drift-circle math) and must stay bit-for-bit
+// identical to the owner-approved feel (see bicyclePhysics.test.ts drift-
+// circle regression guard). COLLISION_AXLE_GEOMETRY below is the scaled
+// sibling: kart/kart.ts's terrain-edge footprint probes, ground-height
+// probes, and skid-mark spacing all read the BODY's physical size (a bigger
+// kart needs a bigger footprint to avoid clipping into walls/props it now
+// visually overlaps), not the dynamics rig, so they take this one instead —
+// see kart/kart.ts's `axle` field doc comment for the exact split.
+export const KART_VISUAL_SCALE = 1.5;
+
+export const COLLISION_AXLE_GEOMETRY: AxleGeometry = {
+  wheelbase: DEFAULT_AXLE_GEOMETRY.wheelbase * KART_VISUAL_SCALE,
+  trackWidth: DEFAULT_AXLE_GEOMETRY.trackWidth * KART_VISUAL_SCALE,
+};
+
 // ─── PhysicsInput (physics_input.gd) ────────────────────────────────────────
 // Godot passes a full Basis; bicycle_physics.gd only ever reads -basis.z
 // (forward) and basis.x (right), so the web port takes those two unit

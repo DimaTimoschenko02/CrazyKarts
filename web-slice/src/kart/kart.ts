@@ -11,7 +11,7 @@
 import * as THREE from "three";
 import { BicyclePhysics } from "../physics/bicyclePhysics";
 import { ContinuousDrift } from "../physics/driftContinuous";
-import { DEFAULT_AXLE_GEOMETRY } from "../physics/types";
+import { COLLISION_AXLE_GEOMETRY, KART_VISUAL_SCALE } from "../physics/types";
 import type { DriftOutput, KartPhysicsParams, PhysicsInput, PhysicsState } from "../physics/types";
 import { RearSkidMarks } from "../fx/skidMarks";
 import { loadKartModel } from "../map/assetLoader";
@@ -81,7 +81,17 @@ export class Kart {
   private readonly baseCar = new THREE.Group();
 
   private readonly params: KartPhysicsParams;
-  private readonly axle = DEFAULT_AXLE_GEOMETRY;
+  // COLLISION_AXLE_GEOMETRY (physics/types.ts), NOT DEFAULT_AXLE_GEOMETRY:
+  // this field only ever feeds terrain-edge footprint probes
+  // (footprintHalf below), ground-height probes (sampleGroundProbes call in
+  // update()), attitude pitch/roll probes (computeAttitudeTarget call), and
+  // skid-mark spacing (RearSkidMarks below) — i.e. the kart's physical
+  // BODY size for collision/visual purposes. It is never passed to
+  // `this.bicycle` (BicyclePhysics defaults its own internal geometry to
+  // DEFAULT_AXLE_GEOMETRY independently, see the constructor call below) —
+  // this is the split that lets KART_VISUAL_SCALE grow the body without
+  // touching the tuned dynamics. See KART_VISUAL_SCALE's doc comment.
+  private readonly axle = COLLISION_AXLE_GEOMETRY;
   // Body-footprint probe half-extents for the dynamic terrain-edge slide
   // (see physics/terrainWall.ts) — derived once from the axle geometry, same
   // half-wheelbase/half-track distances kart/groundProbe.ts already probes at.
@@ -135,6 +145,9 @@ export class Kart {
 
   constructor(scene: THREE.Scene, stats: KartStats, spawn: THREE.Vector3) {
     this.params = buildKartPhysicsParams(stats);
+    // No geometry arg -> BicyclePhysics defaults to DEFAULT_AXLE_GEOMETRY
+    // (physics/types.ts), UNSCALED — dynamics stay exactly tuned regardless
+    // of `this.axle` above (see that field's doc comment).
     this.bicycle = new BicyclePhysics(this.params);
     this.driftSM = new ContinuousDrift(this.params);
     // Skid trails: gameplay marks left only while drifting (see skidMarks.ts).
@@ -149,29 +162,41 @@ export class Kart {
     this.reset();
   }
 
+  // All dimensions/positions below are authored at the ORIGINAL (pre-scale)
+  // size and wrapped in a group scaled by KART_VISUAL_SCALE — one multiply,
+  // not scattered *1.5 on every box/cone number. loadModel() below clears
+  // this whole group away (real glb model is scaled to an absolute target
+  // length independently, see assetLoader.ts loadKartModel), so there is no
+  // scale residue left on `baseCar` once the real model swaps in.
   private buildPlaceholderMesh(): void {
+    const placeholder = new THREE.Group();
+    placeholder.scale.setScalar(KART_VISUAL_SCALE);
     const body = new THREE.Mesh(
       new THREE.BoxGeometry(1.4, 0.5, 2.4),
       new THREE.MeshStandardMaterial({ color: 0xff4400 })
     );
     body.position.y = 0.45;
-    this.baseCar.add(body);
+    placeholder.add(body);
     const cabin = new THREE.Mesh(
       new THREE.BoxGeometry(1.0, 0.4, 1.0),
       new THREE.MeshStandardMaterial({ color: 0x2266ff })
     );
     cabin.position.set(0, 0.85, -0.2);
-    this.baseCar.add(cabin);
+    placeholder.add(cabin);
     const nose = new THREE.Mesh(
       new THREE.ConeGeometry(0.3, 0.6, 8),
       new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffff00, emissiveIntensity: 0.5 })
     );
     nose.rotation.x = -Math.PI / 2;
     nose.position.set(0, 0.5, -1.4); // -Z = forward
-    this.baseCar.add(nose);
+    placeholder.add(nose);
+    this.baseCar.add(placeholder);
   }
 
   // Swaps the placeholder box kart for the real glb model once it's loaded.
+  // `targetLength` is already KART_VISUAL_SCALE-scaled by the caller (see
+  // kart/stats.ts KartStats.modelLength) — loadKartModel scales the model to
+  // this absolute length, so no extra scale factor is needed here.
   async loadModel(name: string, targetLength: number): Promise<void> {
     const model = await loadKartModel(name, targetLength);
     this.baseCar.clear();

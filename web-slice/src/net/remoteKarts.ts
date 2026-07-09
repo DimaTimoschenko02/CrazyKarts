@@ -10,7 +10,7 @@ import type { GameMap } from "../map/mapLoader";
 import { forwardOf, rightOf } from "../kart/kart";
 import { computeAirborneFactor, computeAttitudeTarget, LEVEL as LEVEL_ATTITUDE } from "../kart/attitude";
 import { sampleGroundProbes, clampGroundProbesForAttitude } from "../kart/groundProbe";
-import { DEFAULT_AXLE_GEOMETRY, DEFAULT_KART_PHYSICS_PARAMS } from "../physics/types";
+import { COLLISION_AXLE_GEOMETRY, DEFAULT_KART_PHYSICS_PARAMS, KART_VISUAL_SCALE } from "../physics/types";
 import { KART_TYPES } from "../kart/stats";
 
 // Adaptive render delay, jitter buffering, and post-interpolation smoothing
@@ -83,13 +83,18 @@ export class RemoteKartManager {
     const group = new THREE.Group();
     group.rotation.order = "YXZ"; // matches the local Kart's convention (kart.ts syncVisual)
     // Placeholder box while the glb loads async, swapped in-place below —
-    // mirrors Kart.buildPlaceholderMesh()/loadModel() in kart/kart.ts.
+    // mirrors Kart.buildPlaceholderMesh()/loadModel() in kart/kart.ts,
+    // including the "wrap in a KART_VISUAL_SCALE-scaled group, don't hand-
+    // scale each number" pattern (see that method's doc comment).
     const placeholder = new THREE.Mesh(
       new THREE.BoxGeometry(1.4, 0.5, 2.4),
       new THREE.MeshStandardMaterial({ color: 0x00ccff })
     );
     placeholder.position.y = 0.45;
-    group.add(placeholder);
+    const placeholderScaled = new THREE.Group();
+    placeholderScaled.scale.setScalar(KART_VISUAL_SCALE);
+    placeholderScaled.add(placeholder);
+    group.add(placeholderScaled);
     group.visible = player.alive;
     this.scene.add(group);
 
@@ -169,8 +174,13 @@ export class RemoteKartManager {
       const airborneRaw = computeAirborneFactor(groundHere, pose.y, REMOTE_AIRBORNE_HEIGHT, REMOTE_AIRBORNE_BAND);
       kart.airborneSm += (airborneRaw - kart.airborneSm) * (1 - Math.exp(-AIRBORNE_FACTOR_RATE * dt));
 
-      const halfWheelbase = DEFAULT_AXLE_GEOMETRY.wheelbase * 0.5;
-      const halfTrack = DEFAULT_AXLE_GEOMETRY.trackWidth * 0.5;
+      // COLLISION_AXLE_GEOMETRY (physics/types.ts), not DEFAULT_AXLE_GEOMETRY:
+      // this is purely a visual body-tilt probe span (how far apart the F/B/
+      // R/L samples are taken to compute pitch/roll), same "physical body
+      // size" role kart/kart.ts's own `axle` field plays for the local kart
+      // — see that field's doc comment for the full dynamics/collision split.
+      const halfWheelbase = COLLISION_AXLE_GEOMETRY.wheelbase * 0.5;
+      const halfTrack = COLLISION_AXLE_GEOMETRY.trackWidth * 0.5;
       // Cliff-edge fix (owner playtest report, 2026-07-09): same clamp the
       // local kart applies (kart/kart.ts) — a remote kart's nose must not
       // pop into a hard dive the instant its synced pose crosses a cliff lip
