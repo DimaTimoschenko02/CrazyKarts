@@ -81,6 +81,13 @@ export interface MapJson {
 // ~0.35 short of full rise there); MAX of two axis-aligned ramps (one per
 // high edge) saturates to full rise exactly at both edges instead. See
 // docs/space-kit-terrain-catalog.md "terrain_sideCornerInner".
+//
+// Optional `grid`: a baked 12×12 sub-cell height sample (road tiles with
+// physics:"approx" — RoadTileCatalogEntry.heightGrid). When present, sample()
+// ignores rise/ax/az/ax2/az2 for this layer entirely and instead point-
+// samples the grid via gridSample() below, which undoes this cell's
+// rot/mirror to find which grid cell sits under the query point. See
+// gridSample() doc for the transform.
 export interface HeightCell {
   base: number;
   rise: number;
@@ -88,6 +95,9 @@ export interface HeightCell {
   az: number;
   ax2?: number;
   az2?: number;
+  grid?: number[][];
+  gridRot?: number;
+  gridMirror?: boolean;
 }
 
 // Ascent direction per rotation table above (side descends → ascent is opposite).
@@ -189,6 +199,46 @@ function mirroredVec(base0: [number, number], rot: number): [number, number] {
   return rotateVec(-x0, z0, rot);
 }
 
+// Point-samples a baked sub-cell height grid (RoadTileCatalogEntry.heightGrid,
+// tools/bake-road-tiles.mjs sampleHeightGrid()) at normalized cell-local
+// offset (lx,lz) ∈ [-0.5,0.5] (0,0 = cell center — the SAME space sample()
+// already uses for lx/lz and the *_ASCENT tables use for ax/az).
+//
+// The grid was baked over the tile's UNROTATED, UNMIRRORED mesh-local
+// footprint (tools/bake-road-tiles.mjs FOOTPRINT_X/Z, normalized here the
+// same way the ascent tables normalize a raw local vector to [-0.5,0.5]).
+// map/mapLoader.ts places each instance with rotation.y = rot and, if
+// mirrored, scale.x = -1 applied BEFORE rotation in three.js's TRS order
+// (mirror = reflect across local X, then rotate — see CellDef.mirror doc) —
+// exactly the transform mirroredVec()/rotateVec() already encode for ascent
+// vectors above. So a world-space query offset (lx,lz) maps back to the grid
+// by applying the INVERSE of that same transform: rotate by -rot, then (if
+// mirrored) negate the X component — i.e. rotate-then-un-mirror, the reverse
+// order of the forward un-mirror-then-rotate placement.
+//
+// Derivation: forward is world = R(rot)·S(mirror)·local (S = diag(±1,1), an
+// involution). rotateVec(x,z,rot) is exactly R(rot) in this codebase's
+// convention (verified against CORNER_ASCENT — see rotateVec doc). R is
+// orthogonal with det 1, so its inverse is R(-rot); S is its own inverse. So
+// local = S(mirror)·R(-rot)·world — rotate the query offset by -rot first,
+// THEN negate X if mirrored (S does not commute past R in general, so this
+// order, not "un-mirror then un-rotate", is the one that actually inverts
+// the forward transform).
+//
+// Point-sampled (nearest grid cell, no bilinear) on purpose: the grid exists
+// specifically to capture sharp height steps (curb lips, canal bank edges) —
+// blending across them would smear back exactly the false-wall/false-hole
+// bug this grid replaces.
+function gridSample(lx: number, lz: number, grid: number[][], rot: number, mirror: boolean): number {
+  const [rx, rz] = rotateVec(lx, lz, normRot(-rot));
+  const nx = mirror ? -rx : rx;
+  const nz = rz;
+  const n = grid.length;
+  const i = clamp(Math.floor((nx + 0.5) * n), 0, n - 1);
+  const j = clamp(Math.floor((nz + 0.5) * n), 0, n - 1);
+  return grid[i][j];
+}
+
 export function normRot(rot: number | undefined): number {
   return ((Math.round(rot ?? 0) % 360) + 360) % 360;
 }
@@ -239,6 +289,11 @@ interface RoadTileCatalogEntry {
   physics: "exact" | "approx";
   topMedian: number;
   slope?: { ax: number; az: number; base: number; rise: number };
+  // 12×12 sub-cell height sample, physics:"approx" tiles only — see
+  // tools/bake-road-tiles.mjs sampleHeightGrid() and gridSample() above.
+  // Absolute tile-local heights (same units/origin as topMedian), indexed
+  // [i][j] over the tile's own unrotated footprint (i ~ local X, j ~ local Z).
+  heightGrid?: number[][];
 }
 
 const ROAD_TILES = roadTilesCatalog as unknown as Record<string, RoadTileCatalogEntry>;
@@ -260,6 +315,13 @@ export function heightCellFor(
     // Unknown tile (catalog out of date): flat at the cell base — visible
     // sink is a louder bug signal than a silent throw during map load.
     if (!entry) return { base: yLevel * lh, rise: 0, ax: 0, az: 0 };
+    if (entry.heightGrid) {
+      // physics:"approx" — sub-cell grid instead of the linear base+rise
+      // model (see HeightCell.grid / gridSample doc). yLevel offsets the
+      // whole baked grid up by a level, same as the flat topMedian branch
+      // below did before this grid existed.
+      return { base: yLevel * lh, rise: 0, ax: 0, az: 0, grid: entry.heightGrid, gridRot: rot, gridMirror: !!mirror };
+    }
     if (entry.slope) {
       const base0: [number, number] = [entry.slope.ax, entry.slope.az];
       const [ax, az] = mirror ? mirroredVec(base0, rot) : rotateVec(base0[0], base0[1], rot);
@@ -443,12 +505,19 @@ export class Heightfield {
     const lz = fz - cz;
     let best = -Infinity;
     for (const cell of stack) {
-      let t = clamp(0.5 + lx * cell.ax + lz * cell.az, 0, 1);
-      if (cell.ax2 !== undefined || cell.az2 !== undefined) {
-        const t2 = clamp(0.5 + lx * (cell.ax2 ?? 0) + lz * (cell.az2 ?? 0), 0, 1);
-        t = Math.max(t, t2);
+      let h: number;
+      if (cell.grid) {
+        // Sub-cell grid layer (road tiles, physics:"approx") — bypasses the
+        // linear base+rise model entirely. See HeightCell.grid / gridSample doc.
+        h = cell.base + gridSample(lx, lz, cell.grid, cell.gridRot ?? 0, cell.gridMirror ?? false);
+      } else {
+        let t = clamp(0.5 + lx * cell.ax + lz * cell.az, 0, 1);
+        if (cell.ax2 !== undefined || cell.az2 !== undefined) {
+          const t2 = clamp(0.5 + lx * (cell.ax2 ?? 0) + lz * (cell.az2 ?? 0), 0, 1);
+          t = Math.max(t, t2);
+        }
+        h = cell.base + cell.rise * t;
       }
-      const h = cell.base + cell.rise * t;
       if (h > best) best = h;
     }
     return best;

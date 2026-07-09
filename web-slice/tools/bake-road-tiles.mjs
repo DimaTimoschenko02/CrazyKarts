@@ -17,14 +17,17 @@
 //     to drive under) → the "bridge" category; our column heightfield can't
 //     represent drive-under yet, so these are flagged physics:"approx"
 //   - water coverage by material name (the pack has a literal "Water" material)
+//   - for physics:"approx" tiles only: a 12×12 sub-cell height grid
+//     (sampleHeightGrid()) so curbs, canal banks and bridge decks get real
+//     per-point collision instead of one flat height for the whole tile
 //
 // The catalog is data (JSON), not code: shared/heightfield.ts and
 // shared/mapAssets.ts consume it so adding/reclassifying tiles never touches
 // physics code. kind → physics contract:
 //   flat        physics "exact"  — one height for the whole tile (median top)
 //   slope       physics "exact"  — linear axis-aligned gradient (base + rise)
-//   bridge/misc physics "approx" — treated as flat at the median top height
-//   water       physics "approx" — flat; gameplay meaning TBD by the owner
+//   bridge/misc physics "approx" — 12×12 heightGrid, point-sampled per query
+//   water       physics "approx" — 12×12 heightGrid (banks become real walls)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -331,6 +334,104 @@ function classify(a) {
   return { kind: "misc", category: "Misc", physics: "approx" };
 }
 
+// ── sub-cell height grid (physics:"approx" tiles only) ──────────────────────
+//
+// analyzeTile()'s 24×24 pass above samples columns over the TILE'S OWN TIGHT
+// AABB — right for plane-fit classification, wrong for a runtime physics
+// grid: several approx tiles (decor props like roadTile_019/020) have a tight
+// AABB far narrower than the 3×3m cell, off-center within it. The runtime
+// recenter (assetLoader.ts ROAD_STAGING_CENTER) always shifts the FIXED
+// staging window x∈[0,3], z∈[-3,0] (verified 302/302 tiles, zero exceptions)
+// onto the cell center — so the physics grid must sample that same fixed
+// window, not the geometry's own bounds, or grid cell (i,j) would land on a
+// different physical spot than the runtime inverse-transform expects for any
+// tile whose content doesn't fill the whole cell.
+const FOOTPRINT_X = [0, 3];
+const FOOTPRINT_Z = [-3, 0];
+const FINE_GRID = 24; // sampled at the same resolution as analyzeTile's pass
+const OUT_GRID = 12; // shipped resolution — 25cm cells on a 3m tile
+
+// Topmost hit in the column regardless of face orientation — same "highest
+// hit wins" rule as analyzeTile's `top = hits[0]`, so the grid's drive-over
+// surface matches topMedian/topMin/topMax exactly where they already agree
+// (this is deliberately NOT floor-filtered: a tile's very top point, even a
+// thin railing, is still what a kart's wheel would first meet vertically).
+function topHit(tris, x, z) {
+  let top = null;
+  for (const t of tris) {
+    const y = columnHit(t, x, z);
+    if (y !== null && (top === null || y > top)) top = y;
+  }
+  return top;
+}
+
+// Fills every `null` cell with its nearest non-null neighbour (multi-source
+// BFS from all sampled cells) — an approx tile's footprint can genuinely have
+// gaps (a decor prop's cell only covers part of the 3m tile; the rest of the
+// column has no geometry at all). Leaving those `null` would push a NaN into
+// the runtime heightfield; extending the nearest known surface is a closer
+// approximation than any single global fallback, and the map-owner can still
+// see a hard edge in the diagnostic scan if a tile's coverage is too sparse
+// to be usable as a full cell. A tile with ZERO hits anywhere (shouldn't
+// happen — every approx tile has at least some top surface) falls back to 0.
+function fillHoles(grid) {
+  const n = grid.length;
+  const queue = [];
+  const seen = grid.map(row => row.map(v => v !== null));
+  let anyHit = false;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (grid[i][j] !== null) { queue.push([i, j]); anyHit = true; }
+  if (!anyHit) { for (const row of grid) row.fill(0); return; }
+  let head = 0;
+  while (head < queue.length) {
+    const [i, j] = queue[head++];
+    const v = grid[i][j];
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ni = i + di, nj = j + dj;
+      if (ni < 0 || nj < 0 || ni >= n || nj >= n || seen[ni][nj]) continue;
+      seen[ni][nj] = true;
+      grid[ni][nj] = v;
+      queue.push([ni, nj]);
+    }
+  }
+}
+
+// Bakes the 12×12 sub-cell physics grid for one approx tile: fine 24×24 pass
+// over the fixed staging footprint, downsampled 2×2→MAX into the shipped
+// grid. MAX (not average) because an over-estimated height costs at most a
+// half-step ledge a kart bumps over; an under-estimate silently swallows a
+// real wall (the exact class of bug this whole grid exists to fix — see the
+// engine-programmer task brief).
+function sampleHeightGrid(tris) {
+  const fine = [];
+  for (let ix = 0; ix < FINE_GRID; ix++) {
+    const x = FOOTPRINT_X[0] + ((ix + 0.5) / FINE_GRID) * (FOOTPRINT_X[1] - FOOTPRINT_X[0]);
+    const row = [];
+    for (let iz = 0; iz < FINE_GRID; iz++) {
+      const z = FOOTPRINT_Z[0] + ((iz + 0.5) / FINE_GRID) * (FOOTPRINT_Z[1] - FOOTPRINT_Z[0]);
+      row.push(topHit(tris, x, z));
+    }
+    fine.push(row);
+  }
+  const coarse = [];
+  const step = FINE_GRID / OUT_GRID;
+  for (let ix = 0; ix < OUT_GRID; ix++) {
+    const row = [];
+    for (let iz = 0; iz < OUT_GRID; iz++) {
+      let m = null;
+      for (let dx = 0; dx < step; dx++) {
+        for (let dz = 0; dz < step; dz++) {
+          const v = fine[ix * step + dx][iz * step + dz];
+          if (v !== null && (m === null || v > m)) m = v;
+        }
+      }
+      row.push(m);
+    }
+    coarse.push(row);
+  }
+  fillHoles(coarse);
+  return coarse.map(row => row.map(v => +v.toFixed(3)));
+}
+
 const DIR_LABEL = { px: "+X", nx: "−X", pz: "+Z", nz: "−Z" };
 
 function slopeDir(gradient) {
@@ -419,6 +520,12 @@ for (const file of files) {
       rise: +(Math.abs(g) * span).toFixed(3),
     };
   }
+  if (cls.physics === "approx") {
+    // Sub-cell physics grid — see sampleHeightGrid() doc above. Replaces the
+    // old "flat at topMedian" contract for these 110 tiles: shared/heightfield.ts
+    // point-samples this instead of using topMedian/rise for the cell.
+    entry.heightGrid = sampleHeightGrid(tris);
+  }
   catalog[name] = entry;
   counts.set(cls.category, (counts.get(cls.category) ?? 0) + 1);
 }
@@ -435,7 +542,7 @@ for (const [name, e] of Object.entries(catalog)) {
   if (!byCat.has(e.category)) byCat.set(e.category, []);
   byCat.get(e.category).push([name, e]);
 }
-let md = `# Kenney 3D Road Tiles — baked catalog\n\nGenerated by \`web-slice/tools/bake-road-tiles.mjs\` — do not edit by hand.\nTiles are 3×3m in plan (pivot at a corner in the source files; the loader recenters XZ).\n\`physics: exact\` = the column heightfield represents this tile faithfully (flat or straight axis slope).\n\`physics: approx\` = visual-only for now: the tile renders but physics treats it as FLAT at its median top height (bridges can't be driven under yet — column model has one height per column).\n\n`;
+let md = `# Kenney 3D Road Tiles — baked catalog\n\nGenerated by \`web-slice/tools/bake-road-tiles.mjs\` — do not edit by hand.\nTiles are 3×3m in plan (pivot at a corner in the source files; the loader recenters XZ).\n\`physics: exact\` = the column heightfield represents this tile faithfully (flat or straight axis slope).\n\`physics: approx\` = the column heightfield uses a baked 12×12 sub-cell height grid (heightGrid) instead of the linear base+rise model — real per-point collision for curbs/banks/decks, but still one height per column (bridges can't be driven under yet).\n\n`;
 for (const [cat, entries] of [...byCat.entries()].sort()) {
   md += `## ${cat} (${entries.length})\n\n| tile | label | kind | physics | top median | rise | road edges | materials |\n|---|---|---|---|---|---|---|---|\n`;
   for (const [name, e] of entries) {
