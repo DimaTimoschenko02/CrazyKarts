@@ -28,19 +28,58 @@ export interface PaletteCategory { category: string; isProp: boolean; items: Pal
 // (the editor has a grid preset for this), NOT space-kit's 1/0.5.
 import roadTilesCatalog from "./roadTilesCatalog.json";
 
-interface RoadTileEntry { category: string; label: string; materials?: Record<string, number> }
+// kind/topMin/topMax are present on every one of the 302 baked entries (see
+// tools/bake-road-tiles.mjs) — topMin/topMax are the tile's measured lowest/
+// highest top-surface Y (flat tiles: topMin === topMax; slopes: low/high
+// edge), used below both for the slope label rewrite and the height-family
+// clustering the asset browser's "Высота" chips filter on.
+interface RoadTileEntry {
+  category: string;
+  label: string;
+  kind: string;
+  topMin: number;
+  topMax: number;
+  materials?: Record<string, number>;
+}
+
+const roadTileEntries = Object.entries(roadTilesCatalog as Record<string, RoadTileEntry>);
 
 const ROAD_CATEGORY_ORDER = [
   "Roads: Straight", "Roads: Corner", "Roads: Cross & T", "Roads: End & Detail",
   "Slopes", "Slopes: Curved & Corner", "Bridges", "Water", "Ground", "Misc",
 ];
 
+// Slope kinds get their label's connection-edge heights appended/inlined —
+// see withHeightLabel below, right above the height-family clustering that
+// consumes the same topMin/topMax data.
+const SLOPE_KINDS = new Set(["slope", "slope-curved", "slope-diagonal"]);
+const RISE_SEGMENT = /\brise\s+[\d.]+/;
+
+function formatHeightPair(topMin: number, topMax: number): string {
+  return `${topMin.toFixed(2)}→${topMax.toFixed(2)}`; // "0.61→1.17"
+}
+
+// Owner pain point (2026-07-09): manually trial-and-erroring which slope
+// connects cleanly to a given flat tile's edge height. The pack's own
+// generated label carries an approximate "rise N" (kind "slope" only) —
+// replaced in place with the two measured edge heights, which is both more
+// precise and IS the answer to "does this connect to my 1.65 tile". Curved/
+// diagonal slopes have no "rise" segment to replace, so the pair is
+// appended instead. Flat tiles are untouched (their "hN.NN" already exists
+// — see docs/roads-catalog.md).
+function withHeightLabel(entry: RoadTileEntry): string {
+  if (!SLOPE_KINDS.has(entry.kind)) return entry.label;
+  const pair = formatHeightPair(entry.topMin, entry.topMax);
+  if (RISE_SEGMENT.test(entry.label)) return entry.label.replace(RISE_SEGMENT, pair);
+  return `${entry.label} ${pair}`;
+}
+
 const ROAD_CATEGORIES: PaletteCategory[] = ROAD_CATEGORY_ORDER.map(category => ({
   category,
   isProp: false,
-  items: Object.entries(roadTilesCatalog as Record<string, RoadTileEntry>)
+  items: roadTileEntries
     .filter(([, e]) => e.category === category)
-    .map(([asset, e]) => ({ asset, label: e.label })),
+    .map(([asset, e]) => ({ asset, label: withHeightLabel(e) })),
 })).filter(cat => cat.items.length > 0);
 
 // ── Legacy: Kenney Space Kit ───────────────────────────────────────────────
@@ -252,7 +291,7 @@ export const ASSET_NAMES = PALETTE.flatMap(cat => cat.items.map(i => i.asset));
 // have no such data). Used by the asset-browser modal's material chips —
 // see src/editor/assetBrowserFilter.ts.
 export const ASSET_MATERIALS = new Map<string, Record<string, number>>(
-  Object.entries(roadTilesCatalog as Record<string, RoadTileEntry>)
+  roadTileEntries
     .filter((entry): entry is [string, RoadTileEntry & { materials: Record<string, number> }] => !!entry[1].materials)
     .map(([asset, e]) => [asset, e.materials])
 );
@@ -262,6 +301,82 @@ export const ASSET_MATERIALS = new Map<string, Record<string, number>>(
 export const MATERIAL_FAMILIES = [
   "Grass", "Asphalt", "Grey_Asphalt", "White", "Stone", "Sand", "Alternate_Dirt", "Water",
 ];
+
+// ── Connection-height families ────────────────────────────────────────────
+// Owner pain point (2026-07-09): two tiles only butt together seamlessly
+// when their touching edge heights are close (empirically: <=~0.03 apart
+// reads as seamless, >=~0.05 apart visibly steps) — finding a slope that
+// matches a given flat tile's edge meant hand-testing candidates in the
+// editor. topMin/topMax (measured geometry, not the pack's approximate
+// "rise" label) get clustered into named "height families" so the asset
+// browser's "Высота" chip row can filter to "everything that connects at
+// ~1.71m" in one click — see assetBrowserFilter.ts and the "Fits selected"
+// button in main.ts.
+// Neighbor gap 0.035 splits at the pack's natural boundaries (largest gap
+// INSIDE a real family in the measured data is 0.023; the critical
+// 1.661→1.700 boundary gap is 0.039). The span cap keeps chains honest:
+// without it transitive merging glued 1.604..1.730 into one family —
+// putting 1.65 and 1.707 together, the exact pair the owner reported as
+// visibly NOT connecting (~0.06 step).
+const HEIGHT_CLUSTER_GAP = 0.035; // max gap between sorted neighbors to keep chaining
+const HEIGHT_CLUSTER_SPAN = 0.06; // max width (last − first) of one family
+
+function formatHeight(v: number): string {
+  return v.toFixed(2);
+}
+
+// A flat tile's top edge is one connection height (topMin === topMax); a
+// slope's low/high edges are two. Deduped per-tile so a flat tile doesn't
+// contribute the same value twice into the clustering below.
+function connectionHeightsOf(entry: RoadTileEntry): number[] {
+  return entry.topMin === entry.topMax ? [entry.topMin] : [entry.topMin, entry.topMax];
+}
+
+const sortedHeights: number[] = roadTileEntries
+  .flatMap(([, e]) => connectionHeightsOf(e))
+  .sort((a, b) => a - b);
+
+// Greedy clustering over the sorted heights: extend the current family while
+// the neighbor gap stays small AND the family's total span stays within what
+// the eye still accepts as "one connection tier" — either limit breached
+// starts a new family. Span check uses current[0] so a chain of tiny gaps
+// can't creep across a visible mismatch.
+const heightClusters: number[][] = [];
+for (const h of sortedHeights) {
+  const current = heightClusters[heightClusters.length - 1];
+  if (
+    current &&
+    h - current[current.length - 1] <= HEIGHT_CLUSTER_GAP &&
+    h - current[0] <= HEIGHT_CLUSTER_SPAN
+  ) current.push(h);
+  else heightClusters.push([h]);
+}
+
+function median(sorted: number[]): number {
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+// Ordered low → high (clusters arrive in that order since sortedHeights was
+// sorted first), labeled by the cluster's median height.
+export const HEIGHT_FAMILIES: string[] = heightClusters.map(c => formatHeight(median(c)));
+
+// Every value in sortedHeights came from exactly one cluster — safe 1:1
+// reverse lookup from a raw height back to its family label.
+const heightToFamily = new Map<number, string>();
+heightClusters.forEach((cluster, i) => {
+  for (const h of cluster) heightToFamily.set(h, HEIGHT_FAMILIES[i]);
+});
+
+// asset → set of height-family labels it touches (road tiles only; legacy
+// space-kit assets have no measured geometry and are absent from this map
+// entirely — same "absent = no data" convention as ASSET_MATERIALS).
+export const ASSET_HEIGHT_FAMILIES = new Map<string, Set<string>>(
+  roadTileEntries.map(([asset, e]) => [
+    asset,
+    new Set(connectionHeightsOf(e).map(h => heightToFamily.get(h)!)),
+  ])
+);
 
 export const PROP_ASSETS = new Set(
   PALETTE.filter(cat => cat.isProp).flatMap(cat => cat.items.map(i => i.asset))

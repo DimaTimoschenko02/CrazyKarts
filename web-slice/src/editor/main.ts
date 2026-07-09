@@ -22,7 +22,7 @@ import { filterBrowserAssets, type BrowserAssetInfo, type BrowserFilterState } f
 // list (src/main.ts) — see shared/mapAssets.ts header comment for why.
 import {
   PALETTE, ASSET_NAMES, isPropAsset, DEFAULT_COLLAPSED_CATEGORIES,
-  ASSET_MATERIALS, MATERIAL_FAMILIES,
+  ASSET_MATERIALS, MATERIAL_FAMILIES, ASSET_HEIGHT_FAMILIES, HEIGHT_FAMILIES,
 } from "../shared/mapAssets";
 
 const MIN_GRID_SIZE = 16;
@@ -511,6 +511,7 @@ const BROWSER_ASSETS: BrowserAssetInfo[] = PALETTE.flatMap(cat =>
     label: item.label,
     category: cat.category,
     materials: ASSET_MATERIALS.get(item.asset),
+    heightFamilies: ASSET_HEIGHT_FAMILIES.get(item.asset),
   }))
 );
 const BROWSER_CATEGORIES = PALETTE.map(cat => cat.category);
@@ -540,7 +541,7 @@ function visibleBrowserCategories(): string[] {
 }
 
 let assetBrowserOpen = false;
-let browserFilter: BrowserFilterState = { categories: new Set(), materials: new Set(), query: "" };
+let browserFilter: BrowserFilterState = { categories: new Set(), materials: new Set(), heights: new Set(), query: "" };
 const browserCards = new Map<string, HTMLButtonElement>();
 
 const assetBrowserOverlay = document.getElementById("assetBrowserOverlay")!;
@@ -549,6 +550,8 @@ const assetBrowserLegacyToggle = document.getElementById("assetBrowserLegacyTogg
 const assetBrowserGrid = document.getElementById("assetBrowserGrid")!;
 const assetBrowserCategoryChips = document.getElementById("assetBrowserCategoryChips")!;
 const assetBrowserMaterialChips = document.getElementById("assetBrowserMaterialChips")!;
+const assetBrowserHeightChips = document.getElementById("assetBrowserHeightChips")!;
+const assetBrowserFitButton = document.getElementById("assetBrowserFitButton") as HTMLButtonElement;
 const assetBrowserEmpty = document.createElement("div");
 assetBrowserEmpty.id = "assetBrowserEmpty";
 assetBrowserEmpty.textContent = "No assets match these filters.";
@@ -609,7 +612,59 @@ function renderBrowserChips(): void {
       })
     );
   }
+
+  assetBrowserHeightChips.innerHTML = "";
+  assetBrowserHeightChips.appendChild(
+    makeFilterChip("All", browserFilter.heights.size === 0, () => {
+      browserFilter = { ...browserFilter, heights: new Set() };
+      renderBrowserChips();
+      applyBrowserFilter();
+    })
+  );
+  for (const h of HEIGHT_FAMILIES) {
+    assetBrowserHeightChips.appendChild(
+      makeFilterChip(h, browserFilter.heights.has(h), () => {
+        const next = new Set(browserFilter.heights);
+        if (next.has(h)) next.delete(h); else next.add(h);
+        browserFilter = { ...browserFilter, heights: next };
+        renderBrowserChips();
+        applyBrowserFilter();
+      })
+    );
+  }
 }
+
+// The currently active asset's own connection-height families, or null if
+// there's no active asset or it's a legacy asset with no measured geometry
+// (ASSET_HEIGHT_FAMILIES only covers road tiles — see mapAssets.ts).
+function activeAssetHeightFamilies(): ReadonlySet<string> | null {
+  if (!activeAsset) return null;
+  const families = ASSET_HEIGHT_FAMILIES.get(activeAsset);
+  return families && families.size > 0 ? families : null;
+}
+
+// Owner workflow (2026-07-09): C-eyedrop a placed tile → B → this button →
+// see every tile that connects at that exact edge height, instead of
+// hand-testing candidates. Replaces the height-row selection outright
+// (doesn't merge with whatever was already picked) — category/material
+// rows are untouched.
+function updateFitButtonState(): void {
+  const families = activeAssetHeightFamilies();
+  assetBrowserFitButton.disabled = !families;
+  assetBrowserFitButton.title = families
+    ? `Show tiles connecting at: ${[...families].join(", ")}`
+    : activeAsset
+      ? "Selected asset has no measured connection height (legacy Space Kit asset)"
+      : "Select an asset first (palette, browser card, or C-eyedropper)";
+}
+assetBrowserFitButton.addEventListener("click", () => {
+  const families = activeAssetHeightFamilies();
+  if (!families) return;
+  browserFilter = { ...browserFilter, heights: new Set(families) };
+  renderBrowserChips();
+  applyBrowserFilter();
+});
+updateFitButtonState(); // activeAsset is null at this point (declared above, before Palette UI) — starts disabled
 
 // Rebuilt at boot (after buildPalette/addPaletteThumbnails — see the boot
 // IIFE, so cards can borrow the palette buttons' already-rendered
@@ -717,6 +772,7 @@ function selectAsset(asset: string): void {
   for (const [name, btn] of paletteButtons) btn.classList.toggle("active", name === asset);
   for (const [name, btn] of recentButtons) btn.classList.toggle("active", name === asset);
   for (const [name, card] of browserCards) card.classList.toggle("active", name === asset);
+  updateFitButtonState();
   rebuildGhost();
   refreshCursor(lastClientX, lastClientY);
 }
@@ -726,6 +782,7 @@ function deselectAsset(): void {
   for (const btn of paletteButtons.values()) btn.classList.remove("active");
   for (const btn of recentButtons.values()) btn.classList.remove("active");
   for (const card of browserCards.values()) card.classList.remove("active");
+  updateFitButtonState();
   if (ghost) { scene.remove(ghost); ghost = null; }
   refreshCursor(lastClientX, lastClientY);
 }
