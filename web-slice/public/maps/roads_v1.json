@@ -4156,19 +4156,11 @@
       "mirror": true
     },
     {
-      "asset": "roadTile_163",
-      "x": 31,
-      "z": 48,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
+      "asset": "roadTile_012",
       "x": 31,
       "z": 49,
       "y_level": 0,
-      "rot": 0,
+      "rot": -90,
       "mirror": true
     },
     {
@@ -4246,14 +4238,6 @@
     {
       "asset": "roadTile_163",
       "x": 32,
-      "z": 50,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 31,
       "z": 50,
       "y_level": 0,
       "rot": 0,
@@ -7197,86 +7181,6 @@
     },
     {
       "asset": "roadTile_163",
-      "x": 25,
-      "z": 48,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 25,
-      "z": 49,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 25,
-      "z": 50,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 26,
-      "z": 50,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 27,
-      "z": 50,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 28,
-      "z": 50,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 29,
-      "z": 50,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 30,
-      "z": 50,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 30,
-      "z": 49,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 30,
-      "z": 48,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
       "x": 30,
       "z": 47,
       "y_level": 0,
@@ -7501,62 +7405,6 @@
     },
     {
       "asset": "roadTile_163",
-      "x": 29,
-      "z": 48,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 29,
-      "z": 49,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 28,
-      "z": 49,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 27,
-      "z": 49,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 27,
-      "z": 48,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 26,
-      "z": 48,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 28,
-      "z": 48,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
       "x": 28,
       "z": 47,
       "y_level": 0,
@@ -7775,14 +7623,6 @@
       "asset": "roadTile_163",
       "x": 27,
       "z": 47,
-      "y_level": 0,
-      "rot": 0,
-      "mirror": true
-    },
-    {
-      "asset": "roadTile_163",
-      "x": 26,
-      "z": 49,
       "y_level": 0,
       "rot": 0,
       "mirror": true
@@ -8058,48 +7898,6 @@
     {
       "asset": "roadTile_204",
       "x": 39,
-      "z": 47,
-      "y_level": 3,
-      "rot": 90
-    },
-    {
-      "asset": "roadTile_204",
-      "x": 39,
-      "z": 48,
-      "y_level": 3,
-      "rot": 90
-    },
-    {
-      "asset": "roadTile_204",
-      "x": 39,
-      "z": 49,
-      "y_level": 3,
-      "rot": 90
-    },
-    {
-      "asset": "roadTile_204",
-      "x": 39,
-      "z": 50,
-      "y_level": 3,
-      "rot": 90
-    },
-    {
-      "asset": "roadTile_204",
-      "x": 39,
-      "z": 51,
-      "y_level": 3,
-      "rot": 90
-    },
-    {
-      "asset": "roadTile_204",
-      "x": 39,
-      "z": 52,
-      "y_level": 3,
-      "rot": 90
-    },
-    {
-      "asset": "roadTile_204",
-      "x": 39,
       "z": 53,
       "y_level": 3,
       "rot": 90
@@ -8118,6 +7916,570 @@
       "z": 46,
       "y_level": 1,
       "rot": 90
+    },
+    {
+      "asset": "roadTile_279",
+      "x": 39,
+      "z": 54,
+      "y_level": 4,
+      "rot": 90
+    },
+    {
+      "asset": "roadTile_279",
+      "x": 39,
+      "z": 49,
+      "y_level": 4,
+      "rot": 90
+    },
+    {
+      "asset": "roadTile_279",
+      "x": 39,
+      "z": 47,
+      "y_level": 4,
+      "rot": 90
+    },
+    {
+      "asset": "roadTile_279",
+      "x": 39,
+      "z": 48,
+      "y_level": 4,
+      "rot": 90
+    },
+    {
+      "asset": "roadTile_279",
+      "x": 39,
+      "z": 50,
+      "y_level": 4,
+      "rot": 90
+    },
+    {
+      "asset": "roadTile_279",
+      "x": 39,
+      "z": 51,
+      "y_level": 4,
+      "rot": 90
+    },
+    {
+      "asset": "roadTile_279",
+      "x": 39,
+      "z": 52,
+      "y_level": 4,
+      "rot": 90
+    },
+    {
+      "asset": "roadTile_279",
+      "x": 39,
+      "z": 53,
+      "y_level": 4,
+      "rot": 90
+    },
+    {
+      "asset": "roadTile_279",
+      "x": 36,
+      "z": 47,
+      "y_level": 2,
+      "rot": 90
+    },
+    {
+      "asset": "roadTile_279",
+      "x": 36,
+      "z": 48,
+      "y_level": 2,
+      "rot": 90
+    },
+    {
+      "asset": "roadTile_279",
+      "x": 36,
+      "z": 49,
+      "y_level": 2,
+      "rot": 90
+    },
+    {
+      "asset": "roadTile_279",
+      "x": 36,
+      "z": 50,
+      "y_level": 2,
+      "rot": 90
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 31,
+      "z": 50,
+      "y_level": 0,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 31,
+      "z": 51,
+      "y_level": 0,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 30,
+      "z": 51,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 30,
+      "z": 52,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 31,
+      "z": 52,
+      "y_level": 0,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 30,
+      "z": 49,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 29,
+      "z": 49,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_012",
+      "x": 30,
+      "z": 50,
+      "y_level": 1,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_012",
+      "x": 29,
+      "z": 50,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_037",
+      "x": 29,
+      "z": 51,
+      "y_level": 1,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_012",
+      "x": 29,
+      "z": 52,
+      "y_level": 2,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_012",
+      "x": 28,
+      "z": 50,
+      "y_level": 1,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_037",
+      "x": 28,
+      "z": 51,
+      "y_level": 1,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_037",
+      "x": 28,
+      "z": 49,
+      "y_level": 0,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 31,
+      "z": 53,
+      "y_level": 0,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 31,
+      "z": 54,
+      "y_level": 0,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 31,
+      "z": 55,
+      "y_level": 0,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 30,
+      "z": 53,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 30,
+      "z": 54,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 30,
+      "z": 55,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 29,
+      "z": 53,
+      "y_level": 2,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 29,
+      "z": 54,
+      "y_level": 2,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 29,
+      "z": 55,
+      "y_level": 2,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 28,
+      "z": 52,
+      "y_level": 2,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 27,
+      "z": 49,
+      "y_level": 1,
+      "rot": 180,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_037",
+      "x": 27,
+      "z": 50,
+      "y_level": 1,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 27,
+      "z": 51,
+      "y_level": 2,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 27,
+      "z": 52,
+      "y_level": 2,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 26,
+      "z": 52,
+      "y_level": 2,
+      "rot": -90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 26,
+      "z": 49,
+      "y_level": 2,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 26,
+      "z": 50,
+      "y_level": 2,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 26,
+      "z": 51,
+      "y_level": 2,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 26,
+      "z": 53,
+      "y_level": 3,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 27,
+      "z": 53,
+      "y_level": 3,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 28,
+      "z": 53,
+      "y_level": 3,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 28,
+      "z": 54,
+      "y_level": 3,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 28,
+      "z": 55,
+      "y_level": 3,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 27,
+      "z": 55,
+      "y_level": 3,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 27,
+      "z": 54,
+      "y_level": 3,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 26,
+      "z": 54,
+      "y_level": 3,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 26,
+      "z": 55,
+      "y_level": 3,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_023",
+      "x": 31,
+      "z": 48,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_023",
+      "x": 30,
+      "z": 48,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_023",
+      "x": 29,
+      "z": 48,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_023",
+      "x": 28,
+      "z": 48,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_023",
+      "x": 27,
+      "z": 48,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_023",
+      "x": 26,
+      "z": 48,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 26,
+      "z": 49,
+      "y_level": 0,
+      "rot": 90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 27,
+      "z": 49,
+      "y_level": 0,
+      "rot": 90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_152",
+      "x": 26,
+      "z": 49,
+      "y_level": 1,
+      "rot": 90,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 32,
+      "z": 51,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 33,
+      "z": 51,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 33,
+      "z": 52,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 32,
+      "z": 52,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 32,
+      "z": 53,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 33,
+      "z": 53,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 32,
+      "z": 54,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 33,
+      "z": 54,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 33,
+      "z": 55,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
+    },
+    {
+      "asset": "roadTile_163",
+      "x": 32,
+      "z": 55,
+      "y_level": 0,
+      "rot": 0,
+      "mirror": true
     }
   ],
   "props": []
