@@ -16,6 +16,7 @@ import type { AssetLibrary } from "../map/assetLoader";
 import type { MapJson } from "../map/mapLoader";
 import { TWO_CELL_ASSETS, longAxis } from "../shared/heightfield";
 import { shouldDeletePropFirst, topCellYLevelAt } from "./deletePriority";
+import { cellsAlongLine } from "./paintLine";
 // Palette data (categories/items/isProp) is shared with the game's preload
 // list (src/main.ts) — see shared/mapAssets.ts header comment for why.
 import { PALETTE, ASSET_NAMES, isPropAsset, DEFAULT_COLLAPSED_CATEGORIES } from "../shared/mapAssets";
@@ -1311,8 +1312,60 @@ let shiftDragStartClientX = 0;
 let shiftDragStartClientY = 0;
 const MARQUEE_CLICK_THRESHOLD_PX = 5;
 
+// ── Drag-paint (hold LMB) ───────────────────────────────────────────────
+// Holding the left button with a cell asset selected paints every cell the
+// cursor passes over — clicking tiles one by one turned out to be impractical
+// for filling ground (owner request 2026-07-09). Cells between two pointermove
+// samples are filled along the line (cellsAlongLine) so a fast flick leaves no
+// holes. The WHOLE stroke commits as ONE batch undo entry on pointerup —
+// Ctrl+Z removes the stroke, not one tile at a time. Props and 2-cell assets
+// keep the old click-to-place behavior (spamming those along a drag would
+// just pile up overlapping copies).
+interface PaintStroke {
+  batch: UndoEntry[];
+  painted: Set<string>; // cell keys touched this stroke — never repaint
+  lastX: number;
+  lastZ: number;
+}
+let paintStroke: PaintStroke | null = null;
+
+function paintCellAt(stroke: PaintStroke, x: number, z: number): void {
+  if (!activeAsset) return;
+  const key = cellKey(x, z, yLevel);
+  if (stroke.painted.has(key)) return;
+  stroke.painted.add(key);
+  const rot = ROT_CYCLE[rotIndex];
+  const before = cells.get(key) ?? null;
+  // Re-placing an identical tile is a visual no-op — skip it so the stroke's
+  // undo batch doesn't fill up with entries that restore what's already there.
+  if (before && before.asset === activeAsset && before.rot === rot && !!before.mirror === mirrorState) return;
+  const rec: CellRecord = { asset: activeAsset, x, z, y_level: yLevel, rot };
+  if (mirrorState) rec.mirror = true;
+  placeCell(rec);
+  stroke.batch.push({ kind: "cell", key, before, after: rec });
+}
+
+function finishPaintStroke(): void {
+  if (!paintStroke) return;
+  const { batch } = paintStroke;
+  paintStroke = null;
+  if (batch.length === 0) return;
+  pushUndo(batch.length === 1 ? batch[0] : { kind: "batch", entries: batch });
+  scheduleAutosave();
+}
+
 renderer.domElement.addEventListener("pointermove", e => {
   refreshCursor(e.clientX, e.clientY);
+  if (paintStroke) {
+    // Fill every cell from the last painted one to the cursor's current cell
+    // (line-walk, so fast mouse moves don't leave gaps), then advance the
+    // stroke anchor.
+    for (const c of cellsAlongLine(paintStroke.lastX, paintStroke.lastZ, lastCellX, lastCellZ)) {
+      paintCellAt(paintStroke, c.x, c.z);
+    }
+    paintStroke.lastX = lastCellX;
+    paintStroke.lastZ = lastCellZ;
+  }
   if (shiftDragActive) {
     const dist = Math.hypot(e.clientX - shiftDragStartClientX, e.clientY - shiftDragStartClientY);
     if (dist > MARQUEE_CLICK_THRESHOLD_PX) shiftDragMoved = true;
@@ -1362,16 +1415,25 @@ renderer.domElement.addEventListener("pointerdown", e => {
       const rec: PropRecord = { asset: activeAsset, x: lastFloatX, z: lastFloatZ, y_level: yLevel, rot, scale: 1.0 };
       addProp(rec);
       pushUndo({ kind: "prop", before: null, after: rec });
-    } else {
+      scheduleAutosave();
+    } else if (TWO_CELL_ASSETS.has(activeAsset)) {
+      // 2-cell pieces stay click-to-place: dragging them would stamp
+      // overlapping copies one cell apart.
       const key = cellKey(lastCellX, lastCellZ, yLevel);
       const before = cells.get(key) ?? null;
       const rec: CellRecord = { asset: activeAsset, x: lastCellX, z: lastCellZ, y_level: yLevel, rot };
       if (mirrorState) rec.mirror = true;
       placeCell(rec);
       pushUndo({ kind: "cell", key, before, after: rec });
+      scheduleAutosave();
+    } else {
+      // Start a drag-paint stroke; the first cell paints immediately, the
+      // pointermove handler extends it, pointerup commits it as one undo step.
+      paintStroke = { batch: [], painted: new Set(), lastX: lastCellX, lastZ: lastCellZ };
+      paintCellAt(paintStroke, lastCellX, lastCellZ);
+      renderer.domElement.setPointerCapture(e.pointerId); // keep painting if the drag leaves the canvas
     }
     recordRecentAsset(activeAsset); // "used" = actually placed, not just clicked in the palette
-    scheduleAutosave();
   } else if (e.button === 2) {
     // Right click: delete whatever is under the cursor. Usually that's a
     // snapped cell tile first, then the nearest prop — but a prop resting
@@ -1408,6 +1470,10 @@ renderer.domElement.addEventListener("pointerdown", e => {
 });
 
 renderer.domElement.addEventListener("pointerup", e => {
+  if (e.button === 0 && paintStroke) {
+    finishPaintStroke();
+    return;
+  }
   if (!shiftDragActive || e.button !== 0) return;
   shiftDragActive = false;
   hideMarqueeBox();
@@ -1539,6 +1605,7 @@ addEventListener("blur", () => {
     clearDeleteHighlight();
   }
   if (grabMode) exitGrabMode(true);
+  finishPaintStroke(); // commit what was painted — losing focus mustn't lose the stroke's undo entry
   if (shiftDragActive) {
     shiftDragActive = false;
     shiftDragMoved = false;
