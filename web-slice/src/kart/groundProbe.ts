@@ -100,3 +100,64 @@ export function wallAwareGroundHeight(probes: GroundProbes, stepExcludeThreshold
   }
   return best;
 }
+
+// Standard C1-continuous 0..1 ease between edges lo/hi — private copy, same
+// duplication pattern kart/attitude.ts's own smoothstep header comment
+// documents (this module is a leaf shared by both attitude.ts and
+// physics/vertical.ts's ground-follow input and deliberately has no deps
+// beyond plain math).
+function smoothstep(lo: number, hi: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - lo) / (hi - lo)));
+  return t * t * (3 - 2 * t);
+}
+
+// Cliff-edge attitude fix (owner playtest report, 2026-07-09): the downward
+// mirror of wallAwareGroundHeight's wall exclusion above. A probe reading
+// meaningfully LOWER than the center probe is air hanging off a cliff edge —
+// not ground under that wheel — and letting the RAW depth of "whatever's
+// down there" (which can be many meters, an entire floor below on a
+// multi-layer map) feed straight into body TILT (kart/attitude.ts) or the
+// forward slope probe (kart/kart.ts's slopeRaw) is what produced the reported
+// "nose dives the instant the front wheel crosses the lip" pop: a single
+// substep's slope target swinging to something like atan2(-6, dist) ≈ -80°.
+//
+// Unlike wallAwareGroundHeight (which fully DROPS an excluded probe from the
+// vertical/height-follow max — physics/vertical.ts still needs the real,
+// unclamped depth so it can correctly detect launch-off-a-ledge, per the
+// design brief's explicit "do not touch detach logic" instruction), this
+// CAPS a probe's value instead of dropping it: attitude still wants some
+// directional information right at the lip (a little nose-down IS correct as
+// the wheel visually crosses the edge), just not the raw unclamped depth of a
+// floor meters below. `dropLimit` is how far below center a probe is allowed
+// to pull attitude before being capped; the cap eases in smoothly over a
+// `dropLimit * 0.5` band starting exactly at `drop === dropLimit`, so probes
+// reading at/under the limit are returned completely untouched (C0/C1 match
+// at that boundary — see attitude.test.ts's cliff-edge coverage) and probes
+// reading far below plateau at exactly `center - dropLimit`.
+export function clampHeightForAttitude(h: number | null, center: number, dropLimit: number): number | null {
+  if (h === null) return null;
+  const drop = center - h;
+  const band = dropLimit * 0.5;
+  const t = 1 - smoothstep(dropLimit, dropLimit + band, drop);
+  const cap = center - dropLimit;
+  return h * t + cap * (1 - t);
+}
+
+// Probe-set version of clampHeightForAttitude above — clamps every non-center
+// probe against the SAME center reading used elsewhere in this tick (I3's
+// "one probe set, one 'where's the ground' question" convention). When the
+// body's own center is off the map (probes.center === null — the narrow-gap
+// case I3 already handles), there is nothing to clamp against, so the probe
+// set is returned unchanged, same as wallAwareGroundHeight's own
+// center-null fallback above.
+export function clampGroundProbesForAttitude(probes: GroundProbes, dropLimit: number): GroundProbes {
+  if (probes.center === null) return probes;
+  const center = probes.center;
+  return {
+    center,
+    hF: clampHeightForAttitude(probes.hF, center, dropLimit),
+    hB: clampHeightForAttitude(probes.hB, center, dropLimit),
+    hR: clampHeightForAttitude(probes.hR, center, dropLimit),
+    hL: clampHeightForAttitude(probes.hL, center, dropLimit),
+  };
+}

@@ -9,7 +9,7 @@ import type { KartObstacle } from "../physics/kartCollision";
 import type { GameMap } from "../map/mapLoader";
 import { forwardOf, rightOf } from "../kart/kart";
 import { computeAirborneFactor, computeAttitudeTarget, LEVEL as LEVEL_ATTITUDE } from "../kart/attitude";
-import { sampleGroundProbes } from "../kart/groundProbe";
+import { sampleGroundProbes, clampGroundProbesForAttitude } from "../kart/groundProbe";
 import { DEFAULT_AXLE_GEOMETRY, DEFAULT_KART_PHYSICS_PARAMS } from "../physics/types";
 import { KART_TYPES } from "../kart/stats";
 
@@ -171,18 +171,26 @@ export class RemoteKartManager {
 
       const halfWheelbase = DEFAULT_AXLE_GEOMETRY.wheelbase * 0.5;
       const halfTrack = DEFAULT_AXLE_GEOMETRY.trackWidth * 0.5;
+      // Cliff-edge fix (owner playtest report, 2026-07-09): same clamp the
+      // local kart applies (kart/kart.ts) — a remote kart's nose must not
+      // pop into a hard dive the instant its synced pose crosses a cliff lip
+      // either, or the person watching them sees the exact same judder the
+      // owner reported for their own kart.
       const grounded =
         groundHere === null || !this.map
           ? LEVEL_ATTITUDE
           : computeAttitudeTarget(
-              sampleGroundProbes(
-                (x, z) => this.map!.sampleHeightAt(x, z, pose.y, DEFAULT_KART_PHYSICS_PARAMS.layerClimbThreshold),
-                pose.x,
-                pose.z,
-                forwardOf(pose.yaw),
-                rightOf(pose.yaw),
-                halfWheelbase,
-                halfTrack
+              clampGroundProbesForAttitude(
+                sampleGroundProbes(
+                  (x, z) => this.map!.sampleHeightAt(x, z, pose.y, DEFAULT_KART_PHYSICS_PARAMS.layerClimbThreshold),
+                  pose.x,
+                  pose.z,
+                  forwardOf(pose.yaw),
+                  rightOf(pose.yaw),
+                  halfWheelbase,
+                  halfTrack
+                ),
+                DEFAULT_KART_PHYSICS_PARAMS.attitudeCliffDropLimit
               ),
               halfWheelbase,
               halfTrack

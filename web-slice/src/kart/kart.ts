@@ -24,7 +24,7 @@ import { footprintHalfExtents, footprintPoints, resolveTerrainSlide } from "../p
 import { resolveKartVsStatic } from "../physics/staticSlide";
 import { STATIC_COLLISION_SKIN } from "../shared/staticColliders";
 import { computeAttitudeTarget } from "./attitude";
-import { wallAwareGroundHeight, sampleGroundProbes } from "./groundProbe";
+import { wallAwareGroundHeight, sampleGroundProbes, clampHeightForAttitude, clampGroundProbesForAttitude } from "./groundProbe";
 
 // Godot: forward = -Z rotated by yaw around +Y.
 export function forwardOf(yaw: number): THREE.Vector3 {
@@ -324,7 +324,16 @@ export class Kart {
           this.params.layerClimbThreshold
         );
         if (hHere !== null && hAhead !== null) {
-          slopeRaw = Math.atan2(hAhead - hHere, SLOPE_PROBE_DIST);
+          // Cliff-edge fix (owner playtest report, 2026-07-09): a probe past
+          // the lip reads a floor meters below (multi-layer heightfield),
+          // read raw that's atan2(-6, dist) ~ -80 deg for a single substep —
+          // the reported nose-dive pop. Clamp the DOWNWARD depth this probe
+          // is allowed to represent to attitudeCliffDropLimit (uphill/climb
+          // readings are untouched — see clampHeightForAttitude doc in
+          // groundProbe.ts). Non-null in, non-null out (hHere/hAhead are both
+          // checked above), so the cast below is safe.
+          const hAheadEff = clampHeightForAttitude(hAhead, hHere, this.params.attitudeCliffDropLimit) as number;
+          slopeRaw = Math.atan2(hAheadEff - hHere, SLOPE_PROBE_DIST);
         }
       }
       const slopeAlpha = 1 - Math.exp(-SLOPE_FILTER_RATE * dt);
@@ -532,9 +541,19 @@ export class Kart {
     // exp filter (grounded/airborne), same "different rate each side"
     // pattern as the drift engage/exit rates elsewhere in this codebase.
     // Reuses the SAME groundProbes sampled above for the vertical step (P3).
+    // Cliff-edge fix (owner playtest report, 2026-07-09): attitude gets its
+    // OWN clamped copy of groundProbes (clampGroundProbesForAttitude,
+    // groundProbe.ts) so a probe reading a floor meters below on the far side
+    // of a cliff lip can't yank the body's pitch/roll into a hard nose-dive —
+    // the vertical/height-follow step above already consumed the RAW
+    // groundProbes for launch detection and must keep seeing the real depth.
     const attitudeTarget = this.vertical.airborne
       ? { pitch: 0, roll: 0 }
-      : computeAttitudeTarget(groundProbes, this.axle.wheelbase * 0.5, this.axle.trackWidth * 0.5);
+      : computeAttitudeTarget(
+          clampGroundProbesForAttitude(groundProbes, this.params.attitudeCliffDropLimit),
+          this.axle.wheelbase * 0.5,
+          this.axle.trackWidth * 0.5
+        );
     const attitudeRate = this.vertical.airborne ? this.params.attitudeAirborneRelaxRate : this.params.attitudeFollowRate;
     const attitudeAlpha = 1 - Math.exp(-attitudeRate * dt);
     this.pitchSm += (attitudeTarget.pitch - this.pitchSm) * attitudeAlpha;

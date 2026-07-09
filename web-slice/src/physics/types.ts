@@ -219,6 +219,16 @@ export interface KartPhysicsParams {
   attitudeFollowRate: number; // ATTITUDE_FOLLOW_RATE — grounded slope-follow speed
   attitudeAirborneRelaxRate: number; // ATTITUDE_AIRBORNE_RELAX_RATE — how fast the body levels out while airborne
 
+  // Cliff-edge nose-dive fix (owner playtest report, 2026-07-09). Human-
+  // readable per .claude/rules/param-tuner-descriptions.md: "Насколько ниже
+  // машинки должна быть земля под колесом, чтобы корпус перестал наклоняться
+  // в её сторону. Меньше (0.2) — нос почти не клюёт на кромках, но на крутых
+  // съездах корпус позже 'ложится' на склон. Больше (0.8) — корпус честнее
+  // облизывает большие перепады, но на обрывах появляется резкий клевок
+  // носом." See kart/groundProbe.ts clampHeightForAttitude/
+  // clampGroundProbesForAttitude for the actual clamp math.
+  attitudeCliffDropLimit: number; // ATTITUDE_CLIFF_DROP_LIMIT
+
   // Chase camera heading (src/core/camera.ts, 2026-07-07 — camera detached
   // from physical yaw so drift can be visually deep again without spinning
   // the whole screen; see camera.ts file header for the full rationale).
@@ -529,6 +539,11 @@ export const DEFAULT_KART_PHYSICS_PARAMS: KartPhysicsParams = {
   // speed in this vertical slice's speed range.
   attitudeFollowRate: 20,
   attitudeAirborneRelaxRate: 3,
+  // 0.35 — comfortably clears ordinary heightfield tile-seam noise and real
+  // slope probe separation (SLOPE_PROBE_DIST in kart.ts) while capping the
+  // multi-meter drop a probe reads the instant it clears a cliff/ramp lip
+  // onto a lower layer, which is what produced the reported nose-dive pop.
+  attitudeCliffDropLimit: 0.35,
 
   // Chase camera detached from physical yaw (2026-07-07) — see camera.ts
   // file header. 4 -> 7 (owner video-diff session 2026-07-08, point 6: "kart

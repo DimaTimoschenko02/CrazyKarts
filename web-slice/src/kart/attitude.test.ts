@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { GameMap, type MapJson } from "../map/mapLoader";
 import { computeAirborneFactor, computeAttitudeTarget } from "./attitude";
-import { sampleGroundProbes } from "./groundProbe";
+import { sampleGroundProbes, clampGroundProbesForAttitude, type GroundProbes } from "./groundProbe";
 
 function stubLib(names: string[]): Map<string, THREE.Group> {
   return new Map(names.map(n => [n, new THREE.Group()]));
@@ -185,5 +185,128 @@ describe("remote kart attitude blend at the map edge (integration, no THREE scen
     let maxStep = 0;
     for (let i = 16; i < pitches.length; i++) maxStep = Math.max(maxStep, Math.abs(pitches[i] - pitches[i - 1]));
     expect(maxStep).toBeLessThan(0.01);
+  });
+});
+
+// Cliff-edge nose-dive fix (owner playtest report, 2026-07-09):
+// kart/groundProbe.ts clampGroundProbesForAttitude caps how far BELOW the
+// center probe a neighboring probe is allowed to pull body attitude — the
+// downward mirror of wallAwareGroundHeight's wall exclusion. Vertical/
+// height-follow (physics/vertical.ts, the actual launch-detach logic) is
+// untouched by this fix and keeps consuming the RAW probes (see kart.ts
+// step 8b/8d) — these tests only exercise the attitude path.
+describe("clampGroundProbesForAttitude — cliff-edge nose-dive fix", () => {
+  const DROP_LIMIT = 0.35;
+  const HALF_WHEELBASE = 0.6;
+  const HALF_TRACK = 0.5;
+
+  it("pitch target is bounded (not a near-vertical -80deg dive) when the front probe reads a canyon floor meters below", () => {
+    // center + hB on the plateau (0.0), hF has already crossed the lip and
+    // reads the canyon floor 6m below — exactly the "front wheel crosses the
+    // edge" moment the owner reported. hR/hL flat (isolate pitch).
+    const probes: GroundProbes = { center: 0.0, hF: -6.0, hB: 0.0, hR: 0.0, hL: 0.0 };
+
+    const rawPitch = computeAttitudeTarget(probes, HALF_WHEELBASE, HALF_TRACK).pitch;
+    const clampedPitch = computeAttitudeTarget(
+      clampGroundProbesForAttitude(probes, DROP_LIMIT),
+      HALF_WHEELBASE,
+      HALF_TRACK
+    ).pitch;
+
+    // Raw: atan2(-6, 1.2) ~ -1.37 rad (~-78.7deg) — the reported dive.
+    expect(rawPitch).toBeLessThan(-1.0);
+    // Clamped: atan2(-DROP_LIMIT, 1.2) ~ -0.28 rad (~-16deg) — still nose-
+    // down (correct, the wheel really is dropping at the lip) but nowhere
+    // near the raw dive.
+    expect(clampedPitch).toBeGreaterThan(-0.4);
+    expect(clampedPitch).toBeLessThan(0);
+  });
+
+  it("does not touch a probe reading meaningfully HIGHER (climbing a slope stays exactly as before)", () => {
+    const probes: GroundProbes = { center: 0.0, hF: 2.0, hB: 0.0, hR: 0.0, hL: 0.0 };
+    const rawPitch = computeAttitudeTarget(probes, HALF_WHEELBASE, HALF_TRACK).pitch;
+    const clampedPitch = computeAttitudeTarget(
+      clampGroundProbesForAttitude(probes, DROP_LIMIT),
+      HALF_WHEELBASE,
+      HALF_TRACK
+    ).pitch;
+    expect(clampedPitch).toBeCloseTo(rawPitch, 10);
+  });
+
+  it("roll target is bounded the same way when a SIDE probe crosses the lip (not just the front)", () => {
+    const probes: GroundProbes = { center: 0.0, hF: 0.0, hB: 0.0, hR: -6.0, hL: 0.0 };
+    const rawRoll = computeAttitudeTarget(probes, HALF_WHEELBASE, HALF_TRACK).roll;
+    const clampedRoll = computeAttitudeTarget(
+      clampGroundProbesForAttitude(probes, DROP_LIMIT),
+      HALF_WHEELBASE,
+      HALF_TRACK
+    ).roll;
+    expect(rawRoll).toBeLessThan(-1.0);
+    expect(clampedRoll).toBeGreaterThan(-0.4);
+    expect(clampedRoll).toBeLessThan(0);
+  });
+
+  it("end-to-end approach to a real cliff lip (GameMap): clamped pitch target never spikes frame to frame", () => {
+    // Plateau at z=0 (h=6.0, y_level=12), canyon floor at z=1 (h=0.0,
+    // y_level=0) — a real multi-meter drop past the lip, same as the reported
+    // scenario, sampled through the actual heightfield/GameMap path (not a
+    // synthetic GroundProbes literal like the tests above).
+    const map = makeMap([
+      { asset: "terrain", x: 0, z: 0, y_level: 12 },
+      { asset: "terrain", x: 0, z: 1, y_level: 0 },
+    ]);
+    const fwd = { x: 0, z: 1 };
+    const right = { x: 1, z: 0 };
+    const halfWheelbase = 0.3;
+    const halfTrack = 0.5;
+    const yRef = 6.0;
+    const climbThreshold = 0.8;
+
+    const rawPitches: number[] = [];
+    const clampedPitches: number[] = [];
+    // Sweep the kart's own z from well before the lip up to (but not past)
+    // the cell boundary the kart's own CENTER crosses (z=0.5 — cells are 1m
+    // flat tiles here per .claude/rules/map-building.md, so a probe's raw
+    // sampled height steps HARD, in a single sample, the instant it crosses
+    // a cell boundary — there is no continuous interpolation for this fix to
+    // smooth on top of; that's a pre-existing, unrelated characteristic of
+    // this heightfield representation, not something in scope here). The
+    // front probe (z + halfWheelbase=0.3) crosses its OWN cell boundary at
+    // z=0.2, well inside this range — isolating exactly the "front wheel
+    // crosses the lip while the body is still grounded on the plateau" bug
+    // this fix targets, without also crossing the boundary under center.
+    for (let z = 0.05; z <= 0.45; z += 0.01) {
+      const probes = sampleGroundProbes(
+        (px, pz) => map.sampleHeightAt(px, pz, yRef, climbThreshold),
+        0,
+        z,
+        fwd,
+        right,
+        halfWheelbase,
+        halfTrack
+      );
+      rawPitches.push(computeAttitudeTarget(probes, halfWheelbase, halfTrack).pitch);
+      const clamped = clampGroundProbesForAttitude(probes, DROP_LIMIT);
+      clampedPitches.push(computeAttitudeTarget(clamped, halfWheelbase, halfTrack).pitch);
+    }
+
+    const maxStepOf = (series: number[]): number => {
+      let maxStep = 0;
+      for (let i = 1; i < series.length; i++) maxStep = Math.max(maxStep, Math.abs(series[i] - series[i - 1]));
+      return maxStep;
+    };
+    const rawMaxStep = maxStepOf(rawPitches);
+    const clampedMaxStep = maxStepOf(clampedPitches);
+
+    // The underlying grid cell boundary is itself a hard step (see comment
+    // above) — the clamp can't turn that into a fully continuous curve
+    // without heightfield interpolation, which is out of scope. What it DOES
+    // do is cap how far the resulting pitch swing is allowed to reach: the
+    // raw sweep here jumps almost straight to a near-vertical dive in one
+    // sample (matching the reported symptom), the clamped sweep's single
+    // worst step must be a small fraction of that.
+    expect(rawMaxStep).toBeGreaterThan(1.0); // raw: confirms this reproduces the reported near-vertical pop
+    expect(clampedMaxStep).toBeLessThan(0.6); // clamped: still a visible dip at the lip, nowhere near a dive
+    expect(clampedMaxStep).toBeLessThan(rawMaxStep * 0.4); // and a large, unambiguous reduction versus raw
   });
 });
