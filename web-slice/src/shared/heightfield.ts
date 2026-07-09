@@ -58,6 +58,21 @@ export interface PropDef {
   scale?: number;
 }
 
+// Weapon-box spawn point, authored by hand in the map editor (grid-cell
+// coordinates, same space as CellDef — NOT world meters). This is a pure
+// gameplay-spawn annotation, not a terrain layer: Heightfield.fromMapJson
+// below never reads box_points, so hand-placed boxes have zero effect on
+// collision/slope — only server/config/arena.ts (Colyseus match server)
+// consumes this field, converting grid -> world via the same
+// Heightfield.gridToWorld formula the old auto-derived box grid used. See
+// server/spawn/autoSpawn.ts deriveBoxGrid for the fallback used when this is
+// absent/empty (keeps every pre-existing map loading unchanged).
+export interface BoxPointDef {
+  x: number;
+  z: number;
+  y_level: number;
+}
+
 export interface MapJson {
   meta: {
     tile_size: number;
@@ -67,6 +82,7 @@ export interface MapJson {
   rect_fills?: RectFill[];
   cells?: CellDef[];
   props?: PropDef[];
+  box_points?: BoxPointDef[];
 }
 
 // h(local) = base + rise * (0.5 + localX * ax + localZ * az), local ∈ [-0.5, 0.5].

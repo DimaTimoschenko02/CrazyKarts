@@ -64,6 +64,7 @@ const serverStatus = document.getElementById("serverStatus")!;
 const btnUndo = document.getElementById("btnUndo") as HTMLButtonElement;
 const btnCenterMap = document.getElementById("btnCenterMap") as HTMLButtonElement;
 const mapNameLabel = document.getElementById("mapNameLabel")!;
+const boxCounter = document.getElementById("boxCounter")!;
 const marqueeBox = document.getElementById("marqueeBox") as HTMLDivElement;
 const reloadBanner = document.getElementById("reloadBanner") as HTMLDivElement | null;
 
@@ -187,11 +188,19 @@ function isTextInputFocused(): boolean {
 // ── Editor state ─────────────────────────────────────────────────────────
 interface CellRecord { asset: string; x: number; z: number; y_level: number; rot: number; mirror?: boolean }
 interface PropRecord { asset: string; x: number; z: number; y_level: number; rot: number; scale: number }
+// Weapon-box spawn marker — hand-authored (owner request 2026-07-09, see
+// design/notes and MapJson.box_points in shared/heightfield.ts). Deliberately
+// its OWN record type/Map, not a CellRecord: it has no mesh asset and must
+// NEVER flow into `cells`/MapJson.cells (that array feeds Heightfield —
+// a marker must have zero effect on collision/slope, see the box_points doc).
+interface BoxMarkerRecord { x: number; z: number; y_level: number }
 
 const cells = new Map<string, CellRecord>();
 const cellObjs = new Map<string, THREE.Object3D>();
 const props: PropRecord[] = [];
 const propObjs: THREE.Object3D[] = [];
+const boxMarkers = new Map<string, BoxMarkerRecord>();
+const boxMarkerObjs = new Map<string, THREE.Object3D>();
 
 let lib: AssetLibrary | null = null;
 let activeAsset: string | null = null;
@@ -213,6 +222,14 @@ let lastFloatZ = 0;
 // asset for. Same (x, z, y_level) still means "replace" (swap the asset at that
 // exact layer).
 function cellKey(x: number, z: number, yLevel: number): string {
+  return x + "," + z + "," + yLevel;
+}
+
+// Same (x, z, y_level) keying as cellKey, but a separate function/namespace
+// so a box marker and a terrain cell sharing the exact same column never
+// collide in the two DIFFERENT Maps (boxMarkers vs cells) that key strings
+// like this one address.
+function boxMarkerKey(x: number, z: number, yLevel: number): string {
   return x + "," + z + "," + yLevel;
 }
 
@@ -249,8 +266,106 @@ function applyCellTransform(inst: THREE.Object3D, rec: CellRecord): void {
   inst.scale.x = rec.mirror ? -1 : 1; // reflect-then-rotate, matches mapLoader
 }
 
+// ── Weapon-box markers ───────────────────────────────────────────────────
+// Sentinel "asset" id selected via a dedicated palette button (see the
+// Маркеры section in buildPalette below), never registered with the asset
+// loader — the marker has no GLB, it's drawn procedurally (wireframe cube +
+// vertical ray) so it reads clearly against any tile/lighting. Placement/
+// deletion get their own code paths throughout this file rather than being
+// shoehorned through the CellRecord/paint-stroke machinery, because the
+// underlying data (BoxMarkerRecord, MapJson.box_points) is intentionally NOT
+// a terrain layer — see the box_points doc in shared/heightfield.ts.
+const WEAPON_BOX_MARKER_ASSET = "weapon_box_marker";
+const BOX_MARKER_COLOR = 0xffcc33; // neon gold, matches the owner's ask
+const BOX_MARKER_EDGE = 0.85; // world meters — fixed size, independent of TILE_SIZE/grid preset
+const BOX_MARKER_RAY_HEIGHT = 4; // world meters above the cube top, for visibility from a distance
+
+// Builds one marker's visual: a translucent gold cube (so it reads as a
+// volume, not just an outline) + wireframe edges (crisp silhouette) + a thin
+// vertical ray (spotting it from far across the map / from above). Fixed
+// size in world meters — unlike placeCell's ghost/instance, this never scales
+// with TILE_SIZE, so a marker stays a legible, consistent landmark whether
+// the map is on the 1m space-kit grid or the 3m road-tile grid.
+function makeBoxMarkerMesh(): THREE.Object3D {
+  const group = new THREE.Group();
+  const cubeGeom = new THREE.BoxGeometry(BOX_MARKER_EDGE, BOX_MARKER_EDGE, BOX_MARKER_EDGE);
+  cubeGeom.translate(0, BOX_MARKER_EDGE / 2, 0); // sit ON the cell's ground plane, not straddling it
+
+  const fillMat = new THREE.MeshBasicMaterial({
+    color: BOX_MARKER_COLOR, transparent: true, opacity: 0.22, depthWrite: false,
+  });
+  group.add(new THREE.Mesh(cubeGeom, fillMat));
+
+  const wireMat = new THREE.LineBasicMaterial({ color: BOX_MARKER_COLOR, transparent: true, opacity: 0.9 });
+  group.add(new THREE.LineSegments(new THREE.EdgesGeometry(cubeGeom), wireMat));
+
+  const rayGeom = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, BOX_MARKER_EDGE, 0),
+    new THREE.Vector3(0, BOX_MARKER_EDGE + BOX_MARKER_RAY_HEIGHT, 0),
+  ]);
+  const rayMat = new THREE.LineBasicMaterial({ color: BOX_MARKER_COLOR, transparent: true, opacity: 0.55 });
+  group.add(new THREE.Line(rayGeom, rayMat));
+
+  return group;
+}
+
+// Position only — markers carry no rotation/mirror (unoriented point marker).
+function applyBoxMarkerTransform(inst: THREE.Object3D, rec: BoxMarkerRecord): void {
+  inst.position.set((rec.x - HALF) * TILE_SIZE, rec.y_level * LEVEL_HEIGHT, (rec.z - HALF) * TILE_SIZE);
+}
+
+function updateBoxCounter(): void {
+  boxCounter.textContent = `Боксы: ${boxMarkers.size}`;
+}
+
+// Sets/overwrites the marker at rec's (x, z, y_level) — used both by fresh
+// user placement and by undo/redo replay (mirrors placeCell's "same key
+// means replace" contract).
+function placeBoxMarker(rec: BoxMarkerRecord): void {
+  const key = boxMarkerKey(rec.x, rec.z, rec.y_level);
+  const existing = boxMarkerObjs.get(key);
+  if (existing) scene.remove(existing);
+  const inst = makeBoxMarkerMesh();
+  applyBoxMarkerTransform(inst, rec);
+  inst.userData.mapKind = "box";
+  inst.userData.mapKey = key;
+  scene.add(inst);
+  boxMarkers.set(key, rec);
+  boxMarkerObjs.set(key, inst);
+  updateBoxCounter();
+}
+
+function removeBoxMarker(key: string): boolean {
+  const obj = boxMarkerObjs.get(key);
+  if (!obj) return false;
+  scene.remove(obj);
+  boxMarkerObjs.delete(key);
+  boxMarkers.delete(key);
+  updateBoxCounter();
+  return true;
+}
+
+// Which box marker a right-click/erase at (x, z) removes: same "exact
+// active-level match, else topmost in the column" rule as cellKeyToDelete —
+// kept as an independent function (not shared code) since it walks a
+// DIFFERENT Map (boxMarkers, not cells).
+function boxMarkerKeyToDelete(x: number, z: number, activeY: number): string | null {
+  const exact = boxMarkerKey(x, z, activeY);
+  if (boxMarkers.has(exact)) return exact;
+  let topKey: string | null = null;
+  let topY = -Infinity;
+  for (const [key, rec] of boxMarkers) {
+    if (rec.x === x && rec.z === z && rec.y_level > topY) {
+      topY = rec.y_level;
+      topKey = key;
+    }
+  }
+  return topKey;
+}
+
 // ── Palette UI ───────────────────────────────────────────────────────────
 const paletteButtons = new Map<string, HTMLButtonElement>();
+let markerButton: HTMLButtonElement | null = null;
 
 // Collapsible categories: which ones are collapsed persists across reloads
 // (localStorage), so the owner's sidebar layout stays put session to
@@ -389,6 +504,25 @@ function buildPalette(): void {
   browseBtn.addEventListener("click", () => openAssetBrowser());
   toolbar.appendChild(browseBtn);
   sidebar.appendChild(toolbar);
+
+  // Маркеры — pinned above Recent, non-collapsible (one item, always wanted
+  // in reach). Weapon Box is a procedural marker, not a real palette asset
+  // (see the "Weapon-box markers" section above) — its own click handler,
+  // not the generic item.asset wiring the category loop below uses.
+  const markerLabel = document.createElement("div");
+  markerLabel.className = "category-label";
+  markerLabel.textContent = "Маркеры";
+  sidebar.appendChild(markerLabel);
+  const markerBtn = document.createElement("button");
+  markerBtn.className = "palette-btn";
+  const markerLabelSpan = document.createElement("span");
+  markerLabelSpan.className = "palette-label";
+  markerLabelSpan.textContent = "🟨 Weapon Box";
+  markerBtn.title = "Точка спавна оружия — ЛКМ ставит (без дублей), ПКМ удаляет первым приоритетом";
+  markerBtn.appendChild(markerLabelSpan);
+  markerBtn.addEventListener("click", () => selectAsset(WEAPON_BOX_MARKER_ASSET));
+  sidebar.appendChild(markerBtn);
+  markerButton = markerBtn;
 
   // Recent section first, so it stays pinned above every real category.
   recentLabelEl = document.createElement("div");
@@ -772,6 +906,7 @@ function selectAsset(asset: string): void {
   for (const [name, btn] of paletteButtons) btn.classList.toggle("active", name === asset);
   for (const [name, btn] of recentButtons) btn.classList.toggle("active", name === asset);
   for (const [name, card] of browserCards) card.classList.toggle("active", name === asset);
+  markerButton?.classList.toggle("active", asset === WEAPON_BOX_MARKER_ASSET);
   updateFitButtonState();
   rebuildGhost();
   refreshCursor(lastClientX, lastClientY);
@@ -782,6 +917,7 @@ function deselectAsset(): void {
   for (const btn of paletteButtons.values()) btn.classList.remove("active");
   for (const btn of recentButtons.values()) btn.classList.remove("active");
   for (const card of browserCards.values()) card.classList.remove("active");
+  markerButton?.classList.remove("active");
   updateFitButtonState();
   if (ghost) { scene.remove(ghost); ghost = null; }
   refreshCursor(lastClientX, lastClientY);
@@ -807,7 +943,15 @@ function makeGhostFrom(template: THREE.Object3D): THREE.Object3D {
 
 function rebuildGhost(): void {
   if (ghost) { scene.remove(ghost); ghost = null; }
-  if (!activeAsset || !lib) return;
+  if (!activeAsset) return;
+  if (activeAsset === WEAPON_BOX_MARKER_ASSET) {
+    // makeBoxMarkerMesh() is already translucent by construction — no need
+    // to route it through makeGhostFrom's opacity-lowering traversal.
+    ghost = makeBoxMarkerMesh();
+    scene.add(ghost);
+    return;
+  }
+  if (!lib) return;
   const template = lib.get(activeAsset);
   if (!template) return;
   ghost = makeGhostFrom(template);
@@ -900,13 +1044,14 @@ function removePropByRef(rec: PropRecord): boolean {
 const UNDO_LIMIT = 50;
 interface CellUndoEntry { kind: "cell"; key: string; before: CellRecord | null; after: CellRecord | null }
 interface PropUndoEntry { kind: "prop"; before: PropRecord | null; after: PropRecord | null }
+interface BoxUndoEntry { kind: "box"; key: string; before: BoxMarkerRecord | null; after: BoxMarkerRecord | null }
 // Groups several cell/prop mutations into one undo/redo step — used by
 // "Center Map" (btnCenterMap below), which touches every placed cell and
 // prop in one user action. `entries` is recorded in the order the mutations
 // were applied; undo replays it back-to-front (so removals happen before the
 // re-adds they depended on), redo replays it forward.
 interface BatchUndoEntry { kind: "batch"; entries: UndoEntry[] }
-type UndoEntry = CellUndoEntry | PropUndoEntry | BatchUndoEntry;
+type UndoEntry = CellUndoEntry | PropUndoEntry | BoxUndoEntry | BatchUndoEntry;
 
 const undoStack: UndoEntry[] = [];
 const redoStack: UndoEntry[] = [];
@@ -931,6 +1076,11 @@ function applyEntry(entry: UndoEntry, direction: "undo" | "redo"): void {
   if (entry.kind === "cell") {
     const target = direction === "undo" ? entry.before : entry.after;
     if (target) placeCell(target); else removeCell(entry.key);
+    return;
+  }
+  if (entry.kind === "box") {
+    const target = direction === "undo" ? entry.before : entry.after;
+    if (target) placeBoxMarker(target); else removeBoxMarker(entry.key);
     return;
   }
   const removeTarget = direction === "undo" ? entry.after : entry.before;
@@ -969,6 +1119,10 @@ function rebuildAllPlacements(): void {
   }
   for (let i = 0; i < props.length; i++) {
     propObjs[i].position.set((props[i].x - HALF) * TILE_SIZE, props[i].y_level * LEVEL_HEIGHT, (props[i].z - HALF) * TILE_SIZE);
+  }
+  for (const [key, rec] of boxMarkers) {
+    const obj = boxMarkerObjs.get(key);
+    if (obj) applyBoxMarkerTransform(obj, rec);
   }
 }
 
@@ -1025,7 +1179,7 @@ function matchPresetName(): GridPresetName | null {
 // time. dx/dz are rounded to whole cells — props keep their PROP_STEP
 // sub-cell offset within the cell, since the shift itself is integer.
 function centerMap(): void {
-  if (cells.size === 0 && props.length === 0) return;
+  if (cells.size === 0 && props.length === 0 && boxMarkers.size === 0) return;
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const rec of cells.values()) {
     minX = Math.min(minX, rec.x); maxX = Math.max(maxX, rec.x);
@@ -1035,13 +1189,18 @@ function centerMap(): void {
     minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
     minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
   }
+  for (const rec of boxMarkers.values()) {
+    minX = Math.min(minX, rec.x); maxX = Math.max(maxX, rec.x);
+    minZ = Math.min(minZ, rec.z); maxZ = Math.max(maxZ, rec.z);
+  }
   const dx = Math.round(HALF - (minX + maxX) / 2);
   const dz = Math.round(HALF - (minZ + maxZ) / 2);
   if (dx === 0 && dz === 0) return;
 
-  // Snapshot before mutating — cells/props arrays/maps change as we go.
+  // Snapshot before mutating — cells/props/boxMarkers arrays/maps change as we go.
   const oldCells = Array.from(cells.values());
   const oldProps = props.slice();
+  const oldBoxes = Array.from(boxMarkers.values());
   const batch: UndoEntry[] = [];
 
   // Remove everything first (recording "after: null" entries), THEN place
@@ -1058,6 +1217,11 @@ function centerMap(): void {
     removePropByRef(rec);
     batch.push({ kind: "prop", before: rec, after: null });
   }
+  for (const rec of oldBoxes) {
+    const oldKey = boxMarkerKey(rec.x, rec.z, rec.y_level);
+    removeBoxMarker(oldKey);
+    batch.push({ kind: "box", key: oldKey, before: rec, after: null });
+  }
   for (const rec of oldCells) {
     const moved: CellRecord = { ...rec, x: rec.x + dx, z: rec.z + dz };
     placeCell(moved);
@@ -1067,6 +1231,11 @@ function centerMap(): void {
     const moved: PropRecord = { ...rec, x: rec.x + dx, z: rec.z + dz };
     addProp(moved);
     batch.push({ kind: "prop", before: null, after: moved });
+  }
+  for (const rec of oldBoxes) {
+    const moved: BoxMarkerRecord = { ...rec, x: rec.x + dx, z: rec.z + dz };
+    placeBoxMarker(moved);
+    batch.push({ kind: "box", key: boxMarkerKey(moved.x, moved.z, moved.y_level), before: null, after: moved });
   }
 
   pushUndo({ kind: "batch", entries: batch });
@@ -1086,6 +1255,10 @@ function clearAll(): void {
   for (const obj of propObjs) scene.remove(obj);
   props.length = 0;
   propObjs.length = 0;
+  for (const obj of boxMarkerObjs.values()) scene.remove(obj);
+  boxMarkers.clear();
+  boxMarkerObjs.clear();
+  updateBoxCounter();
   // A bulk clear/import/load invalidates any prior undo history — replaying
   // an old entry against the now-cleared map would resurrect stale records.
   undoStack.length = 0;
@@ -1712,13 +1885,21 @@ interface EraseStroke {
 }
 let eraseStroke: EraseStroke | null = null;
 
-// Deletes whatever occupies (x, z), same priority as the old single-click
-// RMB delete: a prop resting above the cell stack's top comes off first
-// (e.g. a rock on a road tile), else the cell at the active y_level (or the
-// column's topmost cell if nothing sits at that exact layer), else falls
-// back to the nearest prop. Returns the undo entry for whatever got
-// removed, or null if the spot was already empty.
+// Deletes whatever occupies (x, z). Priority: a weapon-box marker in this
+// column comes off FIRST, ahead of everything else (owner spec, 2026-07-09 —
+// markers are a thin annotation layer and should never require carefully
+// avoiding the tile underneath just to remove one); else a prop resting
+// above the cell stack's top (e.g. a rock on a road tile); else the cell at
+// the active y_level (or the column's topmost cell if nothing sits at that
+// exact layer); else falls back to the nearest prop. Returns the undo entry
+// for whatever got removed, or null if the spot was already empty.
 function deleteAt(x: number, z: number, floatX: number, floatZ: number): UndoEntry | null {
+  const boxKey = boxMarkerKeyToDelete(x, z, yLevel);
+  if (boxKey) {
+    const before = boxMarkers.get(boxKey) ?? null;
+    if (removeBoxMarker(boxKey)) return { kind: "box", key: boxKey, before, after: null };
+  }
+
   const propIdx = findNearestPropIndex(floatX, floatZ);
   const topCellY = topCellYLevelAt(cells.values(), x, z);
   const propY = propIdx >= 0 ? props[propIdx].y_level : null;
@@ -1860,6 +2041,18 @@ renderer.domElement.addEventListener("pointerdown", e => {
     // Then place the active asset (no-op if nothing selected).
     if (!activeAsset) return;
     const rot = ROT_CYCLE[rotIndex];
+    if (activeAsset === WEAPON_BOX_MARKER_ASSET) {
+      // Single click, no drag-paint (owner spec: boxes are штучные placements,
+      // not painted like terrain) and no duplicate at the same (x, z, y_level).
+      const key = boxMarkerKey(lastCellX, lastCellZ, yLevel);
+      if (!boxMarkers.has(key)) {
+        const rec: BoxMarkerRecord = { x: lastCellX, z: lastCellZ, y_level: yLevel };
+        placeBoxMarker(rec);
+        pushUndo({ kind: "box", key, before: null, after: rec });
+        scheduleAutosave();
+      }
+      return; // no recordRecentAsset — the marker isn't a real palette asset with a thumbnail
+    }
     if (isPropAsset(activeAsset)) {
       const rec: PropRecord = { asset: activeAsset, x: lastFloatX, z: lastFloatZ, y_level: yLevel, rot, scale: 1.0 };
       addProp(rec);
@@ -2099,6 +2292,13 @@ function buildMapJson(): MapJson {
     },
     cells: Array.from(cells.values()),
     props: props.map(p => ({ ...p })),
+    // Only emitted when non-empty — an absent/omitted field is what tells
+    // server/config/arena.ts to fall back to the auto-derive (see the
+    // box_points doc in shared/heightfield.ts), so a map with zero
+    // hand-placed markers keeps behaving exactly as before this feature.
+    ...(boxMarkers.size > 0
+      ? { box_points: Array.from(boxMarkers.values()).map(r => ({ x: r.x, z: r.z, y_level: r.y_level })) }
+      : {}),
   };
 }
 
@@ -2129,16 +2329,20 @@ function loadMapJson(data: MapJson): void {
       rot: prop.rot ?? 0, scale: prop.scale ?? 1.0,
     });
   }
+  for (const bp of data.box_points ?? []) {
+    placeBoxMarker({ x: bp.x, z: bp.z, y_level: bp.y_level });
+  }
 }
 
 // Finds the largest cell-space coordinate used anywhere in a MapJson (rect
-// fills, cells, props), so the editor grid can auto-fit around an imported
-// or server-loaded map instead of clipping it against the default 32x32.
+// fills, cells, props, box_points), so the editor grid can auto-fit around an
+// imported or server-loaded map instead of clipping it against the default 32x32.
 function maxCoordOf(data: MapJson): number {
   let max = 0;
   for (const r of data.rect_fills ?? []) max = Math.max(max, r.x_max, r.z_max);
   for (const c of data.cells ?? []) max = Math.max(max, c.x, c.z);
   for (const p of data.props ?? []) max = Math.max(max, p.x, p.z);
+  for (const b of data.box_points ?? []) max = Math.max(max, b.x, b.z);
   return max;
 }
 

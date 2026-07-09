@@ -115,16 +115,27 @@ export function loadArena(name?: string): Arena {
   // deriveSpawnGrid returns fewer only if the map genuinely doesn't have
   // that many flat, edge-clear cells (see autoSpawn.ts doc).
   const spawnGrid: readonly GridPoint[] = deriveSpawnGrid(mapJson, 6);
-  // Excludes the spawn cells so a box never stacks exactly on a spawn point.
-  const boxGrid: readonly GridPoint[] = deriveBoxGrid(mapJson, 6, spawnGrid);
 
   const toWorldPoints = (grid: readonly GridPoint[]): WorldPoint[] =>
     grid.map(([gx, gz]) => heightfield.gridToWorld(gx, gz));
 
+  // Hand-authored box_points (map editor, "Маркеры" category) win outright
+  // over the auto-derive when present — the owner placing boxes by hand is
+  // explicitly opting that map OUT of the farthest-point-sampling heuristic.
+  // y_level isn't carried into WorldPoint (never was — the auto-derived path
+  // didn't track box height either, see the client's own box-height handling),
+  // only x/z through the same gridToWorld formula every other grid->world
+  // conversion in this file already uses. Absent/empty falls back to the old
+  // auto-derive so every pre-existing map keeps loading unchanged.
+  const boxPoints: WorldPoint[] =
+    mapJson.box_points && mapJson.box_points.length > 0
+      ? mapJson.box_points.map(p => heightfield.gridToWorld(p.x, p.z))
+      : toWorldPoints(deriveBoxGrid(mapJson, 6, spawnGrid)); // excludes spawn cells so a box never stacks on a spawn point
+
   const arena: Arena = {
     heightfield,
     spawnPoints: toWorldPoints(spawnGrid),
-    boxPoints: toWorldPoints(boxGrid),
+    boxPoints,
     // spawn uses top-layer sample() intentionally; multi-layer spawn selection is out of scope
     groundHeightAt: p => heightfield.sample(p.x, p.z) ?? nearestWalkableHeight(heightfield, p),
   };

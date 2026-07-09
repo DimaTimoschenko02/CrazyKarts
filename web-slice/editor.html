@@ -76,6 +76,7 @@
   #statusHint { color: #ffcc00; }
 
   #mapNameLabel { font-size: 12px; color: #ffcc00; margin-left: 2px; white-space: nowrap; }
+  #boxCounter { font-size: 12px; color: #ffd24aaa; margin-left: 2px; white-space: nowrap; }
 
   /* Inline Save As panel — replaces window.prompt() (blocks automation, ugly). */
   #saveAsPanel {
@@ -250,6 +251,7 @@
     <button id="btnSave" title="Save over the currently-loaded map (asks for a name if none is loaded)">Save</button>
     <button id="btnSaveAs" title="Save as a new name, never overwriting the current map">Save As</button>
     <span id="mapNameLabel">Map: (unsaved)</span>
+    <span id="boxCounter" title="Количество weapon-box маркеров на карте (см. Маркеры в палитре)">Боксы: 0</span>
     <span id="serverStatus"></span>
     <button id="btnUndo" title="Undo (Z or Cmd/Ctrl+Z)" disabled>Undo</button>
     <button id="btnCenterMap" title="Shift everything so the map's bounding box is centered on the grid">Center Map</button>
@@ -284,7 +286,8 @@
         <b>Shift</b>+ЛКМ — выделить объект (клик) / выделить рамкой (тащить по пустому месту)<br>
         <b>G</b> — двигать выделенное: ЛКМ фиксирует, Esc отменяет, Q/E — уровень группы<br>
         <b>B</b> — asset browser (крупные превью, фильтры по категории/материалу, поиск)<br>
-        <b>C</b>+ЛКМ — пипетка: взять ассет/поворот/уровень с блока на карте
+        <b>C</b>+ЛКМ — пипетка: взять ассет/поворот/уровень с блока на карте<br>
+        <b>Маркеры → Weapon Box</b> — точка спавна оружия (золотой куб): ЛКМ ставит (без дублей в клетке+уровне), ПКМ удаляет ПЕРВЫМ приоритетом
       </div>
       <div id="marqueeBox" class="hidden"></div>
     </div>

@@ -64,4 +64,18 @@ describe("loadArena", () => {
     expect(direct).not.toBeNull();
     expect(arena.groundHeightAt(onMap)).toBeCloseTo(direct!, 6);
   });
+
+  it("uses hand-authored box_points (world coords via the same grid->world formula as gridToWorld) when present, instead of auto-deriving", () => {
+    const arena = loadArena("test_box_points");
+    // Fixture: tile_size=1, origin_offset=[-2,0,-2] -> world = grid + origin.
+    expect(arena.boxPoints).toEqual([
+      { x: 0, z: 0 }, // grid (2,2)
+      { x: -2, z: 2 }, // grid (0,4)
+    ]);
+  });
+
+  it("falls back to the auto-derive when box_points is absent (mars_base has none)", () => {
+    const arena = loadArena("mars_base");
+    expect(arena.boxPoints.length).toBeGreaterThan(0);
+  });
 });

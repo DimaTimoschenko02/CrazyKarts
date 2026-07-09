@@ -1,0 +1,15 @@
+{
+  "_": "Test fixture for server/config/arena.test.ts — a small flat plateau with hand-authored box_points, used to verify loadArena prefers authored box_points over the auto-derive when present. Not a real playable map.",
+  "meta": {
+    "tile_size": 1.0,
+    "level_height": 0.5,
+    "origin_offset": [-2, 0, -2]
+  },
+  "rect_fills": [
+    { "asset": "terrain", "x_min": 0, "z_min": 0, "x_max": 4, "z_max": 4, "y_level": 1, "rot": 0 }
+  ],
+  "box_points": [
+    { "x": 2, "z": 2, "y_level": 1 },
+    { "x": 0, "z": 4, "y_level": 1 }
+  ]
+}
