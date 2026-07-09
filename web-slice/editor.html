@@ -166,9 +166,23 @@
     flex: 1 1 auto; background: #12122a; color: #00ffee; border: 1px solid #00ffee88;
     padding: 7px 10px; font-family: inherit; font-size: 13px; border-radius: 4px;
   }
+  #assetBrowserLegacyLabel {
+    flex: 0 0 auto; font-size: 12px; color: #00ffee99; display: flex; align-items: center; gap: 5px;
+    cursor: pointer; white-space: nowrap;
+  }
+  /* Owner asked "why two chip rows?" — a small gray row label answers it at
+     a glance instead of relying on chip content alone (esp. once the
+     material row is empty-looking at "All materials"). */
+  .asset-browser-row {
+    flex: 0 0 auto; display: flex; align-items: flex-start; gap: 10px;
+    padding: 6px 14px; border-bottom: 1px solid #00ffee22;
+  }
+  .asset-browser-row-label {
+    flex: 0 0 auto; width: 64px; padding-top: 4px;
+    font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase; color: #00ffee66;
+  }
   .asset-browser-chips {
-    flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 6px;
-    padding: 8px 14px; border-bottom: 1px solid #00ffee22;
+    flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0;
   }
   .asset-browser-chip {
     background: #12122a; color: #cde; border: 1px solid #333366;
@@ -261,7 +275,8 @@
         <b>X</b> (держать) — точное удаление: курсор целится в конкретный блок под мышкой (не по клетке сверху) — для тоннелей в стене<br>
         <b>Shift</b>+ЛКМ — выделить объект (клик) / выделить рамкой (тащить по пустому месту)<br>
         <b>G</b> — двигать выделенное: ЛКМ фиксирует, Esc отменяет, Q/E — уровень группы<br>
-        <b>B</b> — asset browser (крупные превью, фильтры по категории/материалу, поиск)
+        <b>B</b> — asset browser (крупные превью, фильтры по категории/материалу, поиск)<br>
+        <b>C</b>+ЛКМ — пипетка: взять ассет/поворот/уровень с блока на карте
       </div>
       <div id="marqueeBox" class="hidden"></div>
     </div>
@@ -270,10 +285,19 @@
     <div id="assetBrowserPanel">
       <div id="assetBrowserHeader">
         <input type="text" id="assetBrowserSearch" placeholder="Search assets… (label or id)">
+        <label id="assetBrowserLegacyLabel" title="Show the old Kenney Space Kit asset set (superseded by the road-tiles pack for terrain/roads, still the only prop/decor source)">
+          <input type="checkbox" id="assetBrowserLegacyToggle"> Legacy
+        </label>
         <button id="assetBrowserClose" title="Close (Esc)">✕ Close</button>
       </div>
-      <div id="assetBrowserCategoryChips" class="asset-browser-chips"></div>
-      <div id="assetBrowserMaterialChips" class="asset-browser-chips"></div>
+      <div class="asset-browser-row">
+        <span class="asset-browser-row-label">Категория</span>
+        <div id="assetBrowserCategoryChips" class="asset-browser-chips"></div>
+      </div>
+      <div class="asset-browser-row">
+        <span class="asset-browser-row-label">Материал</span>
+        <div id="assetBrowserMaterialChips" class="asset-browser-chips"></div>
+      </div>
       <div id="assetBrowserGrid"></div>
     </div>
   </div>

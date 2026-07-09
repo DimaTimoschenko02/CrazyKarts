@@ -12,9 +12,14 @@ export interface BrowserAssetInfo {
   materials?: Record<string, number>;
 }
 
+// Category/material chips are multiselect within their own row (owner
+// request 2026-07-09: clicking a second category chip must not deselect
+// the first) — an empty Set means "All" for that row. Between the two
+// rows the combination is still AND: (any selected category) AND (any
+// selected material) AND (text query).
 export interface BrowserFilterState {
-  category: string | null; // null = "All"
-  material: string | null; // null = "All materials"
+  categories: ReadonlySet<string>; // empty = "All"
+  materials: ReadonlySet<string>; // empty = "All materials"
   query: string;
 }
 
@@ -24,18 +29,21 @@ export interface BrowserFilterState {
 // of a filter that would otherwise be misleading.
 export const MATERIAL_SHARE_THRESHOLD = 0.15;
 
-function matchesCategory(info: BrowserAssetInfo, category: string | null): boolean {
-  return category === null || info.category === category;
+function matchesCategory(info: BrowserAssetInfo, categories: ReadonlySet<string>): boolean {
+  return categories.size === 0 || categories.has(info.category);
 }
 
 // Assets without material data (all legacy space-kit props) are invisible
-// under "All materials" (nothing to exclude) but hidden once a specific
-// material is picked — we don't know what they're made of, so showing them
-// under e.g. "Grass" would be a false positive.
-function matchesMaterial(info: BrowserAssetInfo, material: string | null): boolean {
-  if (material === null) return true;
+// under "All materials" (nothing to exclude) but hidden once at least one
+// specific material is selected — we don't know what they're made of, so
+// showing them under e.g. "Grass" would be a false positive.
+function matchesMaterial(info: BrowserAssetInfo, materials: ReadonlySet<string>): boolean {
+  if (materials.size === 0) return true;
   if (!info.materials) return false;
-  return (info.materials[material] ?? 0) >= MATERIAL_SHARE_THRESHOLD;
+  for (const m of materials) {
+    if ((info.materials[m] ?? 0) >= MATERIAL_SHARE_THRESHOLD) return true;
+  }
+  return false;
 }
 
 function matchesQuery(info: BrowserAssetInfo, query: string): boolean {
@@ -44,15 +52,16 @@ function matchesQuery(info: BrowserAssetInfo, query: string): boolean {
   return info.label.toLowerCase().includes(q) || info.asset.toLowerCase().includes(q);
 }
 
-// All filter types AND together (category AND material AND text search).
+// Within a row: OR (any selected category / any selected material
+// matches). Between category row, material row, and text query: AND.
 export function filterBrowserAssets(
   items: readonly BrowserAssetInfo[],
   filter: BrowserFilterState
 ): BrowserAssetInfo[] {
   return items.filter(
     item =>
-      matchesCategory(item, filter.category) &&
-      matchesMaterial(item, filter.material) &&
+      matchesCategory(item, filter.categories) &&
+      matchesMaterial(item, filter.materials) &&
       matchesQuery(item, filter.query)
   );
 }

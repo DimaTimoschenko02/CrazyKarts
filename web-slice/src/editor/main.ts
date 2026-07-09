@@ -514,13 +514,38 @@ const BROWSER_ASSETS: BrowserAssetInfo[] = PALETTE.flatMap(cat =>
   }))
 );
 const BROWSER_CATEGORIES = PALETTE.map(cat => cat.category);
+// Matches mapAssets.ts's `Legacy: ${cat.category}` naming — see PALETTE there.
+const LEGACY_CATEGORY_PREFIX = "Legacy: ";
+
+// Legacy space-kit visibility persists across reloads (owner request
+// 2026-07-09: it's visual clutter while building purely from the roads
+// pack). Defaults to HIDDEN — localStorage.getItem returns null on a
+// fresh browser, which only matches the "true" string when explicitly
+// turned on before.
+const SHOW_LEGACY_STORAGE_KEY = "editor-browser-show-legacy";
+function loadShowLegacy(): boolean {
+  try { return localStorage.getItem(SHOW_LEGACY_STORAGE_KEY) === "true"; }
+  catch { return false; }
+}
+let showLegacyAssets = loadShowLegacy();
+function saveShowLegacy(): void {
+  localStorage.setItem(SHOW_LEGACY_STORAGE_KEY, String(showLegacyAssets));
+}
+
+function visibleBrowserAssets(): BrowserAssetInfo[] {
+  return showLegacyAssets ? BROWSER_ASSETS : BROWSER_ASSETS.filter(i => !i.category.startsWith(LEGACY_CATEGORY_PREFIX));
+}
+function visibleBrowserCategories(): string[] {
+  return showLegacyAssets ? BROWSER_CATEGORIES : BROWSER_CATEGORIES.filter(c => !c.startsWith(LEGACY_CATEGORY_PREFIX));
+}
 
 let assetBrowserOpen = false;
-let browserFilter: BrowserFilterState = { category: null, material: null, query: "" };
+let browserFilter: BrowserFilterState = { categories: new Set(), materials: new Set(), query: "" };
 const browserCards = new Map<string, HTMLButtonElement>();
 
 const assetBrowserOverlay = document.getElementById("assetBrowserOverlay")!;
 const assetBrowserSearch = document.getElementById("assetBrowserSearch") as HTMLInputElement;
+const assetBrowserLegacyToggle = document.getElementById("assetBrowserLegacyToggle") as HTMLInputElement;
 const assetBrowserGrid = document.getElementById("assetBrowserGrid")!;
 const assetBrowserCategoryChips = document.getElementById("assetBrowserCategoryChips")!;
 const assetBrowserMaterialChips = document.getElementById("assetBrowserMaterialChips")!;
@@ -528,6 +553,7 @@ const assetBrowserEmpty = document.createElement("div");
 assetBrowserEmpty.id = "assetBrowserEmpty";
 assetBrowserEmpty.textContent = "No assets match these filters.";
 assetBrowserEmpty.classList.add("hidden");
+assetBrowserLegacyToggle.checked = showLegacyAssets;
 
 function makeFilterChip(label: string, active: boolean, onClick: () => void): HTMLButtonElement {
   const chip = document.createElement("button");
@@ -538,20 +564,26 @@ function makeFilterChip(label: string, active: boolean, onClick: () => void): HT
   return chip;
 }
 
+// Category/material rows are independent multiselects (owner request
+// 2026-07-09: picking a second category chip must not deselect the
+// first) — each chip toggles membership in its row's Set, "All" clears
+// the row entirely. The two rows still AND against each other (and the
+// text query) — that combination lives in assetBrowserFilter.ts.
 function renderBrowserChips(): void {
   assetBrowserCategoryChips.innerHTML = "";
   assetBrowserCategoryChips.appendChild(
-    makeFilterChip("All", browserFilter.category === null, () => {
-      browserFilter = { ...browserFilter, category: null };
+    makeFilterChip("All", browserFilter.categories.size === 0, () => {
+      browserFilter = { ...browserFilter, categories: new Set() };
       renderBrowserChips();
       applyBrowserFilter();
     })
   );
-  for (const cat of BROWSER_CATEGORIES) {
+  for (const cat of visibleBrowserCategories()) {
     assetBrowserCategoryChips.appendChild(
-      makeFilterChip(cat, browserFilter.category === cat, () => {
-        // Click the active chip again → back to "All" (toggle, not stuck-on).
-        browserFilter = { ...browserFilter, category: browserFilter.category === cat ? null : cat };
+      makeFilterChip(cat, browserFilter.categories.has(cat), () => {
+        const next = new Set(browserFilter.categories);
+        if (next.has(cat)) next.delete(cat); else next.add(cat);
+        browserFilter = { ...browserFilter, categories: next };
         renderBrowserChips();
         applyBrowserFilter();
       })
@@ -560,16 +592,18 @@ function renderBrowserChips(): void {
 
   assetBrowserMaterialChips.innerHTML = "";
   assetBrowserMaterialChips.appendChild(
-    makeFilterChip("All materials", browserFilter.material === null, () => {
-      browserFilter = { ...browserFilter, material: null };
+    makeFilterChip("All materials", browserFilter.materials.size === 0, () => {
+      browserFilter = { ...browserFilter, materials: new Set() };
       renderBrowserChips();
       applyBrowserFilter();
     })
   );
   for (const mat of MATERIAL_FAMILIES) {
     assetBrowserMaterialChips.appendChild(
-      makeFilterChip(mat, browserFilter.material === mat, () => {
-        browserFilter = { ...browserFilter, material: browserFilter.material === mat ? null : mat };
+      makeFilterChip(mat, browserFilter.materials.has(mat), () => {
+        const next = new Set(browserFilter.materials);
+        if (next.has(mat)) next.delete(mat); else next.add(mat);
+        browserFilter = { ...browserFilter, materials: next };
         renderBrowserChips();
         applyBrowserFilter();
       })
@@ -577,13 +611,15 @@ function renderBrowserChips(): void {
   }
 }
 
-// Built once at boot (after buildPalette/addPaletteThumbnails — see the
-// boot IIFE) so cards can borrow the palette buttons' already-rendered
-// thumbnail <img> data URLs via thumbSrcFor() straight away.
+// Rebuilt at boot (after buildPalette/addPaletteThumbnails — see the boot
+// IIFE, so cards can borrow the palette buttons' already-rendered
+// thumbnail <img> data URLs via thumbSrcFor() straight away) AND whenever
+// the Legacy toggle flips, since that changes which assets exist at all
+// (not just which are hidden by the text/chip filters).
 function buildAssetBrowserGrid(): void {
   assetBrowserGrid.innerHTML = "";
   browserCards.clear();
-  for (const info of BROWSER_ASSETS) {
+  for (const info of visibleBrowserAssets()) {
     const card = document.createElement("button");
     card.type = "button";
     card.className = "asset-browser-card";
@@ -611,7 +647,7 @@ function buildAssetBrowserGrid(): void {
 }
 
 function applyBrowserFilter(): void {
-  const matched = new Set(filterBrowserAssets(BROWSER_ASSETS, browserFilter).map(i => i.asset));
+  const matched = new Set(filterBrowserAssets(visibleBrowserAssets(), browserFilter).map(i => i.asset));
   let anyVisible = false;
   for (const [asset, card] of browserCards) {
     const visible = matched.has(asset);
@@ -651,6 +687,21 @@ function closeAssetBrowser(): void {
 
 assetBrowserSearch.addEventListener("input", () => {
   browserFilter = { ...browserFilter, query: assetBrowserSearch.value };
+  applyBrowserFilter();
+});
+assetBrowserLegacyToggle.addEventListener("change", () => {
+  showLegacyAssets = assetBrowserLegacyToggle.checked;
+  saveShowLegacy();
+  // Drop any selected categories that just left the visible set — otherwise
+  // toggling Legacy off while a "Legacy: Props" chip is active would leave
+  // the grid stuck empty with no visible chip explaining why.
+  const nowVisible = new Set(visibleBrowserCategories());
+  browserFilter = {
+    ...browserFilter,
+    categories: new Set([...browserFilter.categories].filter(c => nowVisible.has(c))),
+  };
+  buildAssetBrowserGrid();
+  renderBrowserChips();
   applyBrowserFilter();
 });
 document.getElementById("assetBrowserClose")!.addEventListener("click", () => closeAssetBrowser());
@@ -1120,6 +1171,77 @@ function deletePreciseTarget(): void {
   updatePreciseDeleteHover();
 }
 
+// ── Eyedropper (C held) ───────────────────────────────────────────────────
+// "Pick up" whatever's under the cursor instead of hunting for it in a
+// 320-asset palette: reuses raycastPreciseTarget (the exact same "which
+// placed record is under the mouse" logic X/precise-delete already solved)
+// but READS the record instead of removing it — sets activeAsset/rotIndex/
+// mirrorState/yLevel to match, so the very next click stamps an identical
+// copy. Held-mode toggle, same pattern as preciseDeleteMode/KeyX below.
+let eyedropMode = false;
+let eyedropTarget: PreciseTarget | null = null;
+let pickHighlight: THREE.Box3Helper | null = null;
+
+function clearPickHighlight(): void {
+  if (!pickHighlight) return;
+  scene.remove(pickHighlight);
+  pickHighlight.geometry.dispose();
+  (pickHighlight.material as THREE.Material).dispose();
+  pickHighlight = null;
+}
+
+function setPickHighlight(root: THREE.Object3D | null): void {
+  clearPickHighlight();
+  if (!root) return;
+  const box = new THREE.Box3().setFromObject(root);
+  // Green, not precise-delete's red — same box-outline mechanism (own
+  // geometry/material, never touches the target's own material) but a
+  // different color so "pick" and "delete" hovers are never confused.
+  pickHighlight = new THREE.Box3Helper(box, 0x22ff66);
+  scene.add(pickHighlight);
+}
+
+// PropRecord has no `mirror` field (only CellRecord does) — narrow on
+// `kind` rather than trying to access a shared shape, same as
+// deletePreciseTarget/updatePreciseStatusBar above do.
+function eyedropSourceRecord(target: PreciseTarget): CellRecord | PropRecord | null {
+  return target.kind === "cell" ? cells.get(target.key) ?? null : target.rec;
+}
+
+function updateEyedropStatusBar(): void {
+  const rec = eyedropTarget ? eyedropSourceRecord(eyedropTarget) : null;
+  if (!rec) {
+    statusMain.textContent = "eyedropper (C): наведи на блок";
+    statusHint.textContent = "ЛКМ — взять ассет с блока под курсором · отпусти C — выйти из режима";
+    return;
+  }
+  const mir = "mirror" in rec && rec.mirror ? "  mirror: ON" : "";
+  statusMain.textContent = `eyedropper: ${rec.asset}  rot: ${rec.rot}${mir}  y_level: ${rec.y_level}`;
+  statusHint.textContent = "ЛКМ — взять этот ассет (не ставит блок) · отпусти C — выйти из режима";
+}
+
+function updateEyedropHover(): void {
+  eyedropTarget = raycastPreciseTarget();
+  setPickHighlight(eyedropTarget?.root ?? null);
+  updateEyedropStatusBar();
+}
+
+// Applies the hovered record's asset/rot/mirror/y_level to the current
+// placement state — click-to-place right afterwards then stamps an exact
+// copy. Deliberately does NOT place anything itself.
+function pickEyedropTarget(): void {
+  if (!eyedropTarget) return;
+  const rec = eyedropSourceRecord(eyedropTarget);
+  if (!rec) return;
+  selectAsset(rec.asset);
+  const idx = ROT_CYCLE.indexOf(rec.rot as (typeof ROT_CYCLE)[number]);
+  rotIndex = idx >= 0 ? idx : 0; // ROT_CYCLE covers every rot a placed record can have; -1 shouldn't happen
+  mirrorState = "mirror" in rec && !!rec.mirror;
+  yLevel = THREE.MathUtils.clamp(rec.y_level, 0, MAX_Y_LEVEL);
+  updatePlane();
+  refreshCursor(lastClientX, lastClientY);
+}
+
 // ── Group selection (Shift) + grab-move (G) ────────────────────────────────
 // Selection is pure editor UI state — it never touches cells/props/undo by
 // itself. Cells are keyed the same way the model already keys them (cellKey);
@@ -1404,6 +1526,11 @@ function refreshCursor(clientX: number, clientY: number): void {
     updatePreciseDeleteHover();
     return;
   }
+  if (eyedropMode) {
+    if (ghost) ghost.visible = false; // no placement while picking
+    updateEyedropHover();
+    return;
+  }
   const rect = renderer.domElement.getBoundingClientRect();
   const ndc = new THREE.Vector2(
     ((clientX - rect.left) / rect.width) * 2 - 1,
@@ -1578,6 +1705,12 @@ renderer.domElement.addEventListener("pointerdown", e => {
     return;
   }
 
+  if (eyedropMode) {
+    // Left click picks; nothing gets placed or deleted while eyedropping.
+    if (e.button === 0) pickEyedropTarget();
+    return;
+  }
+
   if (e.button === 0 && e.shiftKey) {
     shiftDragActive = true;
     shiftDragMoved = false;
@@ -1715,10 +1848,21 @@ addEventListener("keydown", e => {
     // Held-key mode toggle, not a one-shot action — guard against the flood
     // of repeat keydown events the browser fires while a key stays down
     // (e.repeat) so we don't redo the enter-mode work every ~30ms. Ignored
-    // entirely while grabbing — two overlapping ghost-preview modes at once
-    // would be confusing, and grab has no delete concept anyway.
-    if (!preciseDeleteMode && !grabMode) {
+    // entirely while grabbing or eyedropping — overlapping ghost-preview
+    // modes at once would be confusing, and grab has no delete concept anyway.
+    if (!preciseDeleteMode && !grabMode && !eyedropMode) {
       preciseDeleteMode = true;
+      refreshCursor(lastClientX, lastClientY);
+    }
+    e.preventDefault();
+    return;
+  }
+
+  if (e.code === "KeyC") {
+    // Same held-mode toggle pattern as KeyX (precise-delete) just above —
+    // see the "Eyedropper (C held)" section for pickEyedropTarget/hover.
+    if (!preciseDeleteMode && !grabMode && !eyedropMode) {
+      eyedropMode = true;
       refreshCursor(lastClientX, lastClientY);
     }
     e.preventDefault();
@@ -1793,6 +1937,12 @@ addEventListener("keyup", e => {
     clearDeleteHighlight();
     refreshCursor(lastClientX, lastClientY); // restores ghost visibility + normal status bar
   }
+  if (e.code === "KeyC") {
+    eyedropMode = false;
+    eyedropTarget = null;
+    clearPickHighlight();
+    refreshCursor(lastClientX, lastClientY); // restores ghost visibility + normal status bar
+  }
 });
 
 // If focus leaves the window mid-pan (alt-tab, devtools) the keyup never
@@ -1806,6 +1956,11 @@ addEventListener("blur", () => {
     preciseDeleteMode = false;
     preciseTarget = null;
     clearDeleteHighlight();
+  }
+  if (eyedropMode) {
+    eyedropMode = false;
+    eyedropTarget = null;
+    clearPickHighlight();
   }
   if (grabMode) exitGrabMode(true);
   finishPaintStroke(); // commit what was painted — losing focus mustn't lose the stroke's undo entry
