@@ -1698,6 +1698,68 @@ interface PaintStroke {
 }
 let paintStroke: PaintStroke | null = null;
 
+// ── Drag-erase (hold RMB) ────────────────────────────────────────────────
+// Mirrors drag-paint above: holding the right button erases every cell the
+// cursor passes over instead of one click per tile. Same line-walk
+// (cellsAlongLine), same per-stroke undo batch, same dedup-by-cell-so-a-
+// stroke-never-repeats-work as PaintStroke. A plain click is just a
+// one-cell stroke, committed on pointerup exactly like drag-paint.
+interface EraseStroke {
+  batch: UndoEntry[];
+  erased: Set<string>; // "x,z" cells touched this stroke — never re-erase
+  lastX: number;
+  lastZ: number;
+}
+let eraseStroke: EraseStroke | null = null;
+
+// Deletes whatever occupies (x, z), same priority as the old single-click
+// RMB delete: a prop resting above the cell stack's top comes off first
+// (e.g. a rock on a road tile), else the cell at the active y_level (or the
+// column's topmost cell if nothing sits at that exact layer), else falls
+// back to the nearest prop. Returns the undo entry for whatever got
+// removed, or null if the spot was already empty.
+function deleteAt(x: number, z: number, floatX: number, floatZ: number): UndoEntry | null {
+  const propIdx = findNearestPropIndex(floatX, floatZ);
+  const topCellY = topCellYLevelAt(cells.values(), x, z);
+  const propY = propIdx >= 0 ? props[propIdx].y_level : null;
+
+  if (shouldDeletePropFirst(topCellY, propY)) {
+    const rec = props[propIdx];
+    removePropByRef(rec);
+    return { kind: "prop", before: rec, after: null };
+  }
+
+  const key = cellKeyToDelete(x, z, yLevel);
+  const cellBefore = key ? cells.get(key) ?? null : null;
+  const removedCell = key ? removeCell(key) : false;
+  if (removedCell && key) {
+    return { kind: "cell", key, before: cellBefore, after: null };
+  }
+  if (propIdx >= 0) {
+    const rec = props[propIdx];
+    removePropByRef(rec);
+    return { kind: "prop", before: rec, after: null };
+  }
+  return null;
+}
+
+function eraseCellAt(stroke: EraseStroke, x: number, z: number, floatX: number, floatZ: number): void {
+  const key = x + "," + z;
+  if (stroke.erased.has(key)) return;
+  stroke.erased.add(key);
+  const entry = deleteAt(x, z, floatX, floatZ);
+  if (entry) stroke.batch.push(entry);
+}
+
+function finishEraseStroke(): void {
+  if (!eraseStroke) return;
+  const { batch } = eraseStroke;
+  eraseStroke = null;
+  if (batch.length === 0) return;
+  pushUndo(batch.length === 1 ? batch[0] : { kind: "batch", entries: batch });
+  scheduleAutosave();
+}
+
 function paintCellAt(stroke: PaintStroke, x: number, z: number): void {
   if (!activeAsset) return;
   const key = cellKey(x, z, yLevel);
@@ -1734,6 +1796,18 @@ renderer.domElement.addEventListener("pointermove", e => {
     }
     paintStroke.lastX = lastCellX;
     paintStroke.lastZ = lastCellZ;
+  }
+  if (eraseStroke) {
+    // Same line-walk as paintStroke — a fast flick shouldn't skip cells and
+    // leave untouched tiles behind. Intermediate cells use their own center
+    // as the float position for the prop-nearest search (cellsAlongLine only
+    // yields integer cell coords, and 0.6 world units of slack easily covers
+    // the difference from the exact cursor position).
+    for (const c of cellsAlongLine(eraseStroke.lastX, eraseStroke.lastZ, lastCellX, lastCellZ)) {
+      eraseCellAt(eraseStroke, c.x, c.z, c.x, c.z);
+    }
+    eraseStroke.lastX = lastCellX;
+    eraseStroke.lastZ = lastCellZ;
   }
   if (shiftDragActive) {
     const dist = Math.hypot(e.clientX - shiftDragStartClientX, e.clientY - shiftDragStartClientY);
@@ -1810,43 +1884,25 @@ renderer.domElement.addEventListener("pointerdown", e => {
     }
     recordRecentAsset(activeAsset); // "used" = actually placed, not just clicked in the palette
   } else if (e.button === 2) {
-    // Right click: delete whatever is under the cursor. Usually that's a
-    // snapped cell tile first, then the nearest prop — but a prop resting
-    // at or above the top of the cell stack at this spot (e.g. a rock
-    // placed on a road tile) is the visible top layer, so it should come
-    // off first instead of the road underneath it. See deletePriority.ts.
-    const propIdx = findNearestPropIndex(lastFloatX, lastFloatZ);
-    const topCellY = topCellYLevelAt(cells.values(), lastCellX, lastCellZ);
-    const propY = propIdx >= 0 ? props[propIdx].y_level : null;
-
-    if (shouldDeletePropFirst(topCellY, propY)) {
-      const rec = props[propIdx];
-      removePropByRef(rec);
-      pushUndo({ kind: "prop", before: rec, after: null });
-      scheduleAutosave();
-      return;
-    }
-
-    const key = cellKeyToDelete(lastCellX, lastCellZ, yLevel);
-    const cellBefore = key ? cells.get(key) ?? null : null;
-    const removedCell = key ? removeCell(key) : false;
-    if (removedCell && key) {
-      pushUndo({ kind: "cell", key, before: cellBefore, after: null });
-      scheduleAutosave();
-      return;
-    }
-    if (propIdx >= 0) {
-      const rec = props[propIdx];
-      removePropByRef(rec);
-      pushUndo({ kind: "prop", before: rec, after: null });
-      scheduleAutosave();
-    }
+    // Right click: delete whatever is under the cursor, same priority as
+    // deleteAt (prop above the stack first, else the active-layer/topmost
+    // cell, else prop — see deletePriority.ts). Start an erase stroke so
+    // holding the button and dragging keeps deleting through every new
+    // cell, mirroring drag-paint; a plain click is just a one-cell stroke
+    // committed on pointerup.
+    eraseStroke = { batch: [], erased: new Set(), lastX: lastCellX, lastZ: lastCellZ };
+    eraseCellAt(eraseStroke, lastCellX, lastCellZ, lastFloatX, lastFloatZ);
+    renderer.domElement.setPointerCapture(e.pointerId); // keep erasing if the drag leaves the canvas
   }
 });
 
 renderer.domElement.addEventListener("pointerup", e => {
   if (e.button === 0 && paintStroke) {
     finishPaintStroke();
+    return;
+  }
+  if (e.button === 2 && eraseStroke) {
+    finishEraseStroke();
     return;
   }
   if (!shiftDragActive || e.button !== 0) return;
@@ -2021,6 +2077,7 @@ addEventListener("blur", () => {
   }
   if (grabMode) exitGrabMode(true);
   finishPaintStroke(); // commit what was painted — losing focus mustn't lose the stroke's undo entry
+  finishEraseStroke(); // same for an in-progress erase drag
   if (shiftDragActive) {
     shiftDragActive = false;
     shiftDragMoved = false;
