@@ -28,7 +28,7 @@ export interface PaletteCategory { category: string; isProp: boolean; items: Pal
 // (the editor has a grid preset for this), NOT space-kit's 1/0.5.
 import roadTilesCatalog from "./roadTilesCatalog.json";
 
-interface RoadTileEntry { category: string; label: string }
+interface RoadTileEntry { category: string; label: string; materials?: Record<string, number> }
 
 const ROAD_CATEGORY_ORDER = [
   "Roads: Straight", "Roads: Corner", "Roads: Cross & T", "Roads: End & Detail",
@@ -247,6 +247,22 @@ export const PALETTE: PaletteCategory[] = [
 ];
 
 export const ASSET_NAMES = PALETTE.flatMap(cat => cat.items.map(i => i.asset));
+
+// asset → material composition (road tiles only; legacy space-kit assets
+// have no such data). Used by the asset-browser modal's material chips —
+// see src/editor/assetBrowserFilter.ts.
+export const ASSET_MATERIALS = new Map<string, Record<string, number>>(
+  Object.entries(roadTilesCatalog as Record<string, RoadTileEntry>)
+    .filter((entry): entry is [string, RoadTileEntry & { materials: Record<string, number> }] => !!entry[1].materials)
+    .map(([asset, e]) => [asset, e.materials])
+);
+
+// Fixed display order for the material chips (matches the road-tiles bake
+// script's material naming — see tools/bake-road-tiles.mjs / docs/roads-catalog.md).
+export const MATERIAL_FAMILIES = [
+  "Grass", "Asphalt", "Grey_Asphalt", "White", "Stone", "Sand", "Alternate_Dirt", "Water",
+];
+
 export const PROP_ASSETS = new Set(
   PALETTE.filter(cat => cat.isProp).flatMap(cat => cat.items.map(i => i.asset))
 );

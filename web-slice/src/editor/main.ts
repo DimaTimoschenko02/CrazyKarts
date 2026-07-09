@@ -17,9 +17,13 @@ import type { MapJson } from "../map/mapLoader";
 import { TWO_CELL_ASSETS, longAxis } from "../shared/heightfield";
 import { shouldDeletePropFirst, topCellYLevelAt } from "./deletePriority";
 import { cellsAlongLine } from "./paintLine";
+import { filterBrowserAssets, type BrowserAssetInfo, type BrowserFilterState } from "./assetBrowserFilter";
 // Palette data (categories/items/isProp) is shared with the game's preload
 // list (src/main.ts) — see shared/mapAssets.ts header comment for why.
-import { PALETTE, ASSET_NAMES, isPropAsset, DEFAULT_COLLAPSED_CATEGORIES } from "../shared/mapAssets";
+import {
+  PALETTE, ASSET_NAMES, isPropAsset, DEFAULT_COLLAPSED_CATEGORIES,
+  ASSET_MATERIALS, MATERIAL_FAMILIES,
+} from "../shared/mapAssets";
 
 const MIN_GRID_SIZE = 16;
 const MAX_GRID_SIZE = 96;
@@ -371,6 +375,21 @@ function recordRecentAsset(asset: string): void {
 }
 
 function buildPalette(): void {
+  // Sticky toolbar pinned above the scrollable list — the "Browse" button
+  // opens the big-preview asset browser modal (see the "Asset Browser"
+  // section below), the current fix for finding one tile in a 320+ pack by
+  // eye at the sidebar's cramped 32px thumb size.
+  const toolbar = document.createElement("div");
+  toolbar.id = "paletteToolbar";
+  const browseBtn = document.createElement("button");
+  browseBtn.id = "btnBrowseAssets";
+  browseBtn.type = "button";
+  browseBtn.textContent = "🔍 Browse (B)";
+  browseBtn.title = "Browse all assets with large previews (hotkey: B)";
+  browseBtn.addEventListener("click", () => openAssetBrowser());
+  toolbar.appendChild(browseBtn);
+  sidebar.appendChild(toolbar);
+
   // Recent section first, so it stays pinned above every real category.
   recentLabelEl = document.createElement("div");
   recentLabelEl.className = "category-label";
@@ -478,10 +497,175 @@ function addPaletteThumbnails(): void {
   renderRecentSection(); // recent rows can now borrow the freshly rendered thumbs
 }
 
+// ── Asset Browser modal (big-preview grid + filters) ────────────────────
+// The 320+ asset palette (Kenney road tiles pack, 2026-07-08) made the
+// 32px sidebar thumbnails useless for eyeballing a specific tile — this is
+// a full-screen overlay with ~96px cards (reusing the already-rendered
+// palette thumbnail <img> data URLs, so opening it costs zero extra WebGL
+// work), filterable by category / material family / free text. The actual
+// filtering decision is a pure function in assetBrowserFilter.ts (unit
+// tested); this section is purely DOM plumbing around it.
+const BROWSER_ASSETS: BrowserAssetInfo[] = PALETTE.flatMap(cat =>
+  cat.items.map(item => ({
+    asset: item.asset,
+    label: item.label,
+    category: cat.category,
+    materials: ASSET_MATERIALS.get(item.asset),
+  }))
+);
+const BROWSER_CATEGORIES = PALETTE.map(cat => cat.category);
+
+let assetBrowserOpen = false;
+let browserFilter: BrowserFilterState = { category: null, material: null, query: "" };
+const browserCards = new Map<string, HTMLButtonElement>();
+
+const assetBrowserOverlay = document.getElementById("assetBrowserOverlay")!;
+const assetBrowserSearch = document.getElementById("assetBrowserSearch") as HTMLInputElement;
+const assetBrowserGrid = document.getElementById("assetBrowserGrid")!;
+const assetBrowserCategoryChips = document.getElementById("assetBrowserCategoryChips")!;
+const assetBrowserMaterialChips = document.getElementById("assetBrowserMaterialChips")!;
+const assetBrowserEmpty = document.createElement("div");
+assetBrowserEmpty.id = "assetBrowserEmpty";
+assetBrowserEmpty.textContent = "No assets match these filters.";
+assetBrowserEmpty.classList.add("hidden");
+
+function makeFilterChip(label: string, active: boolean, onClick: () => void): HTMLButtonElement {
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "asset-browser-chip" + (active ? " active" : "");
+  chip.textContent = label;
+  chip.addEventListener("click", onClick);
+  return chip;
+}
+
+function renderBrowserChips(): void {
+  assetBrowserCategoryChips.innerHTML = "";
+  assetBrowserCategoryChips.appendChild(
+    makeFilterChip("All", browserFilter.category === null, () => {
+      browserFilter = { ...browserFilter, category: null };
+      renderBrowserChips();
+      applyBrowserFilter();
+    })
+  );
+  for (const cat of BROWSER_CATEGORIES) {
+    assetBrowserCategoryChips.appendChild(
+      makeFilterChip(cat, browserFilter.category === cat, () => {
+        // Click the active chip again → back to "All" (toggle, not stuck-on).
+        browserFilter = { ...browserFilter, category: browserFilter.category === cat ? null : cat };
+        renderBrowserChips();
+        applyBrowserFilter();
+      })
+    );
+  }
+
+  assetBrowserMaterialChips.innerHTML = "";
+  assetBrowserMaterialChips.appendChild(
+    makeFilterChip("All materials", browserFilter.material === null, () => {
+      browserFilter = { ...browserFilter, material: null };
+      renderBrowserChips();
+      applyBrowserFilter();
+    })
+  );
+  for (const mat of MATERIAL_FAMILIES) {
+    assetBrowserMaterialChips.appendChild(
+      makeFilterChip(mat, browserFilter.material === mat, () => {
+        browserFilter = { ...browserFilter, material: browserFilter.material === mat ? null : mat };
+        renderBrowserChips();
+        applyBrowserFilter();
+      })
+    );
+  }
+}
+
+// Built once at boot (after buildPalette/addPaletteThumbnails — see the
+// boot IIFE) so cards can borrow the palette buttons' already-rendered
+// thumbnail <img> data URLs via thumbSrcFor() straight away.
+function buildAssetBrowserGrid(): void {
+  assetBrowserGrid.innerHTML = "";
+  browserCards.clear();
+  for (const info of BROWSER_ASSETS) {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "asset-browser-card";
+    if (info.asset === activeAsset) card.classList.add("active");
+    const img = document.createElement("img");
+    img.className = "asset-browser-thumb";
+    img.alt = "";
+    const src = thumbSrcFor(info.asset);
+    if (src) img.src = src;
+    card.appendChild(img);
+    const label = document.createElement("span");
+    label.className = "asset-browser-label";
+    label.textContent = info.label;
+    card.appendChild(label);
+    // Reuses the exact same selection path as clicking the sidebar palette
+    // button — no duplicated activeAsset/ghost/cursor logic here.
+    card.addEventListener("click", () => {
+      selectAsset(info.asset);
+      closeAssetBrowser();
+    });
+    assetBrowserGrid.appendChild(card);
+    browserCards.set(info.asset, card);
+  }
+  assetBrowserGrid.appendChild(assetBrowserEmpty);
+}
+
+function applyBrowserFilter(): void {
+  const matched = new Set(filterBrowserAssets(BROWSER_ASSETS, browserFilter).map(i => i.asset));
+  let anyVisible = false;
+  for (const [asset, card] of browserCards) {
+    const visible = matched.has(asset);
+    card.classList.toggle("hidden", !visible);
+    if (visible) anyVisible = true;
+  }
+  assetBrowserEmpty.classList.toggle("hidden", anyVisible);
+}
+
+function openAssetBrowser(): void {
+  if (assetBrowserOpen) return;
+  assetBrowserOpen = true;
+  // Thumbnails may not have existed yet the first time buildAssetBrowserGrid
+  // ran (asset library still loading at boot) — top up any still-blank
+  // <img> src on every open. Cheap even for 300+ cards (just a src set).
+  for (const [asset, card] of browserCards) {
+    const img = card.querySelector("img.asset-browser-thumb") as HTMLImageElement | null;
+    if (img && !img.src) {
+      const src = thumbSrcFor(asset);
+      if (src) img.src = src;
+    }
+  }
+  assetBrowserOverlay.classList.remove("hidden");
+  assetBrowserSearch.focus();
+  assetBrowserSearch.select();
+}
+
+function closeAssetBrowser(): void {
+  if (!assetBrowserOpen) return;
+  assetBrowserOpen = false;
+  assetBrowserOverlay.classList.add("hidden");
+  // The search input keeps focus after the overlay is hidden, and a focused
+  // (even invisible) INPUT makes isTextInputFocused() swallow every editor
+  // hotkey — B/R/Q/E all go dead until the user clicks the canvas.
+  assetBrowserSearch.blur();
+}
+
+assetBrowserSearch.addEventListener("input", () => {
+  browserFilter = { ...browserFilter, query: assetBrowserSearch.value };
+  applyBrowserFilter();
+});
+document.getElementById("assetBrowserClose")!.addEventListener("click", () => closeAssetBrowser());
+// Click on the dim backdrop (not the panel itself) also closes — but only
+// if the mousedown+mouseup both landed on the backdrop, so a drag-select
+// that ends outside the panel doesn't accidentally dismiss it.
+assetBrowserOverlay.addEventListener("click", e => {
+  if (e.target === assetBrowserOverlay) closeAssetBrowser();
+});
+
 function selectAsset(asset: string): void {
   activeAsset = asset;
   for (const [name, btn] of paletteButtons) btn.classList.toggle("active", name === asset);
   for (const [name, btn] of recentButtons) btn.classList.toggle("active", name === asset);
+  for (const [name, card] of browserCards) card.classList.toggle("active", name === asset);
   rebuildGhost();
   refreshCursor(lastClientX, lastClientY);
 }
@@ -490,6 +674,7 @@ function deselectAsset(): void {
   activeAsset = null;
   for (const btn of paletteButtons.values()) btn.classList.remove("active");
   for (const btn of recentButtons.values()) btn.classList.remove("active");
+  for (const card of browserCards.values()) card.classList.remove("active");
   if (ghost) { scene.remove(ghost); ghost = null; }
   refreshCursor(lastClientX, lastClientY);
 }
@@ -1488,6 +1673,19 @@ renderer.domElement.addEventListener("pointerup", e => {
 
 // ── Keyboard: R rotate, Q/E y_level, WASD/arrows pan, Ctrl+Z undo, Esc ──
 addEventListener("keydown", e => {
+  // Asset Browser modal takes over the keyboard entirely while open — R/Q/E/
+  // undo/etc must not fire behind it, and this must run BEFORE the
+  // isTextInputFocused() bail-out below so Escape still closes the modal
+  // even while the search input has focus (typing itself is untouched:
+  // we don't preventDefault on anything but Escape). Esc here deliberately
+  // does NOT touch activeAsset/selection — only closeAssetBrowser().
+  if (assetBrowserOpen) {
+    if (e.code === "Escape") {
+      e.preventDefault();
+      closeAssetBrowser();
+    }
+    return;
+  }
   if (isTextInputFocused()) return;
 
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyZ") {
@@ -1536,7 +1734,12 @@ addEventListener("keydown", e => {
     return;
   }
 
-  if (e.code === "KeyR") {
+  if (e.code === "KeyB") {
+    // Without preventDefault the same keystroke's text insertion lands in
+    // the search input we just focused — the browser opens pre-filled "b".
+    e.preventDefault();
+    openAssetBrowser();
+  } else if (e.code === "KeyR") {
     rotIndex = (rotIndex + 1) % ROT_CYCLE.length;
     refreshCursor(lastClientX, lastClientY);
   } else if (e.code === "Space") {
@@ -1993,6 +2196,8 @@ function scheduleAutosave(): void {
   buildPalette();
   lib = await loadAssetLibrary(ASSET_NAMES);
   addPaletteThumbnails();
+  renderBrowserChips();
+  buildAssetBrowserGrid();
   void refreshServerMapList();
   const saved = localStorage.getItem("editor-autosave");
   if (saved) {
