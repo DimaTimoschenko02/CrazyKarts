@@ -74,12 +74,28 @@
 // point that happens to be close to the (now much lower) new ground sample.
 // No bounce: vy resets to 0 on landing, matching the "pure inertia, no
 // physics interaction while airborne" brief (nothing partially elastic).
+//
+// D2 (design/notes/ride-collision-v2.md, 2026-07-09): the rate-detector above
+// covers cliffs and trampolines, but has a blind spot on a SLOW crest over a
+// convex ridge — groundRateNow tracks the kart's own vy closely enough
+// tick-to-tick (both easing toward 0 together as the slope flattens) that
+// their difference never crosses airborneDropThreshold, even though the
+// kart is visibly riding over open air a moment later (symptom #3, "приклеен
+// на гребне"). `groundSnapDistance` adds a second, purely POSITIONAL check
+// layered in front of the follow-filter: if the sampled ground has already
+// fallen more than this far below the kart's CURRENT y, go airborne carrying
+// the current vy (same "carry the rate, don't snap down" contract as the
+// rate-based launch above) even though the rate check alone didn't fire.
+// Checked AFTER the rate detector (so it never double-fires on the same tick
+// a cliff/trampoline launch already did) and BEFORE the follow-filter moves
+// y at all.
 
 export interface VerticalParams {
   gravity: number; // VERTICAL_GRAVITY — downward accel while airborne (m/s²)
   groundFollowRate: number; // VERTICAL_GROUND_FOLLOW_RATE — exp-follow rate while grounded (/s)
   airborneDropThreshold: number; // VERTICAL_AIRBORNE_DROP_THRESHOLD — how far (m/s) the kart's own vertical rate must exceed the ground's current rate-of-rise to trigger a launch — in EITHER direction (cliff drop or ramp-top launch); also the anti-jitter margin
   landingMargin: number; // VERTICAL_LANDING_MARGIN — clearance (m) below which an airborne kart snaps to the ground
+  groundSnapDistance: number; // GROUND_SNAP_DISTANCE — D2 positional detachment: how far (m) the ground must sit below the kart's current y to force airborne even when the rate detector above didn't trip (catches a slow crest over a convex ridge)
 }
 
 export interface VerticalState {
@@ -130,6 +146,13 @@ export function stepVertical(state: VerticalState, inp: VerticalInput, p: Vertic
       // ground sample); vy carries the last ground-following rate, which is
       // exactly the trampoline effect for a kart still climbing when the
       // ramp ends, or a near-level launch when walking off a flat cliff.
+      return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: inp.groundHeight };
+    }
+
+    // D2 positional detachment — see header comment above. Only fires when
+    // the rate detector above didn't already; carries the current vy exactly
+    // like that branch (no snap-down, no re-derivation from the new sample).
+    if (inp.groundHeight < state.y - p.groundSnapDistance) {
       return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: inp.groundHeight };
     }
 

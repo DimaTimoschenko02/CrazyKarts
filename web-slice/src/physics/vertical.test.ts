@@ -6,6 +6,7 @@ const P: VerticalParams = {
   groundFollowRate: 20,
   airborneDropThreshold: 4.0,
   landingMargin: 0.04,
+  groundSnapDistance: 0.07, // matches DEFAULT_KART_PHYSICS_PARAMS.groundSnapDistance
 };
 
 const DT = 1 / 120;
@@ -200,6 +201,54 @@ describe("stepVertical — launch off a flattening ramp top (trampoline)", () =>
     // trampoline, not a token hop.
     expect(maxY - launchY).toBeGreaterThan(0.8);
     expect(maxY - launchY).toBeLessThan(2.0);
+  });
+});
+
+describe("stepVertical — D2 positional detachment (convex ridge crest, symptom #3)", () => {
+  // A moderate grade reversal (climb rate C, then IMMEDIATELY declining at
+  // the mirrored rate -C — the convex-ridge crest case) chosen so the RATE
+  // detector's own margin (vy - groundRateNow, up to ~2C right at the kink)
+  // stays UNDER airborneDropThreshold(4.0) — isolating D2's positional check
+  // as the only thing that can detach the kart here. See RAMP_SLOPE_VSIN
+  // above for where a rate like this comes from physically (a mid-range
+  // kart speed on the arena_slice grade).
+  function rideOverRidge(climbRate: number, snapDistance: number): { everAirborne: boolean; firstAirborneAt: number } {
+    const params: VerticalParams = { ...P, groundSnapDistance: snapDistance };
+    let s = createVerticalState(0);
+    let h = 0;
+    // Climb to a steady-state follow-lag first.
+    for (let i = 0; i < 90; i++) {
+      h += climbRate * DT;
+      s = stepVertical(s, { groundHeight: h, dt: DT }, params);
+    }
+    // Crest: ground immediately reverses to declining at the same rate.
+    for (let i = 0; i < 90; i++) {
+      h -= climbRate * DT;
+      s = stepVertical(s, { groundHeight: h, dt: DT }, params);
+      if (s.airborne) return { everAirborne: true, firstAirborneAt: i };
+    }
+    return { everAirborne: s.airborne, firstAirborneAt: -1 };
+  }
+
+  it("a moderate crest eventually detaches the kart even though the rate detector alone never trips", () => {
+    const result = rideOverRidge(1.7, 0.07);
+    expect(result.everAirborne).toBe(true);
+  });
+
+  it("a gentler crest (small follow-lag, under groundSnapDistance) stays glued — not every tiny dip launches", () => {
+    const result = rideOverRidge(0.8, 0.07);
+    expect(result.everAirborne).toBe(false);
+  });
+
+  it("groundSnapDistance is a genuine tuner knob: tightening it catches the same crest sooner", () => {
+    const loose = rideOverRidge(1.7, 0.2);
+    const tight = rideOverRidge(1.7, 0.03);
+    expect(tight.everAirborne).toBe(true);
+    // Looser threshold either never detaches on this same crest, or detaches
+    // meaningfully later than the tight one.
+    if (loose.everAirborne) {
+      expect(loose.firstAirborneAt).toBeGreaterThan(tight.firstAirborneAt);
+    }
   });
 });
 

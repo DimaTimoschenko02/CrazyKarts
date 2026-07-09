@@ -160,6 +160,47 @@ export interface KartPhysicsParams {
   verticalAirborneDropThreshold: number; // VERTICAL_AIRBORNE_DROP_THRESHOLD
   verticalLandingMargin: number; // VERTICAL_LANDING_MARGIN
 
+  // Ride & Collision v2 (design/notes/ride-collision-v2.md) — D2: positional
+  // ground-detachment. The existing verticalAirborneDropThreshold above is a
+  // RATE check (vy vs. the ground's own rate-of-rise) and stays exactly as it
+  // was — it's what covers trampolines (a ramp that suddenly flattens while
+  // the kart is still climbing fast). This is a SEPARATE, purely positional
+  // check layered in front of it: "has the sampled ground height fallen more
+  // than this far below the kart's current y THIS TICK" — added because a
+  // slow crest over a convex ridge lets groundRateNow track vy closely enough,
+  // tick to tick, that the rate check never trips even once the kart is
+  // visibly hovering over open air (see vertical.ts stepVertical for the
+  // exact check and the design doc's symptom #3 "приклеен на гребне").
+  groundSnapDistance: number; // GROUND_SNAP_DISTANCE
+
+  // Ride & Collision v2 — D1: wall-aware ground height. groundProbe.ts's
+  // wallAwareGroundHeight() excludes any of the F/B/R/L probes that read
+  // MORE than this far above the CENTER probe from the ground-height MAX —
+  // those are walls (e.g. a corner probe landing on the TOP of a neighboring
+  // wall_block cube), not ground the kart's own underside is resting on, and
+  // including them was the root cause of the "catapult" bug (symptom #1):
+  // one such probe made groundHeight jump a full block-height in a single
+  // tick, which the vertical rate-detector then read as a huge implied
+  // upward vy and launched the kart. Defaults to 0.3 — the same "unclimbable
+  // step" cutoff kart/kart.ts historically hardcoded (as MAX_STEP) for the
+  // terrain-slide path, before that path moved to D3b's own local-gradient
+  // criterion below — so "too steep to climb" and "too tall to count as
+  // ground under the body" still agree on the same cutoff by default.
+  groundStepExcludeThreshold: number; // GROUND_STEP_EXCLUDE_THRESHOLD
+
+  // Ride & Collision v2 — D3b: wall vs. slope gradient. resolveTerrainSlide
+  // (physics/terrainWall.ts) used to compare the footprint corner's height
+  // before/after a substep move directly — at the corner's own offset
+  // distance from the body center (0.45-0.6m), which falsely flagged a
+  // perfectly climbable ~26° ramp as a wall whenever heightfield cell
+  // rounding put the before/after samples in different cells. This threshold
+  // instead gates a short, FIXED-length probe (0.15m, hardcoded in
+  // terrainWall.ts — not itself a tuner knob) straddling the corner's
+  // destination along the direction of travel: rise over that short base
+  // above this value = wall, at/below = drivable slope. See terrainWall.ts
+  // WALL_GRADIENT_BASE doc for the exact geometry.
+  terrainWallGradientThreshold: number; // TERRAIN_WALL_GRADIENT_THRESHOLD
+
   // Body attitude (pitch/roll) follow — src/kart/kart.ts step 8b/8d.
   attitudeFollowRate: number; // ATTITUDE_FOLLOW_RATE — grounded slope-follow speed
   attitudeAirborneRelaxRate: number; // ATTITUDE_AIRBORNE_RELAX_RATE — how fast the body levels out while airborne
@@ -439,6 +480,27 @@ export const DEFAULT_KART_PHYSICS_PARAMS: KartPhysicsParams = {
   verticalGroundFollowRate: 20,
   verticalAirborneDropThreshold: 4.0,
   verticalLandingMargin: 0.04,
+
+  // Ride & Collision v2 (design/notes/ride-collision-v2.md, 2026-07-09).
+  // groundSnapDistance 0.07: comfortably above ordinary heightfield
+  // follow-lag/micro-noise (sub-cm to a couple cm — see the existing
+  // "does not chatter" test) so flat/gently-sloped driving never trips it,
+  // but well under the gap a kart actually hovering off a crest opens up
+  // within a tick or two at cruise speed — inside the design doc's 0.05-0.10
+  // calibration band.
+  groundSnapDistance: 0.07,
+  // groundStepExcludeThreshold 0.3: matches the terrain-slide path's own
+  // "too steep to climb" cutoff (kart/kart.ts's old hardcoded MAX_STEP, now
+  // folded into terrainWallGradientThreshold below) by design — a probe the
+  // slide path would already refuse to drive up is exactly the kind of probe
+  // that shouldn't be allowed to lift the body's ground height either.
+  groundStepExcludeThreshold: 0.3,
+  // terrainWallGradientThreshold 0.27: rise-over-the-0.15m-base threshold —
+  // atan(0.27/0.15) ≈ 61°, i.e. blocks anything steeper than roughly 60-65°.
+  // arena_slice's steepest legit ramp (~26.6°) clears this with a huge
+  // margin (a 0.15m base on that slope only rises ~0.075m, well under 0.27),
+  // while a wall_block's near-vertical side trips it immediately.
+  terrainWallGradientThreshold: 0.27,
 
   // 20 (up from the old hardcoded pitch-only rate of 10) — a plain 10 let a
   // kart crossing a ramp tile at top speed clear it before the filter caught

@@ -24,7 +24,7 @@ import { footprintHalfExtents, footprintPoints, resolveTerrainSlide } from "../p
 import { resolveKartVsStatic } from "../physics/staticSlide";
 import { STATIC_COLLISION_SKIN } from "../shared/staticColliders";
 import { computeAttitudeTarget } from "./attitude";
-import { maxGroundHeight, sampleGroundProbes } from "./groundProbe";
+import { wallAwareGroundHeight, sampleGroundProbes } from "./groundProbe";
 
 // Godot: forward = -Z rotated by yaw around +Y.
 export function forwardOf(yaw: number): THREE.Vector3 {
@@ -33,9 +33,6 @@ export function forwardOf(yaw: number): THREE.Vector3 {
 export function rightOf(yaw: number): THREE.Vector3 {
   return new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
 }
-
-// Max climbable rise per move — a full tile step is 0.5, ramps rise gradually.
-const MAX_STEP = 0.3;
 
 // `obstacles` (step 8c below) is now ONLY other connected players' rendered
 // karts (net/remoteKarts.ts getObstacles(), no `radius` — always treated as
@@ -371,9 +368,10 @@ export class Kart {
     //   8a. Dynamic terrain-edge slide (physics/terrainWall.ts): handles
     //       genuine off-map boundaries and any too-steep terrain step —
     //       including wall_block*/ground_block cube sides (a full-level 0.5
-    //       step > MAX_STEP), which this path owns since the 2026-07-08
-    //       rework (blocks are walkable on top now, so their old 2D SAT
-    //       AABBs are gone — see shared/staticColliders.ts module doc).
+    //       step, near-vertical over the D3b gradient base), which this path
+    //       owns since the 2026-07-08 rework (blocks are walkable on top now,
+    //       so their old 2D SAT AABBs are gone — see shared/staticColliders.ts
+    //       module doc).
     //       Integrates the candidate XZ move itself and slides tangentially
     //       (I2) instead of killing a whole world axis.
     //   8b. Static SAT contact resolution (physics/staticSlide.ts) against
@@ -401,7 +399,7 @@ export class Kart {
         { x: rightNow.x, z: rightNow.z },
         this.footprintHalf.halfLength,
         this.footprintHalf.halfWidth,
-        MAX_STEP
+        this.params.terrainWallGradientThreshold
       );
       const afterStatic = resolveKartVsStatic(
         map.getStaticColliders(),
@@ -490,6 +488,9 @@ export class Kart {
     // sample budget for both height and pitch/roll) — a rigid body resting
     // in a V-groove or straddling a ridge "mounts" the highest contact point
     // instead of sinking to whatever its own center happens to read.
+    // D1 (design/notes/ride-collision-v2.md): wallAwareGroundHeight also
+    // excludes any probe reading like a wall (a neighbor's roof, not this
+    // body's own ground) — see groundProbe.ts doc for the exact rule.
     const groundProbes = sampleGroundProbes(
       (x, z) => map?.sampleHeight(x, z) ?? null,
       this.state.pos.x,
@@ -499,12 +500,13 @@ export class Kart {
       this.axle.wheelbase * 0.5,
       this.axle.trackWidth * 0.5
     );
-    const groundHeightNow = maxGroundHeight(groundProbes);
+    const groundHeightNow = wallAwareGroundHeight(groundProbes, this.params.groundStepExcludeThreshold);
     this.vertical = stepVertical(this.vertical, { groundHeight: groundHeightNow, dt }, {
       gravity: this.params.verticalGravity,
       groundFollowRate: this.params.verticalGroundFollowRate,
       airborneDropThreshold: this.params.verticalAirborneDropThreshold,
       landingMargin: this.params.verticalLandingMargin,
+      groundSnapDistance: this.params.groundSnapDistance,
     });
     this.state.pos.y = this.vertical.y;
 

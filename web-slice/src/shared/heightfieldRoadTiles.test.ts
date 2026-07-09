@@ -96,6 +96,19 @@ describe("road tiles heightfield", () => {
     const n = grid.length;
     const cornerLoX = grid[0][0]; // local X low edge, local Z low edge
     const cornerHiX = grid[n - 1][0]; // local X high edge, local Z low edge
+    // D3a (2026-07-09): gridSample() is bilinear now (see heightfield.ts
+    // doc), so a query has to land EXACTLY on a grid cell's own center to
+    // read that cell's raw value with zero blend from its neighbors — the
+    // old ±0.48 near-boundary probes below deliberately sat just OFF-center
+    // (to prove "inside the corner cell, not the next one" under the old
+    // point-sample model) and would now pick up a small, real blend from the
+    // adjacent cell instead of matching the corner value exactly. EDGE below
+    // is that exact per-axis cell-0 / cell-(n-1) center offset in world
+    // meters (tile_size 3) — bilinear reduces to an exact point-sample AT a
+    // cell's own center by construction (see gridSample() doc), so every
+    // assertion here still pins the same rotation/mirror mapping the old
+    // probes did, just anchored precisely instead of approximately.
+    const EDGE = (0.5 - 0.5 / n) * 3;
     // Sanity: the two corners this test leans on are genuinely different —
     // otherwise a rebake could silently make every rot/mirror assertion below
     // pass by accident (both sides reading the same flat value).
@@ -103,14 +116,15 @@ describe("road tiles heightfield", () => {
       expect(Math.abs(cornerHiX - cornerLoX)).toBeGreaterThan(0.5);
     });
 
-    it("rot=0: heightCellFor returns the grid untouched, point-sampled by sample()", () => {
+    it("rot=0: heightCellFor returns the grid, bilinearly sampled by sample()", () => {
       const cell = heightCellFor("roadTile_045", 0, 0, LH);
       expect(cell.rise).toBe(0);
       expect(cell.grid).toBe(grid);
       const hf = mapWith([{ asset: "roadTile_045", x: 0, z: 0, y_level: 0 }]);
-      // lx=lz=-0.48 sits inside grid cell (0,0); lx=+0.48 inside cell (n-1,0).
-      expect(hf.sample(-0.48 * 3, -0.48 * 3)!).toBeCloseTo(cornerLoX, 5);
-      expect(hf.sample(0.48 * 3, -0.48 * 3)!).toBeCloseTo(cornerHiX, 5);
+      // lx=lz=-EDGE sits exactly at grid cell (0,0)'s own center; lx=+EDGE at
+      // cell (n-1,0)'s center.
+      expect(hf.sample(-EDGE, -EDGE)!).toBeCloseTo(cornerLoX, 5);
+      expect(hf.sample(EDGE, -EDGE)!).toBeCloseTo(cornerHiX, 5);
     });
 
     it("rot=90: grid rotates with the mesh (same R_y convention as the slope tests)", () => {
@@ -118,25 +132,25 @@ describe("road tiles heightfield", () => {
       // Forward transform world=rotateVec(local,rot) — verified against
       // RAMP_ASCENT/CORNER_ASCENT in heightfield.ts — maps local (nx,nz) to
       // world (lz=nx*... ) as (world_lx, world_lz) = (nz, -nx) at rot=90 (cos=0,
-      // sin=1: [x*0+z*1, -x*1+z*0] = [z, -x]). Local (−0.48,−0.48) → world
-      // (lx=−0.48, lz=0.48); local (+0.48,−0.48) → world (lx=−0.48, lz=−0.48).
-      expect(hf.sample(-0.48 * 3, 0.48 * 3)!).toBeCloseTo(cornerLoX, 5);
-      expect(hf.sample(-0.48 * 3, -0.48 * 3)!).toBeCloseTo(cornerHiX, 5);
+      // sin=1: [x*0+z*1, -x*1+z*0] = [z, -x]). Local (−EDGE,−EDGE) → world
+      // (lx=−EDGE, lz=EDGE); local (+EDGE,−EDGE) → world (lx=−EDGE, lz=−EDGE).
+      expect(hf.sample(-EDGE, EDGE)!).toBeCloseTo(cornerLoX, 5);
+      expect(hf.sample(-EDGE, -EDGE)!).toBeCloseTo(cornerHiX, 5);
     });
 
     it("rot=180: grid flips fully (local low-X edge now reads on the world +X side)", () => {
       const hf = mapWith([{ asset: "roadTile_045", x: 0, z: 0, y_level: 0, rot: 180 }]);
-      // rotateVec(x,z,180) = [-x,-z]: local (−0.48,−0.48) → world (0.48,0.48).
-      expect(hf.sample(0.48 * 3, 0.48 * 3)!).toBeCloseTo(cornerLoX, 5);
-      expect(hf.sample(-0.48 * 3, 0.48 * 3)!).toBeCloseTo(cornerHiX, 5);
+      // rotateVec(x,z,180) = [-x,-z]: local (−EDGE,−EDGE) → world (EDGE,EDGE).
+      expect(hf.sample(EDGE, EDGE)!).toBeCloseTo(cornerLoX, 5);
+      expect(hf.sample(-EDGE, EDGE)!).toBeCloseTo(cornerHiX, 5);
     });
 
     it("rot=270 (−90): grid rotates the other way", () => {
       const hf = mapWith([{ asset: "roadTile_045", x: 0, z: 0, y_level: 0, rot: -90 }]);
       // rotateVec(x,z,270): cos=0,sin=-1 → [x*0+z*(-1), -x*(-1)+z*0] = [-z, x].
-      // Local (−0.48,−0.48) → world (0.48,−0.48).
-      expect(hf.sample(0.48 * 3, -0.48 * 3)!).toBeCloseTo(cornerLoX, 5);
-      expect(hf.sample(0.48 * 3, 0.48 * 3)!).toBeCloseTo(cornerHiX, 5);
+      // Local (−EDGE,−EDGE) → world (EDGE,−EDGE).
+      expect(hf.sample(EDGE, -EDGE)!).toBeCloseTo(cornerLoX, 5);
+      expect(hf.sample(EDGE, EDGE)!).toBeCloseTo(cornerHiX, 5);
     });
 
     it("mirror: reflects across local X BEFORE the rotation (matches mapLoader's TRS order)", () => {
@@ -144,17 +158,17 @@ describe("road tiles heightfield", () => {
       // so the grid reads mirrored on the world-X axis — same corners swap as
       // an unmirrored rot=180 would produce on X alone (Z untouched).
       const hf = mapWith([{ asset: "roadTile_045", x: 0, z: 0, y_level: 0, mirror: true }]);
-      expect(hf.sample(0.48 * 3, -0.48 * 3)!).toBeCloseTo(cornerLoX, 5);
-      expect(hf.sample(-0.48 * 3, -0.48 * 3)!).toBeCloseTo(cornerHiX, 5);
+      expect(hf.sample(EDGE, -EDGE)!).toBeCloseTo(cornerLoX, 5);
+      expect(hf.sample(-EDGE, -EDGE)!).toBeCloseTo(cornerHiX, 5);
     });
 
     it("mirror + rot=90: reflect-then-rotate composes (not commutative with rotate-then-reflect)", () => {
       const hf = mapWith([{ asset: "roadTile_045", x: 0, z: 0, y_level: 0, rot: 90, mirror: true }]);
       // Forward: world = rotateVec(-nx, nz, rot) (mirroredVec convention).
-      // At rot=90: rotateVec(-x,z,90) = [z, x]. Local (−0.48,−0.48) →
-      // world (lx=−0.48, lz=−0.48); local (+0.48,−0.48) → world (−0.48,+0.48).
-      expect(hf.sample(-0.48 * 3, -0.48 * 3)!).toBeCloseTo(cornerLoX, 5);
-      expect(hf.sample(-0.48 * 3, 0.48 * 3)!).toBeCloseTo(cornerHiX, 5);
+      // At rot=90: rotateVec(-x,z,90) = [z, x]. Local (−EDGE,−EDGE) →
+      // world (lx=−EDGE, lz=−EDGE); local (+EDGE,−EDGE) → world (−EDGE,+EDGE).
+      expect(hf.sample(-EDGE, -EDGE)!).toBeCloseTo(cornerLoX, 5);
+      expect(hf.sample(-EDGE, EDGE)!).toBeCloseTo(cornerHiX, 5);
     });
 
     it("drive OVER a bridge deck works and reflects the real deck contour (not a flat plateau)", () => {
@@ -162,7 +176,7 @@ describe("road tiles heightfield", () => {
       // replaces: topMedian ≠ every corner of the deck anymore, because the
       // deck genuinely isn't flat (it's an approach ramp on one side).
       const hf = mapWith([{ asset: "roadTile_045", x: 0, z: 0, y_level: 0 }]);
-      const sampled = hf.sample(0.48 * 3, -0.48 * 3)!;
+      const sampled = hf.sample(EDGE, -EDGE)!;
       expect(sampled).toBeCloseTo(cornerHiX, 5);
       expect(Math.abs(sampled - CAT.roadTile_045.topMedian)).toBeGreaterThan(0.5);
       // drive-under is still deferred (single column height per query — no
@@ -174,6 +188,55 @@ describe("road tiles heightfield", () => {
       const cell2 = heightCellFor("roadTile_045", 2, 0, LH);
       expect(cell2.base - cell0.base).toBeCloseTo(2 * LH, 5);
       expect(cell2.grid).toBe(cell0.grid);
+    });
+
+    // D3a regression (design/notes/ride-collision-v2.md symptom #4, "грид-
+    // лесенка"): sweeping across a grid-cell boundary must read as a smooth
+    // ramp, not the old raw per-cell step (~10cm on this tile). This is what
+    // actually fixes the ground-height chatter — see vertical.ts's rate/
+    // position detachment, which used to spuriously fire on every one of
+    // these steps.
+    it("sweeping across a grid-cell boundary along X removes the old raw per-cell step (bilinear vs. the old nearest-cell point-sample)", () => {
+      const hf = mapWith([{ asset: "roadTile_045", x: 0, z: 0, y_level: 0 }]);
+      const zProbe = -0.4 * 3; // fixed Z, deep inside grid row j=0's span
+      const steps = 200;
+      const worldXAt = (k: number): number => -1.49 + (2.98 * k) / steps; // sweep nearly the whole tile width
+
+      // Old behavior, reimplemented locally (point-sample, nearest grid
+      // cell — exactly what gridSample() did before D3a): jumps a FULL
+      // cell-to-cell delta the instant a query crosses a cell boundary.
+      function oldPointSample(worldX: number): number {
+        const lx = worldX / 3; // tile_size=3, origin 0
+        const lz = zProbe / 3;
+        const n = grid.length;
+        const i = Math.min(Math.max(Math.floor((lx + 0.5) * n), 0), n - 1);
+        const j = Math.min(Math.max(Math.floor((lz + 0.5) * n), 0), n - 1);
+        return grid[i][j];
+      }
+
+      const maxJump = (fn: (x: number) => number | null): number => {
+        const samples: number[] = [];
+        for (let k = 0; k <= steps; k++) {
+          const h = fn(worldXAt(k));
+          if (h !== null) samples.push(h);
+        }
+        expect(samples.length).toBeGreaterThan(steps / 2);
+        let m = 0;
+        for (let k = 1; k < samples.length; k++) m = Math.max(m, Math.abs(samples[k] - samples[k - 1]));
+        return m;
+      };
+
+      const newMaxJump = maxJump(x => hf.sample(x, zProbe));
+      const oldMaxJump = maxJump(oldPointSample);
+
+      // Sanity: the OLD model actually had a real, non-trivial step to fix
+      // (otherwise this comparison would be vacuous).
+      expect(oldMaxJump).toBeGreaterThan(0.05);
+      // Bilinear must meaningfully shrink the worst single-sub-step jump —
+      // this is what actually fixes the ground-height chatter symptom (#4):
+      // vertical.ts's rate/position detachment used to spuriously fire on
+      // every one of these old per-cell steps.
+      expect(newMaxJump).toBeLessThan(oldMaxJump * 0.5);
     });
   });
 });

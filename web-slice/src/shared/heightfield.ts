@@ -225,18 +225,50 @@ function mirroredVec(base0: [number, number], rot: number): [number, number] {
 // order, not "un-mirror then un-rotate", is the one that actually inverts
 // the forward transform).
 //
-// Point-sampled (nearest grid cell, no bilinear) on purpose: the grid exists
-// specifically to capture sharp height steps (curb lips, canal bank edges) —
-// blending across them would smear back exactly the false-wall/false-hole
-// bug this grid replaces.
+// D3a (design/notes/ride-collision-v2.md, 2026-07-09): this was originally
+// point-sampled (nearest grid cell, no bilinear) on the theory that blending
+// across sharp height steps (curb lips, canal bank edges) would smear back
+// the false-wall/false-hole bug this grid replaces. That theory was wrong in
+// practice: the 12×12 baked grid's own cell-to-cell steps (~10cm on a
+// road-tile-sized cell) were themselves being read as terrain by the
+// vertical-follow path, and a driving kart crossing grid-cell boundaries hit
+// a real, felt micro-stairstep ("chatter" symptom #4) — not a rendering
+// artifact, an actual discontinuous ground-height signal every ~10-25cm of
+// travel. Bilinear interpolation between the 4 surrounding grid cells turns
+// that into an honest, continuous slope (matching what the baked data is
+// actually approximating: a smoothly-varying deck surface, not a real
+// staircase). Genuine walls/edges are NOT lost by this — see
+// physics/terrainWall.ts's D3b gradient check, which now recognizes "wall"
+// by measured slope over a fixed short probe base rather than relying on
+// gridSample()'s old raw single-cell steps to manufacture one.
+//
+// Clamps the CONTINUOUS fractional index to [0, n-1] (not the integer cell
+// index) before flooring, so a query at/past the very edge cell's own center
+// holds that edge cell's value flat with zero blend, rather than either
+// wrapping or extrapolating past the grid's own data — "clamp indices, don't
+// read a neighboring cell" per the design doc, and this module never reads
+// outside its own single `grid` array regardless (neighboring MAP tiles are
+// a wholly separate HeightCell / column lookup in sample() below).
 function gridSample(lx: number, lz: number, grid: number[][], rot: number, mirror: boolean): number {
   const [rx, rz] = rotateVec(lx, lz, normRot(-rot));
   const nx = mirror ? -rx : rx;
   const nz = rz;
   const n = grid.length;
-  const i = clamp(Math.floor((nx + 0.5) * n), 0, n - 1);
-  const j = clamp(Math.floor((nz + 0.5) * n), 0, n - 1);
-  return grid[i][j];
+  const fx = clamp((nx + 0.5) * n - 0.5, 0, n - 1);
+  const fz = clamp((nz + 0.5) * n - 0.5, 0, n - 1);
+  const i0 = Math.floor(fx);
+  const i1 = Math.min(i0 + 1, n - 1);
+  const j0 = Math.floor(fz);
+  const j1 = Math.min(j0 + 1, n - 1);
+  const tx = fx - i0;
+  const tz = fz - j0;
+  const h00 = grid[i0][j0];
+  const h10 = grid[i1][j0];
+  const h01 = grid[i0][j1];
+  const h11 = grid[i1][j1];
+  const hLoZ = h00 + (h10 - h00) * tx;
+  const hHiZ = h01 + (h11 - h01) * tx;
+  return hLoZ + (hHiZ - hLoZ) * tz;
 }
 
 export function normRot(rot: number | undefined): number {
