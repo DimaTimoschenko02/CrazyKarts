@@ -273,6 +273,17 @@ export class Kart {
   update(dt: number, raw: RawInput, map: GameMap | null, obstacles: readonly KartObstacle[] = []): void {
     this.simTime += dt;
 
+    // Multi-layer heightfield floor selection (shared/heightfield.ts
+    // Heightfield.sampleAt) needs a reference Y to decide which stacked
+    // layer this body is near — sampled ONCE here (the map-height carried
+    // over from the END of the previous tick's vertical step, i.e. "y before
+    // this tick's own vertical step") and reused as one closure for every
+    // ground probe this whole tick, per the spec: a probe taken with a
+    // DIFFERENT y per query would let the floor selection drift mid-tick
+    // instead of answering "what floor is THIS body, at its current height,
+    // standing near" consistently.
+    const yRef = this.state.pos.y;
+
     // 1. Input smoothing — kept running even while airborne (see step 5)
     // so a held throttle/steer is already fully "spooled up" the instant
     // the kart lands, instead of popping in with a fresh slew ramp.
@@ -305,10 +316,12 @@ export class Kart {
       // uses for pitch/roll.
       let slopeRaw = 0;
       if (map) {
-        const hHere = map.sampleHeight(this.state.pos.x, this.state.pos.z);
-        const hAhead = map.sampleHeight(
+        const hHere = map.sampleHeightAt(this.state.pos.x, this.state.pos.z, yRef, this.params.layerClimbThreshold);
+        const hAhead = map.sampleHeightAt(
           this.state.pos.x + fwdDir.x * SLOPE_PROBE_DIST,
-          this.state.pos.z + fwdDir.z * SLOPE_PROBE_DIST
+          this.state.pos.z + fwdDir.z * SLOPE_PROBE_DIST,
+          yRef,
+          this.params.layerClimbThreshold
         );
         if (hHere !== null && hAhead !== null) {
           slopeRaw = Math.atan2(hAhead - hHere, SLOPE_PROBE_DIST);
@@ -389,7 +402,10 @@ export class Kart {
     if (map) {
       const fwdNow = forwardOf(this.state.yaw);
       const rightNow = rightOf(this.state.yaw);
-      const terrainSampler = { sample: (x: number, z: number) => map.sampleHeight(x, z), hasColumn: (x: number, z: number) => map.hasColumn(x, z) };
+      const terrainSampler = {
+        sample: (x: number, z: number) => map.sampleHeightAt(x, z, yRef, this.params.layerClimbThreshold),
+        hasColumn: (x: number, z: number) => map.hasColumn(x, z),
+      };
       const afterTerrain = resolveTerrainSlide(
         terrainSampler,
         { x: this.state.pos.x, z: this.state.pos.z },
@@ -492,7 +508,7 @@ export class Kart {
     // excludes any probe reading like a wall (a neighbor's roof, not this
     // body's own ground) — see groundProbe.ts doc for the exact rule.
     const groundProbes = sampleGroundProbes(
-      (x, z) => map?.sampleHeight(x, z) ?? null,
+      (x, z) => map?.sampleHeightAt(x, z, yRef, this.params.layerClimbThreshold) ?? null,
       this.state.pos.x,
       this.state.pos.z,
       fwdDir,

@@ -68,6 +68,36 @@ describe("isBlockedByTerrain", () => {
   });
 });
 
+describe("isBlockedByTerrain — multi-layer (bridge deck) columns", () => {
+  it("does NOT explode flying under a bridge deck (floor 0, roof 3.5) at y=1.0 — layer-aware, not MAX-of-layers", () => {
+    // A stacked column (road floor at y=0, bridge deck roof at y=3.5): the
+    // old plain sample() (MAX-of-layers) would read groundY=3.5 here and
+    // explode the rocket against a roof it's nowhere near. sampleAt(pos.y,
+    // climb=0) instead resolves to the rocket's OWN layer (the floor), which
+    // sits well below it.
+    const bridgeHf = Heightfield.fromMapJson({
+      meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
+      cells: [
+        { asset: "terrain", x: 5, z: 5, y_level: 0 }, // floor h=0
+        { asset: "terrain", x: 5, z: 5, y_level: 7 }, // roof h=3.5
+      ],
+    });
+    expect(isBlockedByTerrain({ x: 5, y: 1.0, z: 5 }, bridgeHf)).toBe(false);
+  });
+
+  it("still explodes hitting a solid ceiling/wall directly ahead at y=3.4 (single-layer column, unchanged 'groundY > pos.y' semantics)", () => {
+    // A single-layer column (just the deck's own underside, no floor below
+    // it) — no stacking involved, so sampleAt(climb=0) resolves to the same
+    // one layer sample() always did, and the pre-existing "groundY > pos.y"
+    // explosion rule is untouched.
+    const deckOnlyHf = Heightfield.fromMapJson({
+      meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
+      cells: [{ asset: "terrain", x: 6, z: 5, y_level: 7 }], // deck underside h=3.5
+    });
+    expect(isBlockedByTerrain({ x: 6, y: 3.4, z: 5 }, deckOnlyHf)).toBe(true);
+  });
+});
+
 describe("computeLaunchPitchRad", () => {
   // A single-tile ramp — the actual arena_slice layout that regressed in the
   // 2026-07-07 live playtest: flat ground (z=0), a 1m terrain_ramp ascending
@@ -82,12 +112,12 @@ describe("computeLaunchPitchRad", () => {
   });
 
   it("returns a positive (uphill) pitch for a kart standing ON a ramp firing uphill", () => {
-    const pitch = computeLaunchPitchRad(0, 1, 0, 1, rampHf);
+    const pitch = computeLaunchPitchRad(0, 1, 0, 1, rampHf, 0.25);
     expect(pitch).toBeGreaterThan(0.3); // ~26.6deg for a 0.5m/1m ramp
   });
 
   it("returns a negative (downhill) pitch firing down the same ramp", () => {
-    const pitch = computeLaunchPitchRad(0, 1, 0, -1, rampHf);
+    const pitch = computeLaunchPitchRad(0, 1, 0, -1, rampHf, 0.25);
     expect(pitch).toBeLessThan(-0.3);
   });
 
@@ -95,10 +125,10 @@ describe("computeLaunchPitchRad", () => {
     // This is what the pre-fix code effectively did: the kart stands on the
     // ramp (z=1) but the muzzle origin sits at z=2.2, over the flat plateau,
     // so a probe around the MUZZLE reads slope 0 and every rocket flew level.
-    const aroundMuzzle = computeLaunchPitchRad(0, 2.2, 0, 1, rampHf);
+    const aroundMuzzle = computeLaunchPitchRad(0, 2.2, 0, 1, rampHf, 0.5);
     expect(Math.abs(aroundMuzzle)).toBeLessThan(0.05);
     // The fixed call site (MatchRoom.handleFire) passes the KART position:
-    const aroundKart = computeLaunchPitchRad(0, 1, 0, 1, rampHf);
+    const aroundKart = computeLaunchPitchRad(0, 1, 0, 1, rampHf, 0.25);
     expect(aroundKart).toBeGreaterThan(0.3);
   });
 
@@ -110,11 +140,11 @@ describe("computeLaunchPitchRad", () => {
         { asset: "terrain", x: 0, z: 1, y_level: 1 },
       ],
     });
-    expect(computeLaunchPitchRad(0, 0, 0, 1, flatHf, 0.5)).toBeCloseTo(0, 5);
+    expect(computeLaunchPitchRad(0, 0, 0, 1, flatHf, 0.5, 0.5)).toBeCloseTo(0, 5);
   });
 
   it("falls back to 0 when a sample point is off the map", () => {
-    expect(computeLaunchPitchRad(0, 1, 0, 1, rampHf, 50)).toBe(0);
+    expect(computeLaunchPitchRad(0, 1, 0, 1, rampHf, 0.25, 50)).toBe(0);
   });
 
   it("clamps extreme slopes to a maximum launch pitch (cliff-edge safety)", () => {
@@ -126,7 +156,7 @@ describe("computeLaunchPitchRad", () => {
       ],
     });
     // Kart parked right at the seam so the symmetric probe straddles the step.
-    const pitch = computeLaunchPitchRad(0, 0.5, 0, 1, cliffHf, 0.5);
+    const pitch = computeLaunchPitchRad(0, 0.5, 0, 1, cliffHf, 0.25, 0.5);
     expect(pitch).toBeCloseTo(Math.PI / 4, 5);
   });
 });

@@ -161,7 +161,11 @@ export class RemoteKartManager {
       // a resting kart's few millimeters of position noise at a map
       // boundary can no longer re-trigger a visible pitch/roll snap on
       // every single frame the way the old binary `airborne` gate did.
-      const groundHere = this.map?.sampleHeight(pose.x, pose.z) ?? null;
+      // Multi-layer floor selection (shared/heightfield.ts Heightfield.sampleAt)
+      // uses the remote kart's own synced pose.y as yRef — same "which floor
+      // is THIS body near" question the local kart asks in kart.ts, just
+      // driven by the network-synced Y instead of physics-simulated state.
+      const groundHere = this.map?.sampleHeightAt(pose.x, pose.z, pose.y, DEFAULT_KART_PHYSICS_PARAMS.layerClimbThreshold) ?? null;
       const airborneRaw = computeAirborneFactor(groundHere, pose.y, REMOTE_AIRBORNE_HEIGHT, REMOTE_AIRBORNE_BAND);
       kart.airborneSm += (airborneRaw - kart.airborneSm) * (1 - Math.exp(-AIRBORNE_FACTOR_RATE * dt));
 
@@ -172,7 +176,7 @@ export class RemoteKartManager {
           ? LEVEL_ATTITUDE
           : computeAttitudeTarget(
               sampleGroundProbes(
-                (x, z) => this.map!.sampleHeight(x, z),
+                (x, z) => this.map!.sampleHeightAt(x, z, pose.y, DEFAULT_KART_PHYSICS_PARAMS.layerClimbThreshold),
                 pose.x,
                 pose.z,
                 forwardOf(pose.yaw),

@@ -62,12 +62,23 @@ export function stepRocket(pos: Vec3, dir: Vec3, speed: number, dt: number): Vec
   return { x: pos.x + dir.x * speed * dt, y: pos.y + dir.y * speed * dt, z: pos.z + dir.z * speed * dt };
 }
 
+// Layer-aware (shared/heightfield.ts Heightfield.sampleAt), climbThreshold=0:
+// a flying rocket has nowhere to "climb" onto a higher deck the way a
+// driving kart's layerClimbThreshold intentionally allows — it should only
+// ever compare itself against its OWN layer's floor (any floor at/below its
+// current y). This also fixes multi-layer columns (e.g. a bridge deck over a
+// road): the old plain sample() (MAX-of-layers) would explode a rocket
+// flying UNDER the deck against the deck's own height even though the
+// rocket is nowhere near it; sampleAt(climb=0) instead compares against the
+// road floor beneath it, matching the ground the rocket is actually over.
+const ROCKET_LAYER_CLIMB_THRESHOLD = 0;
+
 // True if the rocket should explode against terrain/map-edge at `pos`: the
 // ground is higher than the rocket's CURRENT altitude (pos.y, re-checked every
 // tick as the rocket climbs/descends a pitched line), or `pos` is off the
 // heightfield entirely (both read as "hit a wall").
 export function isBlockedByTerrain(pos: Vec3, heightfield: Heightfield): boolean {
-  const groundY = heightfield.sample(pos.x, pos.z);
+  const groundY = heightfield.sampleAt(pos.x, pos.z, pos.y, ROCKET_LAYER_CLIMB_THRESHOLD);
   if (groundY === null) return true; // off the map = wall
   return groundY > pos.y;
 }
@@ -77,6 +88,16 @@ export function isBlockedByTerrain(pos: Vec3, heightfield: Heightfield): boolean
 // not part of the design spec, just guards against a pathological slope
 // sample; 45° comfortably covers every ramp/plateau angle in the current kit.
 const MAX_LAUNCH_PITCH_RAD = Math.PI / 4;
+
+// Layer-aware launch-pitch probing (shared/heightfield.ts Heightfield.
+// sampleAt) uses the SHOOTER's own y as yRef, so a kart standing under a low
+// bridge probes the road floor it's actually driving on, not the bridge deck
+// above it — matching the ordinary "which floor is this body near" rule
+// kart.ts uses while driving. 0.8 = KartPhysicsParams.layerClimbThreshold's
+// design default (see types.ts field doc); kept as a local constant rather
+// than threading the full params object through the weapons module, which
+// otherwise has no dependency on kart tuning at all.
+const LAUNCH_PITCH_LAYER_CLIMB_THRESHOLD = 0.8;
 
 // Ground-slope-aware launch pitch: samples height a short distance behind
 // and ahead of the KART's position (not the muzzle!) along the horizontal
@@ -97,11 +118,12 @@ export function computeLaunchPitchRad(
   dirX: number,
   dirZ: number,
   heightfield: Heightfield,
+  kartY: number,
   lookaheadM = 0.7
 ): number {
   const half = lookaheadM / 2;
-  const h0 = heightfield.sample(kartX - dirX * half, kartZ - dirZ * half);
-  const h1 = heightfield.sample(kartX + dirX * half, kartZ + dirZ * half);
+  const h0 = heightfield.sampleAt(kartX - dirX * half, kartZ - dirZ * half, kartY, LAUNCH_PITCH_LAYER_CLIMB_THRESHOLD);
+  const h1 = heightfield.sampleAt(kartX + dirX * half, kartZ + dirZ * half, kartY, LAUNCH_PITCH_LAYER_CLIMB_THRESHOLD);
   if (h0 === null || h1 === null) return 0;
   const pitch = Math.atan2(h1 - h0, lookaheadM);
   return Math.max(-MAX_LAUNCH_PITCH_RAD, Math.min(MAX_LAUNCH_PITCH_RAD, pitch));

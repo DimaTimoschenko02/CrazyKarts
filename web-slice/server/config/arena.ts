@@ -125,6 +125,7 @@ export function loadArena(name?: string): Arena {
     heightfield,
     spawnPoints: toWorldPoints(spawnGrid),
     boxPoints: toWorldPoints(boxGrid),
+    // spawn uses top-layer sample() intentionally; multi-layer spawn selection is out of scope
     groundHeightAt: p => heightfield.sample(p.x, p.z) ?? nearestWalkableHeight(heightfield, p),
   };
   cache.set(safeName, arena);

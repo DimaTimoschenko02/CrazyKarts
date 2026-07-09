@@ -201,6 +201,20 @@ export interface KartPhysicsParams {
   // WALL_GRADIENT_BASE doc for the exact geometry.
   terrainWallGradientThreshold: number; // TERRAIN_WALL_GRADIENT_THRESHOLD
 
+  // Multi-layer heightfield floor selection (shared/heightfield.ts
+  // Heightfield.sampleAt) — added so a kart can drive UNDER a bridge/second
+  // floor instead of always snapping onto the map's topmost layer at that
+  // XZ. Human-readable per .claude/rules/param-tuner-descriptions.md: "На
+  // сколько выше машинки может быть пол, чтобы она на него взобралась/
+  // прилипла. Меньше — под низкими мостами проезжаешь надёжнее, но высокие
+  // ступеньки перестанут браться. Больше — легче заскакивать на уступы, но
+  // под низким потолком может втянуть на второй этаж." Examples: 0.4 —
+  // почти ничего не берётся само, только настоящие пандусы; 0.8 (default) —
+  // берёт обычный бордюр/уступ примерно в рост колеса; 1.5 — заскакивает на
+  // довольно высокие платформы, но проезд под низкими мостами становится
+  // ненадёжным (может втянуть наверх).
+  layerClimbThreshold: number; // LAYER_CLIMB_THRESHOLD
+
   // Body attitude (pitch/roll) follow — src/kart/kart.ts step 8b/8d.
   attitudeFollowRate: number; // ATTITUDE_FOLLOW_RATE — grounded slope-follow speed
   attitudeAirborneRelaxRate: number; // ATTITUDE_AIRBORNE_RELAX_RATE — how fast the body levels out while airborne
@@ -501,6 +515,11 @@ export const DEFAULT_KART_PHYSICS_PARAMS: KartPhysicsParams = {
   // margin (a 0.15m base on that slope only rises ~0.075m, well under 0.27),
   // while a wall_block's near-vertical side trips it immediately.
   terrainWallGradientThreshold: 0.27,
+
+  // 0.8 (design default, see the field's doc comment above) — comfortably
+  // clears an ordinary curb/single-step ledge without letting a kart snap
+  // onto a low overhead deck it's only grazing the underside of.
+  layerClimbThreshold: 0.8,
 
   // 20 (up from the old hardcoded pitch-only rate of 10) — a plain 10 let a
   // kart crossing a ramp tile at top speed clear it before the filter caught

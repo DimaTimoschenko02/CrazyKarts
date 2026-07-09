@@ -325,6 +325,63 @@ describe("stacked columns (several assets sharing one XZ) — topmost solid wins
   });
 });
 
+describe("sampleAt multi-layer — floor selection for driving under a bridge/second floor", () => {
+  const CLIMB = 0.8; // matches KartPhysicsParams.layerClimbThreshold's design default
+
+  it("floor at 0, roof at 3.5: a mover near the floor (yRef=0.2) drives UNDER the roof, not onto it", () => {
+    const hf = makeHeightfield([
+      { asset: "terrain", x: 0, z: 0, y_level: 0, rot: 0 }, // floor h=0
+      { asset: "terrain", x: 0, z: 0, y_level: 7, rot: 0 }, // roof h=3.5
+    ]);
+    expect(hf.sampleAt(0, 0, 0.2, CLIMB)).toBeCloseTo(0, 6);
+  });
+
+  it("same column: a mover that climbed up to the roof (yRef=3.4) reads the roof, not the floor", () => {
+    const hf = makeHeightfield([
+      { asset: "terrain", x: 0, z: 0, y_level: 0, rot: 0 },
+      { asset: "terrain", x: 0, z: 0, y_level: 7, rot: 0 },
+    ]);
+    expect(hf.sampleAt(0, 0, 3.4, CLIMB)).toBeCloseTo(3.5, 6);
+  });
+
+  it("same column: plain sample() is unchanged — still MAX-of-layers (the roof), regardless of any yRef", () => {
+    const hf = makeHeightfield([
+      { asset: "terrain", x: 0, z: 0, y_level: 0, rot: 0 },
+      { asset: "terrain", x: 0, z: 0, y_level: 7, rot: 0 },
+    ]);
+    expect(hf.sample(0, 0)).toBeCloseTo(3.5, 6);
+  });
+
+  it("a mover BELOW every layer (yRef=-5) falls back to the lowest floor in the column", () => {
+    const hf = makeHeightfield([
+      { asset: "terrain", x: 0, z: 0, y_level: 0, rot: 0 }, // h=0
+      { asset: "terrain", x: 0, z: 0, y_level: 7, rot: 0 }, // h=3.5
+    ]);
+    expect(hf.sampleAt(0, 0, -5, CLIMB)).toBeCloseTo(0, 6);
+  });
+
+  it("a single-layer column behaves identically to sample() for any yRef", () => {
+    const hf = makeHeightfield([{ asset: "terrain", x: 2, z: 2, y_level: 3, rot: 0 }]); // h=1.5
+    const plain = hf.sample(2, 2);
+    expect(hf.sampleAt(2, 2, -10, CLIMB)).toBeCloseTo(plain as number, 6);
+    expect(hf.sampleAt(2, 2, 0, CLIMB)).toBeCloseTo(plain as number, 6);
+    expect(hf.sampleAt(2, 2, 100, CLIMB)).toBeCloseTo(plain as number, 6);
+  });
+
+  it("a tight two-level stack (0 and 0.5, e.g. a curb) still behaves like the old MAX — the top layer wins", () => {
+    const hf = makeHeightfield([
+      { asset: "terrain", x: 0, z: 0, y_level: 0, rot: 0 }, // h=0
+      { asset: "terrain", x: 0, z: 0, y_level: 1, rot: 0 }, // h=0.5
+    ]);
+    expect(hf.sampleAt(0, 0, 0.1, CLIMB)).toBeCloseTo(0.5, 6);
+  });
+
+  it("returns null for an unauthored column, same as sample()", () => {
+    const hf = makeHeightfield([{ asset: "terrain", x: 0, z: 0, y_level: 0, rot: 0 }]);
+    expect(hf.sampleAt(50, 50, 0, CLIMB)).toBeNull();
+  });
+});
+
 describe("Heightfield.hasColumn — authored footprint vs genuine off-map edges", () => {
   it("true for a walkable cell", () => {
     const hf = makeHeightfield([{ asset: "terrain", x: 0, z: 0, y_level: 0 }]);

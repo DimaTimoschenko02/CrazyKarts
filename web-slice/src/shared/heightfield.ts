@@ -524,9 +524,12 @@ export class Heightfield {
     return this.cells.has(cx + "," + cz);
   }
 
-  // Ground height at a world XZ point, or null when there is no cell there
-  // (off the map edge → treated as a wall / explosion trigger by callers).
-  sample(wx: number, wz: number): number | null {
+  // Per-layer heights of the column under a world XZ point, or null when
+  // nothing was authored there. Factored out of sample()/sampleAt() so both
+  // share the exact same per-cell math (grid lookup or linear base+rise+MAX
+  // ax2/az2 model) — neither of those was touched, only lifted out of the
+  // old sample() loop body.
+  private columnHeights(wx: number, wz: number): number[] | null {
     const fx = (wx - this.originX) / this.tile;
     const fz = (wz - this.originZ) / this.tile;
     const cx = Math.round(fx);
@@ -535,7 +538,7 @@ export class Heightfield {
     if (!stack) return null;
     const lx = fx - cx;
     const lz = fz - cz;
-    let best = -Infinity;
+    const heights: number[] = [];
     for (const cell of stack) {
       let h: number;
       if (cell.grid) {
@@ -550,9 +553,53 @@ export class Heightfield {
         }
         h = cell.base + cell.rise * t;
       }
-      if (h > best) best = h;
+      heights.push(h);
     }
-    return best;
+    return heights;
+  }
+
+  // Ground height at a world XZ point, or null when there is no cell there
+  // (off the map edge → treated as a wall / explosion trigger by callers).
+  // Always the MAX across every stacked layer — this is the "topmost solid
+  // wins" convention every existing caller (spawn, diagnostics, rocket
+  // terrain-block) still relies on. See sampleAt() below for the
+  // layer-aware query multi-level ground-follow needs (driving UNDER a
+  // bridge/second floor instead of snapping onto its roof).
+  sample(wx: number, wz: number): number | null {
+    const heights = this.columnHeights(wx, wz);
+    if (heights === null) return null;
+    return Math.max(...heights);
+  }
+
+  // Layer-aware ground height for a mover currently sitting near `yRef`
+  // (typically its own y from the START of this tick, before any vertical
+  // step). Picks the highest floor the mover could actually be standing ON
+  // (any layer at/below yRef + climbThreshold), falling back to the LOWEST
+  // floor in the column when the mover is below every layer (e.g. it just
+  // fell through/spawned under a stack). This is what lets a kart drive
+  // UNDER a bridge/roof instead of the plain MAX-of-layers sample() always
+  // snapping it onto the highest surface in the column.
+  //
+  // v1 limitation: layers are floors only, no ceilings/thickness — driving
+  // within `climbThreshold` of the underside of an overhead deck will still
+  // let the mover "climb" onto it (there's no separate headroom check). Not
+  // a regression versus the old MAX-only behavior (which had no under-bridge
+  // driving at all), just the model's current scope — see the map-building
+  // rules doc if a real ceiling/headroom check becomes necessary later.
+  sampleAt(wx: number, wz: number, yRef: number, climbThreshold: number): number | null {
+    const heights = this.columnHeights(wx, wz);
+    if (heights === null) return null;
+    let bestCandidate = -Infinity;
+    let hasCandidate = false;
+    let lowest = Infinity;
+    for (const h of heights) {
+      if (h < lowest) lowest = h;
+      if (h <= yRef + climbThreshold) {
+        hasCandidate = true;
+        if (h > bestCandidate) bestCandidate = h;
+      }
+    }
+    return hasCandidate ? bestCandidate : lowest;
   }
 }
 

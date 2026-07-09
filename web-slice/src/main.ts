@@ -175,7 +175,8 @@ let map: GameMap | null = null;
     // wall (see kart.ts step 8) and drops the kart into the void. Detect
     // that BEFORE the first physics tick and re-anchor to a walkable cell
     // near the map's own center instead (GameMap.findFallbackSpawn()).
-    if (map.sampleHeight(SPAWN.x, SPAWN.z) === null) {
+    const spawnGround = map.sampleHeight(SPAWN.x, SPAWN.z);
+    if (spawnGround === null) {
       const fallback = map.findFallbackSpawn();
       if (fallback) {
         console.warn(`[boot] SPAWN (${SPAWN.x}, ${SPAWN.z}) is off "${mapName}" — falling back to (${fallback.x}, ${fallback.z})`);
@@ -183,6 +184,13 @@ let map: GameMap | null = null;
       } else {
         console.warn(`[boot] "${mapName}" has no walkable cells at all — driving on the fallback plane`);
       }
+    } else {
+      // Re-anchor the spawn's Y to the map's actual ground (top layer, same
+      // convention as the server's groundHeightAt). SPAWN's authored y=0 is
+      // map-agnostic; starting even slightly BELOW the floor makes the very
+      // first vertical step read as a violent ground rise and fires the
+      // trampoline rate-detector — a ballistic launch straight off spawn.
+      kart.respawnAt(new THREE.Vector3(SPAWN.x, spawnGround, SPAWN.z));
     }
     telemetry.setMapHandles(map, scene);
     net.setMap(map); // remote-kart body tilt (src/net/remoteKarts.ts) needs the heightfield too

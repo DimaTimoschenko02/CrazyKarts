@@ -283,7 +283,7 @@ export class MatchRoom extends Room<{ state: MatchState }> {
       // Probed around the KART (player.x/z), NOT the muzzle: the muzzle sits
       // 1.2m ahead, past the edge of a 1m ramp tile — see the regression
       // note on computeLaunchPitchRad in rocketSim.ts.
-      const pitch = computeLaunchPitchRad(player.x, player.z, dir.dx, dir.dz, this.arena.heightfield);
+      const pitch = computeLaunchPitchRad(player.x, player.z, dir.dx, dir.dz, this.arena.heightfield, player.y);
       const dir3d = tiltDirection3D(dir.dx, dir.dz, pitch);
 
       const id = `r${this.nextRocketId++}`;

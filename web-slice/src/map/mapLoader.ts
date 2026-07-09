@@ -47,6 +47,14 @@ export class GameMap {
     return this.heightfield.sample(wx, wz);
   }
 
+  // Layer-aware ground height for a mover near `yRef` — see
+  // shared/heightfield.ts Heightfield.sampleAt doc for the floor-selection
+  // rule. Lets callers drive UNDER a bridge/second floor instead of always
+  // snapping onto the column's topmost layer (sampleHeight above).
+  sampleHeightAt(x: number, z: number, yRef: number, climbThreshold: number): number | null {
+    return this.heightfield.sampleAt(x, z, yRef, climbThreshold);
+  }
+
   // True if EITHER a walkable cell OR a wall_block* cell was authored here —
   // see shared/heightfield.ts Heightfield.hasColumn doc. Used by
   // physics/terrainWall.ts to tell a genuine off-map edge apart from a
