@@ -28,7 +28,7 @@ last-updated: 2026-07-07
 | 3 | HTML5 Export Pipeline | Infrastructure | 1 | MVP | Broken |
 | 4 | Health & Damage | Core | 2 | MVP | Designed |
 | 5 | Camera System | Core | 2 | MVP | Designed |
-| 6 | Kart Physics | Core | 2 | MVP | v3.1 Implemented in Godot (frozen reference). Live development in web-slice TS port: Continuous Drift v4.0 + v4.1 feel tuning по покадровому сравнению с оригиналом + owner-approved дефолты («лучшая версия езды», круг 126.8°/с ≈ эталон; 2026-07-08, коммиты 3ee62f1/fa1da99, drift-circle regression guard в тестах) — см. reference-videos/README.md. Ride & Collision v2 (2026-07-09, 320a34f): wall-aware ground probes, позиционный отрыв на гребнях, билинейный грид + градиентный критерий стены, анти-дедлок — см. design/notes/ride-collision-v2.md |
+| 6 | Kart Physics | Core | 2 | MVP | v3.1 Implemented in Godot (frozen reference). Live development in web-slice TS port: Continuous Drift v4.0 + v4.1 feel tuning по покадровому сравнению с оригиналом + owner-approved дефолты («лучшая версия езды», круг 126.8°/с ≈ эталон; 2026-07-08, коммиты 3ee62f1/fa1da99, drift-circle regression guard в тестах) — см. reference-videos/README.md. Ride & Collision v2 (2026-07-09, 320a34f): wall-aware ground probes, позиционный отрыв на гребнях, билинейный грид + градиентный критерий стены, анти-дедлок — см. design/notes/ride-collision-v2.md. Multi-layer heightfield (2026-07-09, 8768aed): sampleAt(x,z,yRef) выбирает пол своего слоя — проезд под мостами/вторыми этажами, ракеты слой-aware, спавн заякорен на реальную землю (фикс баллистического вылета со спавна) |
 | 7 | Kart Classes | Feature | 3 | Alpha | Not Started |
 | 8 | Spawn System | Core | 3 | MVP | Designed |
 | 9 | Pickup System | Core | 3 | MVP | Designed |
