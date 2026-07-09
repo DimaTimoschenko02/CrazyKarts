@@ -57,6 +57,15 @@ const SLOPE_PROBE_DIST = 0.75; // meters ahead of the kart's own position
 // meaningfully lagging behind a ramp the kart is actively crossing at speed.
 const SLOPE_FILTER_RATE = 18; // 1/s
 
+// D3a3 (design/notes/ride-collision-v2.md, 2026-07-09): the body's own
+// vertical extent used by GameMap.isSolidBlocked's interval-overlap test
+// (step 8a below) — [yRef, yRef + KART_BODY_HEIGHT]. A rough box, not the
+// visual model's exact silhouette (this game's collision has never modeled
+// true 3D body height beyond this one check), picked to comfortably span a
+// kart's chassis without reaching so tall it starts reading low bridge decks
+// as body-height obstructions.
+const KART_BODY_HEIGHT = 1.0; // meters
+
 export interface KartTelemetry {
   fwdSpeed: number;
   sideSpeed: number;
@@ -439,6 +448,13 @@ export class Kart {
       const terrainSampler = {
         sample: (x: number, z: number) => map.sampleHeightAt(x, z, yRef, this.params.layerClimbThreshold),
         hasColumn: (x: number, z: number) => map.hasColumn(x, z),
+        // D3a3: honest solid-vs-body-height intersection (see terrainWall.ts
+        // TerrainSampler.solidBlocked doc / heightfield.ts Heightfield.
+        // solidBlocked doc) — yRef/kartTop bound into this closure from THIS
+        // tick's reference height (same yRef every other probe this tick
+        // uses, see the yRef doc comment at the top of update()).
+        solidBlocked: (x: number, z: number) =>
+          map.isSolidBlocked(x, z, yRef, yRef + KART_BODY_HEIGHT, this.params.layerClimbThreshold),
       };
       const afterTerrain = resolveTerrainSlide(
         terrainSampler,
@@ -551,7 +567,16 @@ export class Kart {
       this.axle.trackWidth * 0.5
     );
     const groundHeightNow = wallAwareGroundHeight(groundProbes, this.params.groundStepExcludeThreshold);
-    this.vertical = stepVertical(this.vertical, { groundHeight: groundHeightNow, dt }, {
+    // D3 (design/notes/ride-collision-v2.md, 2026-07-09, symptom B1): the
+    // launch/detach checks inside stepVertical read the CONTINUOUS center
+    // probe instead of the wall-aware MAX (groundHeightNow) — see
+    // VerticalInput.detachRefHeight doc. Falls back to groundHeightNow when
+    // the kart's own center point is off the map (narrow-gap case
+    // wallAwareGroundHeight already documents) — stepVertical also falls
+    // back defensively at its own end for the same null, so this is belt-
+    // and-braces, not the only place the fallback happens.
+    const detachRefHeightNow = groundProbes.center ?? groundHeightNow;
+    this.vertical = stepVertical(this.vertical, { groundHeight: groundHeightNow, detachRefHeight: detachRefHeightNow, dt }, {
       gravity: this.params.verticalGravity,
       groundFollowRate: this.params.verticalGroundFollowRate,
       airborneDropThreshold: this.params.verticalAirborneDropThreshold,

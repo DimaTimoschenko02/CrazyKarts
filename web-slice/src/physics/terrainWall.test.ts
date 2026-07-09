@@ -183,6 +183,47 @@ describe("resolveTerrainSlide — wall_block cube sides ARE terrain steps now (2
   });
 });
 
+describe("resolveTerrainSlide — D3a2/D3a3 flush-stacked wall column, sampler mirrors kart.ts's real wiring (symptom A, 2026-07-09)", () => {
+  it("driving from a yard floor into a flush wall_block stack is blocked — the OLD flush-floor bug is gone", () => {
+    // Reproduces the real bug's shape: kart.ts's terrainSampler.sample is
+    // bound to Heightfield.sampleAt (layer-aware), not the plain MAX
+    // sample() — see kart.ts step 8a. A 4-cube flush wall_block stack at
+    // x=1 has a mid-height floor (1.5) exactly flush with the yard floor
+    // (also 1.5) at x=-1/x=0; with climbThreshold small enough that the
+    // stack's true top (2.0) is unreachable, the OLD unfiltered sampleAt
+    // would have picked that flush 1.5 as the "floor" of the wall column too
+    // — zero gradient, drive straight through. The burial filter (D3a2)
+    // removes that buried floor from the candidate set entirely, so
+    // sampleAt now reports the column's one live floor (2.0) instead —
+    // producing a real gradient the existing D3b check catches. solidBlocked
+    // (D3a3) is ALSO wired here (matching kart.ts's actual sampler
+    // construction) as a second, independent line of defense.
+    const hf = Heightfield.fromMapJson({
+      meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
+      cells: [
+        { asset: "terrain", x: -1, z: 0, y_level: 3 }, // yard floor, h=1.5 — keeps rear corners on the map
+        { asset: "terrain", x: 0, z: 0, y_level: 3 }, // yard floor, h=1.5
+        { asset: "wall_block", x: 1, z: 0, y_level: 0 }, // top 0.5
+        { asset: "wall_block", x: 1, z: 0, y_level: 1 }, // top 1.0
+        { asset: "wall_block", x: 1, z: 0, y_level: 2 }, // top 1.5 — flush with the yard floor (the bug's flush point)
+        { asset: "wall_block", x: 1, z: 0, y_level: 3 }, // top 2.0 — the stack's real, only LIVE top
+      ],
+    });
+    const CLIMB = 0.3; // small enough that 2.0 is unreachable from yRef=1.5
+    const yRef = 1.5;
+    const kartTop = yRef + 1.0; // matches kart.ts's KART_BODY_HEIGHT
+    const sampler: TerrainSampler = {
+      sample: (x, z) => hf.sampleAt(x, z, yRef, CLIMB),
+      hasColumn: (x, z) => hf.hasColumn(x, z),
+      solidBlocked: (x, z) => hf.solidBlocked(x, z, yRef, kartTop, CLIMB),
+    };
+    const dt = 1 / 120;
+    const vel = { x: 12, z: 0 };
+    const out = resolveTerrainSlide(sampler, { x: -0.15, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD);
+    expect(out.vel.x).toBeLessThanOrEqual(0.01);
+  });
+});
+
 describe("resolveTerrainSlide — does not false-positive block a kart already parked on a smooth ramp", () => {
   it("every footprint point rising together with the slope never trips the D3b gradient check", () => {
     const hf = Heightfield.fromMapJson({

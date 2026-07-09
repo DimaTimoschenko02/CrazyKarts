@@ -14,7 +14,7 @@ const DT = 1 / 120;
 describe("stepVertical — grounded follow", () => {
   it("follows a flat ground height exactly (no drift)", () => {
     let s = createVerticalState(0);
-    for (let i = 0; i < 60; i++) s = stepVertical(s, { groundHeight: 0, dt: DT }, P);
+    for (let i = 0; i < 60; i++) s = stepVertical(s, { groundHeight: 0, detachRefHeight: 0, dt: DT }, P);
     expect(s.airborne).toBe(false);
     expect(s.y).toBeCloseTo(0, 6);
   });
@@ -26,7 +26,7 @@ describe("stepVertical — grounded follow", () => {
     let h = 0;
     for (let i = 0; i < 200; i++) {
       h += 0.005;
-      s = stepVertical(s, { groundHeight: h, dt: DT }, P);
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, P);
       expect(s.airborne).toBe(false);
     }
     expect(s.y).toBeGreaterThan(0.9);
@@ -39,7 +39,7 @@ describe("stepVertical — grounded follow", () => {
     let wasAirborne = false;
     for (let i = 0; i < 200; i++) {
       const h = noise[i % noise.length];
-      s = stepVertical(s, { groundHeight: h, dt: DT }, P);
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, P);
       if (s.airborne !== wasAirborne) flips++;
       wasAirborne = s.airborne;
     }
@@ -56,12 +56,12 @@ describe("stepVertical — launch off a ramp lip", () => {
     let h = 0;
     for (let i = 0; i < 30; i++) {
       h += 0.05; // steep, deliberate climb
-      s = stepVertical(s, { groundHeight: h, dt: DT }, P);
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, P);
       expect(s.airborne).toBe(false);
     }
     const vyBeforeDrop = s.vy;
     expect(vyBeforeDrop).toBeGreaterThan(1); // was genuinely climbing
-    s = stepVertical(s, { groundHeight: h - 5, dt: DT }, P); // cliff after the ramp
+    s = stepVertical(s, { groundHeight: h - 5, detachRefHeight: h - 5, dt: DT }, P); // cliff after the ramp
     expect(s.airborne).toBe(true);
     expect(s.vy).toBeCloseTo(vyBeforeDrop, 6); // launched carrying the climb rate
     expect(s.vy).toBeGreaterThan(1);
@@ -69,9 +69,9 @@ describe("stepVertical — launch off a ramp lip", () => {
 
   it("also launches (falls, vy~=0) walking slowly off a flat cliff edge", () => {
     let s = createVerticalState(0);
-    for (let i = 0; i < 30; i++) s = stepVertical(s, { groundHeight: 0, dt: DT }, P);
+    for (let i = 0; i < 30; i++) s = stepVertical(s, { groundHeight: 0, detachRefHeight: 0, dt: DT }, P);
     expect(s.vy).toBeCloseTo(0, 3);
-    s = stepVertical(s, { groundHeight: -5, dt: DT }, P);
+    s = stepVertical(s, { groundHeight: -5, detachRefHeight: -5, dt: DT }, P);
     expect(s.airborne).toBe(true);
     expect(Math.abs(s.vy)).toBeLessThan(0.5); // launched near-level, not glued down
   });
@@ -81,7 +81,7 @@ describe("stepVertical — launch off a ramp lip", () => {
     const g = P.gravity;
     let tExpected = 0;
     for (let i = 0; i < 30; i++) {
-      s = stepVertical(s, { groundHeight: -100, dt: DT }, P); // ground far below, never lands
+      s = stepVertical(s, { groundHeight: -100, detachRefHeight: -100, dt: DT }, P); // ground far below, never lands
       tExpected += DT;
       const expectedVy = 5 - g * tExpected;
       expect(s.vy).toBeCloseTo(expectedVy, 5);
@@ -92,13 +92,13 @@ describe("stepVertical — launch off a ramp lip", () => {
     // vy starts positive (apex not yet reached), ground close below —
     // must NOT land while still ascending even if within landingMargin.
     let s: VerticalState = { y: 0.01, vy: 3, airborne: true, groundHeightPrev: null };
-    s = stepVertical(s, { groundHeight: 0, dt: DT }, P);
+    s = stepVertical(s, { groundHeight: 0, detachRefHeight: 0, dt: DT }, P);
     expect(s.airborne).toBe(true); // still rising, must not snap down
 
     // Now simulate falling back down onto flat ground.
     s = { y: 0.5, vy: -1, airborne: true, groundHeightPrev: null };
     for (let i = 0; i < 200 && s.airborne; i++) {
-      s = stepVertical(s, { groundHeight: 0, dt: DT }, P);
+      s = stepVertical(s, { groundHeight: 0, detachRefHeight: 0, dt: DT }, P);
     }
     expect(s.airborne).toBe(false);
     expect(s.vy).toBe(0); // no bounce
@@ -121,11 +121,11 @@ describe("stepVertical — launch off a flattening ramp top (trampoline)", () =>
     let h = 0;
     for (let i = 0; i < 60; i++) {
       h += climbRate * DT;
-      s = stepVertical(s, { groundHeight: h, dt: DT }, P);
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, P);
       expect(s.airborne).toBe(false);
     }
     for (let i = 0; i < 30; i++) {
-      s = stepVertical(s, { groundHeight: h, dt: DT }, P); // ramp flattens
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, P); // ramp flattens
     }
     expect(s.airborne).toBe(false); // stays glued to the now-flat ramp top
     // Ground-follow exp filter still has a little catch-up lag to clear after
@@ -142,13 +142,13 @@ describe("stepVertical — launch off a flattening ramp top (trampoline)", () =>
     let h = 0;
     for (let i = 0; i < 60; i++) {
       h += climbRate * DT;
-      s = stepVertical(s, { groundHeight: h, dt: DT }, P);
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, P);
       expect(s.airborne).toBe(false);
     }
     const vyBeforeFlatten = s.vy;
     expect(vyBeforeFlatten).toBeCloseTo(climbRate, 1);
 
-    s = stepVertical(s, { groundHeight: h, dt: DT }, P); // ramp flattens, ground stops rising
+    s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, P); // ramp flattens, ground stops rising
     expect(s.airborne).toBe(true); // launches on the very first flat tick
     expect(s.vy).toBeCloseTo(vyBeforeFlatten, 6); // carries the climb rate upward
   });
@@ -165,9 +165,9 @@ describe("stepVertical — launch off a flattening ramp top (trampoline)", () =>
     let h = 0;
     for (let i = 0; i < 60; i++) {
       h += climbRate * DT;
-      s = stepVertical(s, { groundHeight: h, dt: DT }, params);
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, params);
     }
-    s = stepVertical(s, { groundHeight: h, dt: DT }, params); // launch tick
+    s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, params); // launch tick
     expect(s.airborne).toBe(true);
     const launchY = s.y;
     const launchVy = s.vy;
@@ -181,7 +181,7 @@ describe("stepVertical — launch off a flattening ramp top (trampoline)", () =>
     let landed = false;
     let flightTime = 0;
     for (let i = 0; i < 400 && !landed; i++) {
-      s = stepVertical(s, { groundHeight: h, dt: DT }, params); // ground stays at the flattened height
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, params); // ground stays at the flattened height
       t += DT;
       maxY = Math.max(maxY, s.y);
       if (!s.airborne) {
@@ -219,12 +219,12 @@ describe("stepVertical — D2 positional detachment (convex ridge crest, symptom
     // Climb to a steady-state follow-lag first.
     for (let i = 0; i < 90; i++) {
       h += climbRate * DT;
-      s = stepVertical(s, { groundHeight: h, dt: DT }, params);
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, params);
     }
     // Crest: ground immediately reverses to declining at the same rate.
     for (let i = 0; i < 90; i++) {
       h -= climbRate * DT;
-      s = stepVertical(s, { groundHeight: h, dt: DT }, params);
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, params);
       if (s.airborne) return { everAirborne: true, firstAirborneAt: i };
     }
     return { everAirborne: s.airborne, firstAirborneAt: -1 };
@@ -263,10 +263,10 @@ describe("stepVertical — params drive the thresholds", () => {
     // rate-based — it needs one prior sample to measure a rate from), then
     // apply a moderate one-tick drop: not a ramp launch, just a modest
     // downhill tick, which is exactly what the threshold margin is for.
-    sLoose = stepVertical(sLoose, { groundHeight: 0, dt: DT }, loose);
-    sStrict = stepVertical(sStrict, { groundHeight: 0, dt: DT }, strict);
-    sLoose = stepVertical(sLoose, { groundHeight: -0.05, dt: DT }, loose);
-    sStrict = stepVertical(sStrict, { groundHeight: -0.05, dt: DT }, strict);
+    sLoose = stepVertical(sLoose, { groundHeight: 0, detachRefHeight: 0, dt: DT }, loose);
+    sStrict = stepVertical(sStrict, { groundHeight: 0, detachRefHeight: 0, dt: DT }, strict);
+    sLoose = stepVertical(sLoose, { groundHeight: -0.05, detachRefHeight: -0.05, dt: DT }, loose);
+    sStrict = stepVertical(sStrict, { groundHeight: -0.05, detachRefHeight: -0.05, dt: DT }, strict);
     expect(sLoose.airborne).toBe(true);
     expect(sStrict.airborne).toBe(false);
   });
@@ -277,9 +277,93 @@ describe("stepVertical — params drive the thresholds", () => {
     const lowG: VerticalParams = { ...P, gravity: 5 };
     const highG: VerticalParams = { ...P, gravity: 40 };
     for (let i = 0; i < 30; i++) {
-      s1 = stepVertical(s1, { groundHeight: -100, dt: DT }, lowG);
-      s2 = stepVertical(s2, { groundHeight: -100, dt: DT }, highG);
+      s1 = stepVertical(s1, { groundHeight: -100, detachRefHeight: -100, dt: DT }, lowG);
+      s2 = stepVertical(s2, { groundHeight: -100, detachRefHeight: -100, dt: DT }, highG);
     }
     expect(Math.abs(s2.vy)).toBeGreaterThan(Math.abs(s1.vy));
+  });
+});
+
+describe("stepVertical — D3 (design/notes/ride-collision-v2.md, 2026-07-09, symptom B1) — detachRefHeight, not groundHeight, drives launch/detach", () => {
+  it("a one-tick groundHeight drop (simulating a wallAwareGroundHeight probe include/exclude flip) does NOT launch when detachRefHeight stays smooth", () => {
+    let s = createVerticalState(0);
+    for (let i = 0; i < 30; i++) s = stepVertical(s, { groundHeight: 0, detachRefHeight: 0, dt: DT }, P);
+    expect(s.airborne).toBe(false);
+    // groundHeight DROPS a full probe-exclusion step in one tick (this is
+    // exactly what wallAwareGroundHeight's stepExcludeThreshold produces on
+    // an ordinary slope when a corner probe that was propping up the MAX
+    // crosses it and gets excluded — see groundProbe.ts) — the rate detector
+    // reads a discrete drop in groundHeight as "the ground fell away", the
+    // false-trampoline mechanism symptom B1 describes. The CONTINUOUS center
+    // probe (detachRefHeight) barely moved this same tick.
+    s = stepVertical(s, { groundHeight: -0.35, detachRefHeight: -0.001, dt: DT }, P);
+    expect(s.airborne).toBe(false);
+  });
+
+  it("a one-tick UPWARD groundHeight step (probe INCLUSION at the deck arrival) does not launch on the following ticks either — the follow-filter vy spike is capped", () => {
+    // The exact trace from the roads_v1 diagnosis (symptom B1): climbing a
+    // 20.1° slope at 6 m/s (real climb rate 2.2 m/s), the front probe rides
+    // just past stepExcludeThreshold; the moment it reaches the flat deck it
+    // re-enters wallAwareGroundHeight's MAX and the follow TARGET jumps
+    // +0.335 in one tick while the center probe stays smooth. The rate
+    // detector's own signal (detachRefHeight) is clean — the danger is the
+    // follow filter converting the target step into a phantom vy≈6-7 that
+    // clears `vy - groundRateNow > threshold` on the NEXT tick. The stored
+    // vy is capped against the ground's own rate to kill exactly this.
+    const CLIMB = 2.2; // m/s, ground rise rate on the slope
+    let s = createVerticalState(0);
+    let h = 0;
+    for (let i = 0; i < 60; i++) {
+      h += CLIMB * DT;
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, P);
+    }
+    expect(s.airborne).toBe(false);
+    // probe inclusion: follow target jumps ahead by a full exclusion step,
+    // center probe keeps its smooth slope rate — and keeps climbing after.
+    for (let i = 0; i < 30; i++) {
+      h += CLIMB * DT;
+      s = stepVertical(s, { groundHeight: h + 0.335, detachRefHeight: h, dt: DT }, P);
+      expect(s.airborne).toBe(false);
+    }
+  });
+
+  it("the SAME discrete groundHeight drop WOULD have launched under the old (groundHeight-only) rate check — proves detachRefHeight is load-bearing here, not a no-op", () => {
+    // Same scenario as above, but detachRefHeight is wired to drop WITH
+    // groundHeight (i.e. behaving like the pre-D3 code, which had no
+    // separate signal) — this must launch, confirming the smooth-signal
+    // case above isn't passing "by accident" (e.g. a threshold that never
+    // fires regardless of input).
+    let s = createVerticalState(0);
+    for (let i = 0; i < 30; i++) s = stepVertical(s, { groundHeight: 0, detachRefHeight: 0, dt: DT }, P);
+    s = stepVertical(s, { groundHeight: -0.35, detachRefHeight: -0.35, dt: DT }, P);
+    expect(s.airborne).toBe(true);
+  });
+
+  it("a real cliff/trampoline launch still fires when BOTH signals genuinely rise together (real geometry, not a probe artifact)", () => {
+    // Cruise-speed climb up a ramp that flattens — detachRefHeight tracks
+    // groundHeight exactly (a real, continuous slope has no probe-exclusion
+    // discontinuity to diverge from), so the launch must still fire on the
+    // very first flat tick, same contract as the pre-D3 "trampoline" test
+    // above.
+    const climbRate = 18 * RAMP_SLOPE_VSIN;
+    let s = createVerticalState(0);
+    let h = 0;
+    for (let i = 0; i < 60; i++) {
+      h += climbRate * DT;
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, P);
+      expect(s.airborne).toBe(false);
+    }
+    const vyBeforeFlatten = s.vy;
+    s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, P); // ramp flattens
+    expect(s.airborne).toBe(true);
+    expect(s.vy).toBeCloseTo(vyBeforeFlatten, 6);
+  });
+
+  it("falls back to groundHeight when detachRefHeight is null (caller's center probe off the map)", () => {
+    let s = createVerticalState(0);
+    for (let i = 0; i < 30; i++) s = stepVertical(s, { groundHeight: 0, detachRefHeight: null, dt: DT }, P);
+    expect(s.airborne).toBe(false);
+    s = stepVertical(s, { groundHeight: -5, detachRefHeight: null, dt: DT }, P);
+    expect(s.airborne).toBe(true); // falls back to the groundHeight-based rate, same as the pre-D3 cliff-edge test
   });
 });

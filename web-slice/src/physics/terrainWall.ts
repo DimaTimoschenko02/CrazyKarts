@@ -93,6 +93,17 @@ export interface TerrainSampler {
   // See heightfield.ts Heightfield.hasColumn doc — false only for a
   // genuinely unauthored spot (every authored column is walkable now).
   hasColumn(x: number, z: number): boolean;
+  // D3a3 (design/notes/ride-collision-v2.md, 2026-07-09): optional honest
+  // solid-intersection test (shared/heightfield.ts Heightfield.solidBlocked)
+  // — catches the case the gradient check below structurally can't: a body
+  // whose OWN reference height (yRef, bound into this closure by the caller —
+  // see kart/kart.ts step 8a) sits well below a solid's flat top (e.g. flying
+  // at ramp-deck height into the SIDE of a thick plate/road-tile slab), where
+  // sample()'s surface-height gradient reads "flat, no wall" because the probe
+  // never actually samples the solid's vertical FACE, only its top surface.
+  // Optional so every existing hand-rolled TerrainSampler in tests (which
+  // only cover the gradient path) keeps compiling unchanged.
+  solidBlocked?(x: number, z: number): boolean;
 }
 
 // One footprint corner's before/after check — returns true if this corner's
@@ -135,7 +146,13 @@ function cornerBlocked(sampler: TerrainSampler, cur: Vec2, next: Vec2, dir: Vec2
   // source it used to be: bilinear grid sampling (D3a) made in-tile heights
   // continuous, and the known cell-seam artifacts top out around 0.2 —
   // under the 0.27 threshold.
-  return hB - hA > gradientThreshold || hNext - hCur > gradientThreshold;
+  if (hB - hA > gradientThreshold || hNext - hCur > gradientThreshold) return true;
+
+  // D3a3: honest solid intersection at the destination — see TerrainSampler.
+  // solidBlocked doc. OR-ed in as an ADDITIONAL way to be blocked (never
+  // suppresses the gradient result above), and skipped entirely when the
+  // caller didn't wire it up (existing tests / callers unaffected).
+  return sampler.solidBlocked?.(next.x, next.z) ?? false;
 }
 
 // D4 anti-deadlock escape — tried only when the main slide loop below never

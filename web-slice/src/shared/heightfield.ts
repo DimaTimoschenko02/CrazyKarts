@@ -104,6 +104,18 @@ export interface MapJson {
 // samples the grid via gridSample() below, which undoes this cell's
 // rot/mirror to find which grid cell sits under the query point. See
 // gridSample() doc for the transform.
+// D3a2 (design/notes/ride-collision-v2.md, 2026-07-09): "floors without
+// thickness" model — every layer used to be a bare surface height with no
+// notion of how far DOWN its own solid actually extends. That's what let a
+// stack of flush-stacked plates read as passable (the bottom plate's top
+// happened to sit flush with an unrelated floor on the far side, so the
+// column's per-point MAX/candidate logic saw "the floor just continues"
+// instead of "there's a wall's worth of solid material here"). `solidBase` is
+// the Y of this layer's LOWER face — the bottom of the physical volume this
+// HeightCell represents, NOT necessarily equal to `base` (which for a THICK
+// solid like a cube is the flat TOP, not the bottom). See heightCellFor()
+// below for the per-family derivation and Heightfield's burial filter
+// (columnLayers/liveFloors) and solidBlocked() for what actually consumes it.
 export interface HeightCell {
   base: number;
   rise: number;
@@ -114,6 +126,7 @@ export interface HeightCell {
   grid?: number[][];
   gridRot?: number;
   gridMirror?: boolean;
+  solidBase: number;
 }
 
 // Ascent direction per rotation table above (side descends → ascent is opposite).
@@ -336,6 +349,13 @@ interface RoadTileCatalogEntry {
   kind: string;
   physics: "exact" | "approx";
   topMedian: number;
+  // D3a2 (design/notes/ride-collision-v2.md, 2026-07-09): the tile's own
+  // lowest mesh point (tools/bake-road-tiles.mjs), same local-meters-above-
+  // pivot space as topMedian/slope.base — used as this layer's solidBase
+  // offset (see heightCellFor's road-tile branch). Baked for every catalog
+  // entry (302/302 as of this pass); optional here defensively for a stale/
+  // hand-edited catalog missing the field.
+  minY?: number;
   slope?: { ax: number; az: number; base: number; rise: number };
   // 12×12 sub-cell height sample, physics:"approx" tiles only — see
   // tools/bake-road-tiles.mjs sampleHeightGrid() and gridSample() above.
@@ -360,26 +380,35 @@ export function heightCellFor(
   const lh = levelHeight;
   if (isRoadTileAsset(asset)) {
     const entry = ROAD_TILES[asset];
+    // solidBase (D3a2): road-tile thickness is baked per-tile in the catalog
+    // as `minY` — the tile's own lowest mesh point, in the SAME local-meters-
+    // above-pivot space topMedian/slope.base use (tools/bake-road-tiles.mjs).
+    // Offset by yLevel*lh exactly like every other height field on this
+    // layer. Missing/unknown catalog entry -> 0 (zero thickness), matching
+    // the existing "flat at cell base" fallback for a stale catalog.
+    const solidBase = yLevel * lh + (entry?.minY ?? 0);
     // Unknown tile (catalog out of date): flat at the cell base — visible
     // sink is a louder bug signal than a silent throw during map load.
-    if (!entry) return { base: yLevel * lh, rise: 0, ax: 0, az: 0 };
+    if (!entry) return { base: yLevel * lh, rise: 0, ax: 0, az: 0, solidBase };
     if (entry.heightGrid) {
       // physics:"approx" — sub-cell grid instead of the linear base+rise
       // model (see HeightCell.grid / gridSample doc). yLevel offsets the
       // whole baked grid up by a level, same as the flat topMedian branch
       // below did before this grid existed.
-      return { base: yLevel * lh, rise: 0, ax: 0, az: 0, grid: entry.heightGrid, gridRot: rot, gridMirror: !!mirror };
+      return { base: yLevel * lh, rise: 0, ax: 0, az: 0, grid: entry.heightGrid, gridRot: rot, gridMirror: !!mirror, solidBase };
     }
     if (entry.slope) {
       const base0: [number, number] = [entry.slope.ax, entry.slope.az];
       const [ax, az] = mirror ? mirroredVec(base0, rot) : rotateVec(base0[0], base0[1], rot);
-      return { base: yLevel * lh + entry.slope.base, rise: entry.slope.rise, ax, az };
+      return { base: yLevel * lh + entry.slope.base, rise: entry.slope.rise, ax, az, solidBase };
     }
-    return { base: yLevel * lh + entry.topMedian, rise: 0, ax: 0, az: 0 };
+    return { base: yLevel * lh + entry.topMedian, rise: 0, ax: 0, az: 0, solidBase };
   }
   if (asset.startsWith("terrain_ramp")) {
     const [ax, az] = RAMP_ASCENT[rot] ?? [0, 0]; // mirror: no-op, base vector has ax0=0 — see CellDef.mirror doc
-    return { base: yLevel * lh, rise: lh, ax, az }; // y_level = LOW edge
+    // solidBase (D3a2): geometry spans [0, +level_height] ABOVE the pivot —
+    // the pivot itself (yLevel*lh) is the solid's lower face.
+    return { base: yLevel * lh, rise: lh, ax, az, solidBase: yLevel * lh }; // y_level = LOW edge
   }
   if (asset.startsWith("terrain_sideCornerInner")) {
     // MUST be checked before the generic "terrain_sideCorner" branch below —
@@ -391,7 +420,8 @@ export function heightCellFor(
     const [ax2, az2] = mirror
       ? mirroredVec([ax20, az20], rot)
       : ([CORNER_INNER_ASCENT[rot]?.[2] ?? 0, CORNER_INNER_ASCENT[rot]?.[3] ?? 0] as [number, number]);
-    return { base: yLevel * lh, rise: lh, ax, az, ax2, az2 }; // y_level = LOW corner
+    // solidBase (D3a2): above-pivot family, same as ramp/sideCorner.
+    return { base: yLevel * lh, rise: lh, ax, az, ax2, az2, solidBase: yLevel * lh }; // y_level = LOW corner
   }
   if (asset.startsWith("terrain_sideCorner")) {
     // Ramp-like vertically: geometry spans [0, +level_height] above pivot.
@@ -400,7 +430,8 @@ export function heightCellFor(
     // makes physics raise the WRONG corner of the tile for every mirrored
     // sideCorner cell (see tools/diagnose_heightfield_holes.ts §3).
     const [ax, az] = mirror ? mirroredVec(CORNER_ASCENT[0], rot) : CORNER_ASCENT[rot] ?? [0, 0];
-    return { base: yLevel * lh, rise: lh, ax, az }; // y_level = LOW edge
+    // solidBase (D3a2): above-pivot family — pivot (yLevel*lh) is the floor.
+    return { base: yLevel * lh, rise: lh, ax, az, solidBase: yLevel * lh }; // y_level = LOW edge
   }
   if (asset.startsWith("terrain_sideCliff")) {
     // MUST be checked before the generic "terrain_side" branch below —
@@ -408,7 +439,8 @@ export function heightCellFor(
     // basis identical to plain side, but Y-span sits ABOVE the pivot like a
     // ramp, so y_level means the LOW edge (not the HIGH edge like plain side).
     const [ax, az] = CLIFF_ASCENT[rot] ?? [0, 0]; // mirror: no-op, ax0=0 — see CellDef.mirror doc
-    return { base: yLevel * lh, rise: lh, ax, az }; // y_level = LOW edge
+    // solidBase (D3a2): above-pivot family, same as ramp.
+    return { base: yLevel * lh, rise: lh, ax, az, solidBase: yLevel * lh }; // y_level = LOW edge
   }
   if (asset.startsWith("terrain_sideEnd")) {
     // MUST be checked before the generic "terrain_side" branch below —
@@ -420,11 +452,15 @@ export function heightCellFor(
         // section originally called this out for sideCliff; the same fix pattern
     // applies here).
     const [ax, az] = SIDE_END_ASCENT[rot] ?? [0, 0]; // mirror: no-op, ax0=0 — see CellDef.mirror doc
-    return { base: yLevel * lh, rise: lh, ax, az }; // y_level = LOW edge
+    // solidBase (D3a2): above-pivot family, same as ramp.
+    return { base: yLevel * lh, rise: lh, ax, az, solidBase: yLevel * lh }; // y_level = LOW edge
   }
   if (asset.startsWith("terrain_side")) {
     const [ax, az] = SIDE_ASCENT[rot] ?? [0, 0]; // mirror: no-op, ax0=0 — see CellDef.mirror doc
-    return { base: yLevel * lh - lh, rise: lh, ax, az }; // y_level = HIGH edge
+    // solidBase (D3a2): BELOW-pivot family — geometry spans [-level_height, 0]
+    // below the pivot (y_level = HIGH edge), so the LOW edge (base itself,
+    // yLevel*lh - lh) is already the solid's own lower face.
+    return { base: yLevel * lh - lh, rise: lh, ax, az, solidBase: yLevel * lh - lh }; // y_level = HIGH edge
   }
   if (asset === "ground_block" || asset.startsWith("wall_block")) {
     // Drivable cube (map/assetLoader.ts): the walkable surface is the cube's
@@ -436,9 +472,16 @@ export function heightCellFor(
     // exactly like a plateau edge. wall_block* shares this branch since the
     // 2026-07-08 owner decision (see the note above heightCellFor) — the two
     // families differ only in top-edge fillets, which are purely visual.
-    return { base: (yLevel + 1) * lh, rise: 0, ax: 0, az: 0 };
+    // solidBase (D3a2): the ONE family here where base (the flat TOP) and
+    // solidBase (the flat BOTTOM, one full level_height below it) genuinely
+    // differ — the cube has real thickness, unlike every thin-quad terrain
+    // family above.
+    return { base: (yLevel + 1) * lh, rise: 0, ax: 0, az: 0, solidBase: yLevel * lh };
   }
-  return { base: yLevel * lh, rise: 0, ax: 0, az: 0 }; // flat terrain / roads
+  // Flat terrain / roads: a thin quad with zero thickness — solidBase equals
+  // the surface height itself (base, since rise=0 here means the surface
+  // never varies across the cell).
+  return { base: yLevel * lh, rise: 0, ax: 0, az: 0, solidBase: yLevel * lh }; // flat terrain / roads
 }
 
 // Pure grid heightfield: builds a lookup of per-cell slope descriptors from a
@@ -487,8 +530,11 @@ export class Heightfield {
         const [dx, dz] = longAxis(rot);
         const half = hf.levelHeight / 2;
         const base = cell.y_level * hf.levelHeight;
-        hf.setCell(cell.x, cell.z, { base, rise: half, ax: dx, az: dz });
-        hf.setCell(cell.x + dx, cell.z + dz, { base: base + half, rise: half, ax: dx, az: dz });
+        // solidBase (D3a2): same above-pivot family as terrain_ramp — each
+        // half's own base IS its solid's lower face (no separate thickness
+        // below it, matching the single-cell ramp branch above).
+        hf.setCell(cell.x, cell.z, { base, rise: half, ax: dx, az: dz, solidBase: base });
+        hf.setCell(cell.x + dx, cell.z + dz, { base: base + half, rise: half, ax: dx, az: dz, solidBase: base + half });
       } else {
         hf.setCell(cell.x, cell.z, heightCellFor(cell.asset, cell.y_level, rot, hf.levelHeight, cell.mirror));
       }
@@ -540,12 +586,16 @@ export class Heightfield {
     return this.cells.has(cx + "," + cz);
   }
 
-  // Per-layer heights of the column under a world XZ point, or null when
-  // nothing was authored there. Factored out of sample()/sampleAt() so both
-  // share the exact same per-cell math (grid lookup or linear base+rise+MAX
-  // ax2/az2 model) — neither of those was touched, only lifted out of the
-  // old sample() loop body.
-  private columnHeights(wx: number, wz: number): number[] | null {
+  // One stacked layer's (height, solidBase) pair AT a specific query point —
+  // solidBase is per-cell constant (see heightCellFor), h varies with lx/lz
+  // for sloped/grid layers exactly like the old columnHeights() did.
+  private static readonly EPS = 0.02; // D3a2 burial-filter tolerance (meters) — see liveFloors doc
+
+  // Per-layer (height, solidBase) pairs of the column under a world XZ point,
+  // or null when nothing was authored there. Factored out of sample()/
+  // sampleAt()/solidBlocked() so all three share the exact same per-cell math
+  // (grid lookup or linear base+rise+MAX ax2/az2 model).
+  private columnLayers(wx: number, wz: number): Array<{ h: number; solidBase: number }> | null {
     const fx = (wx - this.originX) / this.tile;
     const fz = (wz - this.originZ) / this.tile;
     const cx = Math.round(fx);
@@ -554,7 +604,7 @@ export class Heightfield {
     if (!stack) return null;
     const lx = fx - cx;
     const lz = fz - cz;
-    const heights: number[] = [];
+    const layers: Array<{ h: number; solidBase: number }> = [];
     for (const cell of stack) {
       let h: number;
       if (cell.grid) {
@@ -569,9 +619,40 @@ export class Heightfield {
         }
         h = cell.base + cell.rise * t;
       }
-      heights.push(h);
+      layers.push({ h, solidBase: cell.solidBase });
     }
-    return heights;
+    return layers;
+  }
+
+  // D3a2 burial filter: a floor is BURIED (not a real standing/candidate
+  // surface at this point) when some OTHER layer's solid actually occupies
+  // the space right at/below this floor's own height and sticks up higher —
+  // i.e. this floor is the underside of a taller solid sitting flush on top
+  // of it, not open ground. Concretely: layer i is buried iff there exists
+  // layer j (j != i) with solidBase_j <= h_i + EPS (j's solid starts at/below
+  // i's floor — no gap) AND h_j > h_i + EPS (j's solid actually rises above
+  // i's floor, not just touching it). This is what fixes the "stopped wall
+  // stack proezzhaetsya naskvoz'" bug (symptom A, design/notes/
+  // ride-collision-v2.md): a stack of flush-stacked plates only ever exposes
+  // its OWN topmost floor as a live candidate — every plate below it is
+  // buried inside the stack's own solid material, so a probe standing at the
+  // stack's mid-height correctly reads "wall", not "floor continues here".
+  private liveFloors(layers: Array<{ h: number; solidBase: number }>): Array<{ h: number; solidBase: number }> {
+    const EPS = Heightfield.EPS;
+    return layers.filter((li, i) => !layers.some((lj, j) => j !== i && lj.solidBase <= li.h + EPS && lj.h > li.h + EPS));
+  }
+
+  // Per-layer heights of the column under a world XZ point, or null when
+  // nothing was authored there. Thin wrapper over columnLayers() kept for
+  // sample() below, which deliberately stays on the RAW (unfiltered) height
+  // list — the topmost layer in a column is never buried by construction (no
+  // other layer can both start at/below its own height AND rise higher than
+  // it), so applying the burial filter here would be a no-op for the MAX this
+  // method returns; skipping it keeps sample()'s existing callers (spawn,
+  // diagnostics, rocket terrain-block) bit-for-bit unchanged.
+  private columnHeights(wx: number, wz: number): number[] | null {
+    const layers = this.columnLayers(wx, wz);
+    return layers === null ? null : layers.map(l => l.h);
   }
 
   // Ground height at a world XZ point, or null when there is no cell there
@@ -590,32 +671,69 @@ export class Heightfield {
   // Layer-aware ground height for a mover currently sitting near `yRef`
   // (typically its own y from the START of this tick, before any vertical
   // step). Picks the highest floor the mover could actually be standing ON
-  // (any layer at/below yRef + climbThreshold), falling back to the LOWEST
-  // floor in the column when the mover is below every layer (e.g. it just
-  // fell through/spawned under a stack). This is what lets a kart drive
-  // UNDER a bridge/roof instead of the plain MAX-of-layers sample() always
-  // snapping it onto the highest surface in the column.
+  // (any LIVE layer — see liveFloors doc — at/below yRef + climbThreshold),
+  // falling back to the LOWEST live floor in the column when the mover is
+  // below every layer (e.g. it just fell through/spawned under a stack).
+  // This is what lets a kart drive UNDER a bridge/roof instead of the plain
+  // MAX-of-layers sample() always snapping it onto the highest surface in
+  // the column.
   //
-  // v1 limitation: layers are floors only, no ceilings/thickness — driving
-  // within `climbThreshold` of the underside of an overhead deck will still
-  // let the mover "climb" onto it (there's no separate headroom check). Not
-  // a regression versus the old MAX-only behavior (which had no under-bridge
-  // driving at all), just the model's current scope — see the map-building
-  // rules doc if a real ceiling/headroom check becomes necessary later.
+  // D3a2: candidates (and the below-everything fallback) are now filtered
+  // through liveFloors() first, so a BURIED floor (e.g. the underside of a
+  // flush-stacked wall plate — see liveFloors doc) can never be picked as a
+  // standing surface here either, consistent with sample()'s own MAX (which
+  // never needed the filter — see columnHeights doc) and solidBlocked()
+  // below (which deliberately does NOT filter — a buried floor is still real
+  // solid material for collision purposes, just not a place to stand).
   sampleAt(wx: number, wz: number, yRef: number, climbThreshold: number): number | null {
-    const heights = this.columnHeights(wx, wz);
-    if (heights === null) return null;
+    const layers = this.columnLayers(wx, wz);
+    if (layers === null) return null;
+    const live = this.liveFloors(layers);
     let bestCandidate = -Infinity;
     let hasCandidate = false;
     let lowest = Infinity;
-    for (const h of heights) {
-      if (h < lowest) lowest = h;
-      if (h <= yRef + climbThreshold) {
+    for (const l of live) {
+      if (l.h < lowest) lowest = l.h;
+      if (l.h <= yRef + climbThreshold) {
         hasCandidate = true;
-        if (h > bestCandidate) bestCandidate = h;
+        if (l.h > bestCandidate) bestCandidate = l.h;
       }
     }
     return hasCandidate ? bestCandidate : lowest;
+  }
+
+  // D3a3 (design/notes/ride-collision-v2.md, 2026-07-09): honest solid-vs-
+  // moving-body intersection test, for callers that need a real "is there a
+  // WALL here" answer rather than a floor-follow height — the launch-off-a-
+  // ramp-into-a-wall-plate case (symptom B2) needs this because a flying kart
+  // isn't standing on anything, so sampleAt's "which floor is under me" model
+  // doesn't apply; it needs "does any solid's volume overlap the space my
+  // body currently occupies".
+  //
+  // A layer blocks iff ALL of:
+  //   1. h > yRef + climbThreshold — its surface is too tall to just climb
+  //      onto (an ordinary curb/step stays climbable, not a wall).
+  //   2. solidBase < kartTop — the solid's own lower face starts below the
+  //      TOP of the body's vertical extent (otherwise the solid is entirely
+  //      ABOVE the body — e.g. a bridge deck over a kart driving underneath,
+  //      see the design doc's explicit "drive-under stays free" example).
+  //   3. h > yRef — the solid's own top is above the body's BOTTOM (yRef;
+  //      otherwise the solid is entirely below the body — standing/driving
+  //      on top of something is not "blocked").
+  // (2) and (3) together are exactly interval-overlap: [solidBase, h] ∩
+  // [yRef, kartTop] is non-empty.
+  //
+  // Deliberately uses the RAW (unfiltered) layer list, not liveFloors() — a
+  // buried floor (e.g. one plate inside a flush-stacked wall) is still real
+  // solid material a body can run into; burial only changes which floor a
+  // body STANDS on, not what blocks it.
+  solidBlocked(wx: number, wz: number, yRef: number, kartTop: number, climbThreshold: number): boolean {
+    const layers = this.columnLayers(wx, wz);
+    if (layers === null) return false;
+    for (const l of layers) {
+      if (l.h > yRef + climbThreshold && l.solidBase < kartTop && l.h > yRef) return true;
+    }
+    return false;
   }
 }
 

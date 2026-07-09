@@ -113,8 +113,28 @@ export interface VerticalInput {
   // Ground height at the kart's (already horizontally-integrated) XZ this
   // tick, or null when there's no mapped cell there (defensive — normal
   // horizontal collision in kart.ts already prevents entering unmapped
-  // cells, see step 8, so this should not occur in practice).
+  // cells, see step 8, so this should not occur in practice). This is the
+  // FOLLOW target only (the exp-filtered ride height below) — see
+  // detachRefHeight for what actually drives the launch/detach checks.
   groundHeight: number | null;
+  // D3 (design/notes/ride-collision-v2.md, 2026-07-09, symptom B1 "ложный
+  // трамплин на склоне"): a second, CONTINUOUS ground reading — the body's
+  // own CENTER ground probe (kart/groundProbe.ts sampleGroundProbes().center),
+  // NOT the wall-aware MAX-of-probes `groundHeight` above. `groundHeight` can
+  // jump a full probe-exclusion step in a single tick as a corner probe
+  // crosses wallAwareGroundHeight's stepExcludeThreshold and gets included/
+  // excluded from the MAX — a discrete jump the rate-detector below used to
+  // read as a huge implied vy and fire a false launch on an ordinary slope.
+  // The center probe has no such exclusion logic (it's just one continuous
+  // bilinear sample), so it's what the launch/detach checks use instead. The
+  // exp-follow ride-height target (below) deliberately keeps using
+  // `groundHeight` — I3's "mount the highest contact point" behavior for
+  // actually POSITIONING the body is untouched, only the LAUNCH DECISION
+  // moved to the smoother signal. null when the caller's own center probe is
+  // off the map — this module falls back to `groundHeight` in that case (see
+  // stepVertical), same fallback kart.ts's own call site also applies at the
+  // source (defensive: fallback applied twice is still just a fallback).
+  detachRefHeight: number | null;
   dt: number;
 }
 
@@ -133,11 +153,18 @@ export function stepVertical(state: VerticalState, inp: VerticalInput, p: Vertic
       return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: state.groundHeightPrev };
     }
 
+    // D3: the launch/detach checks below read the CONTINUOUS center probe
+    // (detachRefHeight), not the wall-aware MAX `groundHeight` — see
+    // VerticalInput.detachRefHeight doc. Falls back to groundHeight when the
+    // caller has no center reading (defensive; kart.ts's own call site
+    // already applies the same fallback at the source).
+    const detachRef = inp.detachRefHeight ?? inp.groundHeight;
+
     // Raw, unsmoothed rate-of-rise of the sampled ground this tick. null
     // previous sample (first tick ever) means "unknown" — treat as matching
     // the kart's own rate so the very first tick can never spuriously launch.
     const groundRateNow =
-      state.groundHeightPrev === null ? state.vy : (inp.groundHeight - state.groundHeightPrev) / Math.max(dt, 1e-6);
+      state.groundHeightPrev === null ? state.vy : (detachRef - state.groundHeightPrev) / Math.max(dt, 1e-6);
 
     if (state.vy - groundRateNow > p.airborneDropThreshold) {
       // The kart's own vertical momentum is now climbing (or simply not
@@ -146,28 +173,59 @@ export function stepVertical(state: VerticalState, inp: VerticalInput, p: Vertic
       // ground sample); vy carries the last ground-following rate, which is
       // exactly the trampoline effect for a kart still climbing when the
       // ramp ends, or a near-level launch when walking off a flat cliff.
-      return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: inp.groundHeight };
+      return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: detachRef };
     }
 
     // D2 positional detachment — see header comment above. Only fires when
     // the rate detector above didn't already; carries the current vy exactly
     // like that branch (no snap-down, no re-derivation from the new sample).
-    if (inp.groundHeight < state.y - p.groundSnapDistance) {
-      return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: inp.groundHeight };
+    // D3: BOTH signals must agree the ground left from under the body:
+    //  - groundHeight alone dropping (a corner probe crossing the exclusion
+    //    threshold at a ramp foot) is a probe artifact, not a cliff — the
+    //    center probe still reads ground right under the body;
+    //  - detachRef alone sitting below y is just the body riding a corner
+    //    bump (front wheel on a kerb lifts y above the center's ground) —
+    //    the highest contact point is still carrying the kart.
+    // A genuine crest/cliff drops both (on a convex crest the corner probes
+    // read BELOW center, so MAX==center there and the two conditions
+    // coincide — the original D2 behavior).
+    if (inp.groundHeight < state.y - p.groundSnapDistance && detachRef < state.y - p.groundSnapDistance) {
+      return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: detachRef };
     }
 
     const followAlpha = 1 - Math.exp(-p.groundFollowRate * dt);
     const candidateY = state.y + (inp.groundHeight - state.y) * followAlpha;
     const impliedVy = (candidateY - state.y) / Math.max(dt, 1e-6);
-    return { y: candidateY, vy: impliedVy, airborne: false, groundHeightPrev: inp.groundHeight };
+    // D3 second half: `vy` here is pure bookkeeping (launch detector input +
+    // the rate carried into flight) — position is candidateY regardless. A
+    // discrete UPWARD step in the follow target (probe inclusion at
+    // wallAwareGroundHeight's threshold, a sampleAt layer switch) makes
+    // impliedVy spike for a few ticks; next tick that phantom vy clears
+    // `vy - groundRateNow > airborneDropThreshold` and fires a false
+    // trampoline even though the detector's own rate signal is smooth. While
+    // grounded, a body's real vertical rate can't exceed the ground's own
+    // rate-of-rise — cap the excess below the launch threshold so only a
+    // genuine rate DROP (ramp lip, cliff) can trip the detector. Converged
+    // steady-slope climbs have impliedVy == groundRateNow, so the trampoline
+    // carry-over rate is untouched.
+    const vyStored = Math.min(impliedVy, groundRateNow + p.airborneDropThreshold * 0.75);
+    // D3: groundHeightPrev stores detachRef (not groundHeight) so next tick's
+    // groundRateNow above stays an apples-to-apples rate over the SAME
+    // continuous signal — mixing the two would reintroduce a one-tick
+    // discontinuity right at a grounded/launch-check boundary.
+    return { y: candidateY, vy: vyStored, airborne: false, groundHeightPrev: detachRef };
   }
 
   // Airborne: ballistic, no ground-follow, no re-derivation from input.
   const vy = state.vy - p.gravity * dt;
   const y = state.y + vy * dt;
-  const groundHeightPrev = inp.groundHeight ?? state.groundHeightPrev;
+  // D3: mirrors the grounded branch — bookkeeping for the NEXT grounded
+  // tick's rate detector should be the continuous detachRefHeight where the
+  // caller supplied one, falling back to groundHeight/stale-prev exactly as
+  // before when it didn't (airborne callers don't have to populate it).
+  const groundHeightPrev = inp.detachRefHeight ?? inp.groundHeight ?? state.groundHeightPrev;
   if (inp.groundHeight !== null && vy <= 0 && y <= inp.groundHeight + p.landingMargin) {
-    return { y: inp.groundHeight, vy: 0, airborne: false, groundHeightPrev: inp.groundHeight }; // no bounce
+    return { y: inp.groundHeight, vy: 0, airborne: false, groundHeightPrev }; // no bounce
   }
   return { y, vy, airborne: true, groundHeightPrev };
 }

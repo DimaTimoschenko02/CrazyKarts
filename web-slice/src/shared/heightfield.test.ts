@@ -416,6 +416,99 @@ describe("normRot / heightCellFor exports used directly by the diagnostic scan s
   });
 });
 
+describe("D3a2 burial filter (design/notes/ride-collision-v2.md) — flush-stacked solids expose only their own topmost floor", () => {
+  it("a flush 6-cube wall_block stack: a probe unable to reach the true top falls back onto that LIVE top, not a buried mid-height floor", () => {
+    const hf = makeHeightfield([
+      { asset: "wall_block", x: 0, z: 0, y_level: 0 }, // top 0.5, solidBase 0
+      { asset: "wall_block", x: 0, z: 0, y_level: 1 }, // top 1.0, solidBase 0.5
+      { asset: "wall_block", x: 0, z: 0, y_level: 2 }, // top 1.5, solidBase 1.0
+      { asset: "wall_block", x: 0, z: 0, y_level: 3 }, // top 2.0, solidBase 1.5
+      { asset: "wall_block", x: 0, z: 0, y_level: 4 }, // top 2.5, solidBase 2.0
+      { asset: "wall_block", x: 0, z: 0, y_level: 5 }, // top 3.0, solidBase 2.5 (only LIVE floor)
+    ]);
+    // climbThreshold too small to reach the real top (3.0) from yRef=1.5 —
+    // the OLD (unfiltered) MAX-of-reachable behavior would have picked the
+    // buried mid-height floor 1.5 (flush with a neighboring yard floor at
+    // the same height — exactly symptom A, "стена из стопки плит
+    // проезжается насквозь"). The burial filter excludes every buried
+    // floor from BOTH the candidate list and the below-everything fallback,
+    // so this must resolve to the one genuinely live floor, 3.0, even
+    // though 3.0 itself is outside the climb range.
+    expect(hf.sampleAt(0, 0, 1.5, 0.3)).toBeCloseTo(3.0, 6);
+  });
+
+  it("sample() (plain MAX-of-layers) is completely unaffected by the burial filter — still the top of the stack", () => {
+    const hf = makeHeightfield([
+      { asset: "wall_block", x: 0, z: 0, y_level: 0 },
+      { asset: "wall_block", x: 0, z: 0, y_level: 1 },
+    ]);
+    expect(hf.sample(0, 0)).toBeCloseTo(1.0, 6);
+  });
+
+  it("water under a bridge deck: both layers stay LIVE (deck sits a full level above the water floor, not flush) — drive-under preserved", () => {
+    // roadTile_001 = water (topMedian 0.455, minY 0, physics:"approx"
+    // heightGrid). A deck tile placed a full level ABOVE it (y_level 2,
+    // level_height 1.1 — the real Kenney road-tile authoring convention) has
+    // solidBase 2.2 (yLevel*lh + minY(0)) — comfortably above the water
+    // floor's own height, so burial never applies and the under-bridge drive
+    // this whole heightfield model exists to support survives.
+    const hf = Heightfield.fromMapJson({
+      meta: { tile_size: 3, level_height: 1.1, origin_offset: [0, 0, 0] },
+      cells: [
+        { asset: "roadTile_001", x: 0, z: 0, y_level: 0, rot: 0 }, // water, h≈0.455
+        { asset: "roadTile_223", x: 0, z: 0, y_level: 2, rot: 0 }, // bridge deck, solidBase 2.2
+      ],
+    });
+    // A mover down at the water's own height reads the water floor, not the
+    // (unreachably tall) deck.
+    expect(hf.sampleAt(0, 0, 0.5, 0.8)).toBeCloseTo(0.455, 2);
+    // Plain MAX still picks the deck (unaffected — same "topmost wins" rule
+    // sample() has always had).
+    expect(hf.sample(0, 0)).toBeGreaterThan(2.0);
+  });
+});
+
+describe("Heightfield.solidBlocked (D3a3) — honest solid-vs-body-height-range intersection", () => {
+  const CLIMB = 0.8; // KartPhysicsParams.layerClimbThreshold design default
+  const KART_BODY_HEIGHT = 1.0; // matches kart/kart.ts's own constant
+
+  it("flying into the side of a thick solid (body height straddles the solid's interval) is blocked", () => {
+    // ground_block at y_level=1, level_height=1.0: spans solidBase=1.0 up to
+    // its flat top=2.0 — a genuinely thick plate, not a thin quad.
+    const hf = Heightfield.fromMapJson({
+      meta: { tile_size: 1, level_height: 1.0, origin_offset: [0, 0, 0] },
+      cells: [{ asset: "ground_block", x: 0, z: 0, y_level: 1 }],
+    });
+    const yRef = 0.9; // body bottom — well below the plate's own top
+    const kartTop = yRef + KART_BODY_HEIGHT;
+    expect(hf.solidBlocked(0, 0, yRef, kartTop, CLIMB)).toBe(true);
+  });
+
+  it("an ordinary climbable step (within climbThreshold) is NOT blocked", () => {
+    const hf = makeHeightfield([{ asset: "terrain", x: 0, z: 0, y_level: 1 }]); // h=0.5, thin quad
+    const yRef = 0;
+    const kartTop = yRef + KART_BODY_HEIGHT;
+    expect(hf.solidBlocked(0, 0, yRef, kartTop, CLIMB)).toBe(false);
+  });
+
+  it("driving/flying UNDER a solid that sits entirely above the body's height range is NOT blocked (preserves drive-under-a-bridge)", () => {
+    // wall_block at y_level=3, level_height=0.5: solidBase=1.5, top=2.0 —
+    // its own lower face (1.5) sits ABOVE this body's top (yRef 0.455 +
+    // KART_BODY_HEIGHT 1.0 = 1.455), so the two intervals do not overlap —
+    // the same "deck 2.2 > kartTop 1.455" example from the design brief,
+    // reproduced here with round numbers.
+    const hf = makeHeightfield([{ asset: "wall_block", x: 0, z: 0, y_level: 3 }]);
+    const yRef = 0.455;
+    const kartTop = yRef + KART_BODY_HEIGHT; // 1.455 < solidBase 1.5
+    expect(hf.solidBlocked(0, 0, yRef, kartTop, CLIMB)).toBe(false);
+  });
+
+  it("returns false for an unauthored column (nothing to block against)", () => {
+    const hf = makeHeightfield([{ asset: "terrain", x: 0, z: 0, y_level: 0 }]);
+    expect(hf.solidBlocked(50, 50, 0, 1, CLIMB)).toBe(false);
+  });
+});
+
 describe("Heightfield.listCellCoords — drivable-footprint enumeration used by the spawn fallback", () => {
   it("lists every authored column — wall_block cells included (their cube top is drivable now)", () => {
     const hf = makeHeightfield([

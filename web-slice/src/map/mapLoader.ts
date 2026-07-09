@@ -63,6 +63,16 @@ export class GameMap {
     return this.heightfield.hasColumn(wx, wz);
   }
 
+  // D3a3 (design/notes/ride-collision-v2.md, 2026-07-09): honest solid-vs-
+  // body-height-range intersection test — see shared/heightfield.ts
+  // Heightfield.solidBlocked doc for the exact interval-overlap rule. Thin
+  // pass-through, kept here so kart/kart.ts only ever talks to GameMap (same
+  // convention as sampleHeightAt/hasColumn above), never to the Heightfield
+  // internals directly.
+  isSolidBlocked(wx: number, wz: number, yRef: number, kartTop: number, climbThreshold: number): boolean {
+    return this.heightfield.solidBlocked(wx, wz, yRef, kartTop, climbThreshold);
+  }
+
   // Fallback spawn point for when the authored SPAWN constant (main.ts) lands
   // off this particular map (e.g. a hand-built or server-loaded map that
   // never got a cell at the default coordinates) — the kart would otherwise
