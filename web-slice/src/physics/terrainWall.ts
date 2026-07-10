@@ -106,7 +106,14 @@ const FOOTPRINT_OFFSETS: readonly FootprintOffset[] = [
 // check, see module doc. Deliberately NOT a KartPhysicsParams tuner field:
 // it's the geometric "how local is local" knob, not the "how steep counts as
 // a wall" knob (that's wallGradientThreshold, passed in by the caller).
-const WALL_GRADIENT_BASE = 0.15;
+// Exported (2026-07-10, road-tile curb fix) so kart/groundProbe.ts's sibling
+// same-cell wall exclusion for the Y height-follow probes (which sit at a
+// much longer, body-geometry-derived distance from center — ~0.9m/0.675m,
+// not this 0.15m) can scale the SAME calibrated steepness ratio
+// (gradientThreshold / WALL_GRADIENT_BASE, ~61°) to its own longer probe
+// base instead of inventing a second, uncalibrated threshold — see
+// groundProbe.ts excludeSameCellWallProbes doc for the full rationale.
+export const WALL_GRADIENT_BASE = 0.15;
 
 export function footprintHalfExtents(axle: { wheelbase: number; trackWidth: number }): { halfLength: number; halfWidth: number } {
   return { halfLength: axle.wheelbase * 0.5, halfWidth: axle.trackWidth * 0.5 };
@@ -143,6 +150,29 @@ export interface TerrainSampler {
   // that gate. Optional for the same "old hand-rolled test samplers keep
   // compiling" reason as solidBlocked.
   wallBlocked?(x: number, z: number): boolean;
+  // Road-tile curb fix (owner playtest, 2026-07-10 — "carabканье и дребезг
+  // на бортиках дорог"): an ALTERNATIVE gate for the GRAD/STEP steep-rise
+  // checks below, alongside the existing D5 climb-reach gate (isWallHeight).
+  // See shared/heightfield.ts Heightfield.cellKeyAt doc for the full root-
+  // cause writeup — short version: a Kenney road-tile curb is a genuinely
+  // steep (>gradientThreshold) rise baked entirely inside ONE authored
+  // tile's own heightGrid, but only 0.3-0.7m tall — under
+  // layerClimbThreshold (0.8 default), so D5's climb-reach gate let it
+  // through as "just another climbable rise" exactly like it correctly does
+  // for a genuine ramp foot (the two are indistinguishable from a bare
+  // height probe). `sameCell(x1,z1,x2,z2)` answers a DIFFERENT question —
+  // "are these two probe endpoints part of the SAME authored map cell" — and
+  // is true for a curb (both endpoints sample the same tile's own grid) but
+  // false for D5's protected case (a bilinear-grid seam artifact straddling
+  // the boundary between two DIFFERENT authored cells). A steep rise inside
+  // one tile is that tile's own authored geometry — a curb/barrier is
+  // "genuinely a wall" the same way wall_block's isWall tag is, just without
+  // needing a dedicated per-cell flag since the local gradient already tells
+  // us it's steep. Optional for the same "old hand-rolled test samplers keep
+  // compiling" reason as solidBlocked/wallBlocked above; when unset, GRAD/
+  // STEP fall back to the D5-only gate exactly as before (zero behavior
+  // change for any caller that doesn't wire this up).
+  sameCell?(x1: number, z1: number, x2: number, z2: number): boolean;
 }
 
 // One footprint corner's before/after check — returns true if this corner's
@@ -197,8 +227,22 @@ function cornerBlocked(
   // being out of the body's climb reach (see D5 doc comment above) — a rise
   // the body itself is already within `climbThreshold` of isn't a wall this
   // check should be inventing an escape hatch for.
-  const gradWall = hB - hA > gradientThreshold && isWallHeight(hB, yRef, climbThreshold);
-  const stepWall = hNext - hCur > gradientThreshold && isWallHeight(hNext, yRef, climbThreshold);
+  //
+  // Road-tile curb fix (owner playtest, 2026-07-10 — see TerrainSampler.
+  // sameCell doc above and shared/heightfield.ts Heightfield.cellKeyAt doc
+  // for the full root-cause writeup): OR a SECOND, independent gate onto
+  // each criterion — a steep rise is ALSO unconditionally a wall (regardless
+  // of climb reach) when its two probe endpoints both land inside the SAME
+  // authored map cell, i.e. it's a genuine baked-in feature of that one
+  // tile's own geometry (a curb/barrier), not a seam artifact between two
+  // different cells (D5's protected ramp-foot false positive, which by
+  // construction straddles a cell BOUNDARY). Falls back to the climb-reach
+  // gate alone when the caller hasn't wired sameCell up — zero behavior
+  // change for any existing sampler.
+  const gradSameCell = sampler.sameCell?.(next.x - dir.x * half, next.z - dir.z * half, next.x + dir.x * half, next.z + dir.z * half) ?? false;
+  const stepSameCell = sampler.sameCell?.(cur.x, cur.z, next.x, next.z) ?? false;
+  const gradWall = hB - hA > gradientThreshold && (gradSameCell || isWallHeight(hB, yRef, climbThreshold));
+  const stepWall = hNext - hCur > gradientThreshold && (stepSameCell || isWallHeight(hNext, yRef, climbThreshold));
   if (gradWall || stepWall) return true;
 
   // D5 follow-up: wall_block* sides are an explicit, never-climb-gated wall

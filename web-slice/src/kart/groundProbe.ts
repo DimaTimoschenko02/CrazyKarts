@@ -29,6 +29,13 @@
 // HIGHER than the CENTER probe (more than `stepExcludeThreshold`) is treated
 // as a wall — owned by physics/terrainWall.ts's slide/block logic, not by
 // this "where does the body rest" question — and excluded from the max.
+//
+// Road-tile curb fix (2026-07-10) pulls in ONE constant from physics/
+// terrainWall.ts (WALL_GRADIENT_BASE) — see excludeSameCellWallProbes doc
+// below — the only exception to this module's "no deps beyond plain math"
+// convention, and it's a values-only import (a calibration number), not a
+// functional dependency on that module's own collision logic.
+import { WALL_GRADIENT_BASE } from "../physics/terrainWall";
 
 export interface Vec2 {
   x: number;
@@ -110,6 +117,80 @@ export function wallAwareGroundHeight(probes: GroundProbes, kartY: number, climb
     consider(h);
   }
   return best;
+}
+
+// Road-tile curb fix (owner playtest, 2026-07-10 — "carabканье и дребезг на
+// бортиках дорог"). Blocking XZ movement into a curb (physics/terrainWall.ts
+// cornerBlocked's own same-cell gate) turned out to only be HALF the fix: the
+// F/B/R/L probes here sit at a FIXED body-geometry offset from center
+// (halfWheelbase ~0.9m / halfTrack ~0.675m at KART_VISUAL_SCALE) — much
+// farther out than terrainWall.ts's dedicated 0.15m WALL_GRADIENT_BASE — so a
+// probe can reach onto/past a curb's rising face or top well BEFORE the
+// body's own footprint has actually crossed into it. wallAwareGroundHeight's
+// existing climb-reach exclusion (`h - kartY > climbThreshold`) doesn't catch
+// this either, for the exact same D5 reason terrainWall.ts's old gate didn't:
+// a ~0.3-0.7m curb sits comfortably under layerClimbThreshold (0.8 default),
+// so the probe counted toward the MAX and pulled the body's Y up toward the
+// curb top from a distance — the visible "подскок" (Y jump) even when the
+// body center itself was still safely in the middle of the road (see
+// tools/diag_wall_slide.ts's first trace before this fix: y jumped
+// 0.6->1.14 while z was still ~0.2, nowhere near the curb's own 0.6-0.9m
+// transition zone).
+//
+// This function is the sibling of terrainWall.ts's same-cell wall gate —
+// NOT scaled by distance-from-center (an earlier version of this fix tried
+// that and it under-detects: a probe can overshoot ENTIRELY past a curb's
+// short ~0.3m transition zone onto its flat top, at which point the rise
+// AVERAGED over the full ~0.9m reach distance reads gentle even though the
+// curb itself is genuinely steep — the same reason terrainWall.ts's own
+// D3b note explains for why THAT check uses a short fixed base straddling
+// the DESTINATION point, not the full corner-to-corner travel distance).
+// Instead this reuses the IDENTICAL short WALL_GRADIENT_BASE (0.15m) local
+// probe, but centered on each F/B/R/L probe's OWN point (not on body
+// center) — directly answering "is THIS PARTICULAR probe sitting on/just
+// past a steep same-cell edge", independent of how far that probe reaches
+// from the body. A probe is excluded from wallAwareGroundHeight's MAX
+// (nulled out, same convention as that function's own climb-reach
+// exclusion) when the short local rise straddling it exceeds
+// gradientThreshold AND both straddle-points fall inside the SAME
+// authored map cell (see shared/heightfield.ts Heightfield.cellKeyAt doc
+// for why authoring scope, not height, is the right signal). A gentle
+// same-cell slope (an ordinary ramp) never trips this — identical
+// steepness bar terrainWall.ts already validates against arena_slice's
+// ramps.
+export function excludeSameCellWallProbes(
+  probes: GroundProbes,
+  x: number,
+  z: number,
+  fwd: Vec2,
+  right: Vec2,
+  halfWheelbase: number,
+  halfTrack: number,
+  sample: (x: number, z: number) => number | null,
+  sameCell: (x1: number, z1: number, x2: number, z2: number) => boolean,
+  gradientThreshold: number
+): GroundProbes {
+  const half = WALL_GRADIENT_BASE / 2;
+  const test = (h: number | null, dirX: number, dirZ: number, dist: number): number | null => {
+    if (h === null) return null;
+    const px = x + dirX * dist;
+    const pz = z + dirZ * dist;
+    const ax = px - dirX * half;
+    const az = pz - dirZ * half;
+    const bx = px + dirX * half;
+    const bz = pz + dirZ * half;
+    const hA = sample(ax, az) ?? h;
+    const hB = sample(bx, bz) ?? h;
+    if (hB - hA > gradientThreshold && sameCell(ax, az, bx, bz)) return null;
+    return h;
+  };
+  return {
+    center: probes.center,
+    hF: test(probes.hF, fwd.x, fwd.z, halfWheelbase),
+    hB: test(probes.hB, -fwd.x, -fwd.z, halfWheelbase),
+    hR: test(probes.hR, right.x, right.z, halfTrack),
+    hL: test(probes.hL, -right.x, -right.z, halfTrack),
+  };
 }
 
 // Standard C1-continuous 0..1 ease between edges lo/hi — private copy, same

@@ -80,6 +80,16 @@ export class GameMap {
     return this.heightfield.wallBlocked(wx, wz, yRef);
   }
 
+  // Road-tile curb fix (owner playtest, 2026-07-10) — see shared/
+  // heightfield.ts Heightfield.cellKeyAt doc and physics/terrainWall.ts
+  // TerrainSampler.sameCell doc for the full root-cause writeup. Thin
+  // pass-through, same convention as isSolidBlocked/isWallBlocked above.
+  sameCell(x1: number, z1: number, x2: number, z2: number): boolean {
+    const k1 = this.heightfield.cellKeyAt(x1, z1);
+    if (k1 === null) return false;
+    return k1 === this.heightfield.cellKeyAt(x2, z2);
+  }
+
   // Fallback spawn point for when the authored SPAWN constant (main.ts) lands
   // off this particular map (e.g. a hand-built or server-loaded map that
   // never got a cell at the default coordinates) — the kart would otherwise

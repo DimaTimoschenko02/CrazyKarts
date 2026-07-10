@@ -493,3 +493,116 @@ describe("resolveTerrainSlide / tryEscape — D4 anti-deadlock (симптом #
     expect(escaped).toBeNull();
   });
 });
+
+describe("resolveTerrainSlide — road-tile curb fix (owner playtest, 2026-07-10): sameCell gate", () => {
+  // Synthetic curb: a sharp step at x=0 (low side 0.6, high/curb side 1.0 —
+  // Δ0.4, matches the measured real Kenney road-tile curb magnitude, see
+  // gameplay-programmer's tools/diag_wall_slide.ts probe of roadTile_182/015/
+  // 233/228/241 for the real baked numbers this mirrors). yRef=0.6 (the
+  // low/road side, exactly how a kart cruising the road sits) puts the curb
+  // top (1.0) only Δ0.4 above yRef — INSIDE climbThreshold (0.8), i.e. the
+  // exact D5 "within climb reach" condition that used to let this rise
+  // through unblocked (the "carabканье" bug). `sameCell` always true here
+  // simulates the real case: both GRAD probe endpoints and the STEP cur/next
+  // pair all land inside the SAME road tile's own baked heightGrid.
+  // Boundary at x=0.5 (not the body center's own start x) — mirrors the
+  // exact D5 slope-foot test's geometry above (start pos x=-0.15, footprint
+  // halfLength=0.6, so the LEADING corner already sits at x=0.45, just
+  // short of the boundary — matching a real "about to touch" contact, not a
+  // corner that's already spawned on the far side).
+  const curbSampler: TerrainSampler = {
+    sample: (x, _z) => (x < 0.5 ? 0.6 : 1.0),
+    hasColumn: () => true,
+    sameCell: () => true,
+  };
+  const dt = 1 / 120;
+  const yRef = 0.6;
+
+  it("a steep same-cell rise blocks even when it's within D5 climb reach (the bug this fix targets)", () => {
+    // Head-on approach (pure +X) — must be blocked (old behavior: sailed
+    // through since Δ0.4 < CLIMB_THRESHOLD 0.8, see the D5 slope-foot test
+    // above using this exact same start pos/boundary/speed magnitude).
+    const out = resolveTerrainSlide(curbSampler, { x: -0.15, z: 0 }, { x: 12, z: 0 }, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, yRef, CLIMB_THRESHOLD);
+    expect(Math.hypot(out.vel.x, out.vel.z)).toBeLessThanOrEqual(0.01);
+  });
+
+  it("without sameCell wired up (old sampler shape), the SAME rise stays climbable — proves this is opt-in, zero behavior change for old callers", () => {
+    const noSameCellSampler: TerrainSampler = { sample: curbSampler.sample, hasColumn: () => true };
+    const out = resolveTerrainSlide(noSameCellSampler, { x: -0.15, z: 0 }, { x: 12, z: 0 }, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, yRef, CLIMB_THRESHOLD);
+    expect(out.vel.x).toBeCloseTo(12, 6);
+  });
+
+  it("a GENTLE same-cell rise (below gradientThreshold) is NOT walled by sameCell alone — only steep+same-cell walls", () => {
+    // Same yRef/climb-reach setup, but a shallow rise (Δ0.1 over the full
+    // step, well under a 61° gradient) — sameCell must not turn every
+    // within-tile elevation change into a wall, only genuinely steep ones.
+    const gentleSampler: TerrainSampler = {
+      sample: (x, _z) => (x < 0.5 ? 0.6 : 0.7),
+      hasColumn: () => true,
+      sameCell: () => true,
+    };
+    const out = resolveTerrainSlide(gentleSampler, { x: -0.15, z: 0 }, { x: 12, z: 0 }, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, yRef, CLIMB_THRESHOLD);
+    expect(out.vel.x).toBeCloseTo(12, 6);
+  });
+
+  // Angle-of-attack (owner acceptance criteria #1): approach the curb at a
+  // shallow angle relative to its own run (the wall face runs along Z, so
+  // "angle to the wall" is measured from the Z axis) — the tangential (vz)
+  // component must survive the slide untouched (I2's v·n<0-only law), only
+  // the inward (vx) component gets killed. phi is angle FROM the wall
+  // surface (0 = pure graze, 90 = head-on). speed=20 (well above the 6+m/s
+  // owner playtest range) guarantees the leading corner's vx component alone
+  // still crosses the 0.05m gap to the boundary within one 1/120s substep
+  // even at the shallowest tested angle (30°) — this is purely a test-setup
+  // margin, not a claim about real playtest speeds.
+  function approachAtAngle(phiDeg: number, speed = 20) {
+    const phi = (phiDeg * Math.PI) / 180;
+    const vx = speed * Math.sin(phi);
+    const vz = speed * Math.cos(phi);
+    return resolveTerrainSlide(curbSampler, { x: -0.15, z: 0 }, { x: vx, z: vz }, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, yRef, CLIMB_THRESHOLD);
+  }
+
+  it("30 deg to the wall: slides — tangential (vz) speed survives close to its full input value", () => {
+    const speed = 20;
+    const vzIn = speed * Math.cos((30 * Math.PI) / 180);
+    const out = approachAtAngle(30, speed);
+    expect(out.vel.z).toBeGreaterThan(vzIn * 0.9);
+    // Inward component killed — resultant speed must be well below the input.
+    expect(Math.hypot(out.vel.x, out.vel.z)).toBeLessThan(speed);
+  });
+
+  it("50 deg to the wall (owner's acceptance boundary): still slides, tangential speed clearly preserved", () => {
+    const speed = 20;
+    const vzIn = speed * Math.cos((50 * Math.PI) / 180);
+    const out = approachAtAngle(50, speed);
+    expect(out.vel.z).toBeGreaterThan(vzIn * 0.9);
+  });
+
+  it("90 deg (dead head-on, no tangential component at all): clean stop, no residual energy, no penetration", () => {
+    const out = approachAtAngle(90, 20);
+    expect(Math.hypot(out.vel.x, out.vel.z)).toBeLessThanOrEqual(0.01);
+    expect(out.pos.x).toBeLessThanOrEqual(0.5); // never crossed into the curb
+  });
+
+  it("sustained multi-tick contact stays stable: repeatedly stepping into the same curb never penetrates or accumulates residual velocity", () => {
+    // Regression for "машинка не должна оказываться в текстурах" — simulate
+    // ~30 consecutive substeps of a kart continuously steering into the curb
+    // at a shallow angle (as if grazing along it for a full second), and
+    // assert position never sinks past the boundary and velocity never
+    // blows up (no chatter/energy injection tick over tick).
+    let pos = { x: -0.3, z: 0 };
+    let maxXReached = -Infinity;
+    let maxSpeed = 0;
+    for (let i = 0; i < 30; i++) {
+      const phi = (35 * Math.PI) / 180;
+      const speed = 20;
+      const vel = { x: speed * Math.sin(phi), z: speed * Math.cos(phi) };
+      const out = resolveTerrainSlide(curbSampler, pos, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, yRef, CLIMB_THRESHOLD);
+      pos = out.pos;
+      maxXReached = Math.max(maxXReached, pos.x);
+      maxSpeed = Math.max(maxSpeed, Math.hypot(out.vel.x, out.vel.z));
+    }
+    expect(maxXReached).toBeLessThan(0.5 - halfLength + 0.01); // leading corner never crosses the curb boundary
+    expect(maxSpeed).toBeLessThanOrEqual(20 + 1e-6); // never gains energy tick over tick
+  });
+});

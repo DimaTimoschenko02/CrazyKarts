@@ -409,6 +409,29 @@ describe("Heightfield.hasColumn — authored footprint vs genuine off-map edges"
   });
 });
 
+describe("Heightfield.cellKeyAt — same-authored-cell test (road-tile curb fix, 2026-07-10)", () => {
+  it("two points inside the SAME cell return equal, non-null keys", () => {
+    const hf = makeHeightfield([{ asset: "terrain", x: 0, z: 0, y_level: 0 }]);
+    const k1 = hf.cellKeyAt(-0.3, 0.1);
+    const k2 = hf.cellKeyAt(0.3, -0.2);
+    expect(k1).not.toBeNull();
+    expect(k1).toBe(k2);
+  });
+
+  it("two points in DIFFERENT authored cells return different keys", () => {
+    const hf = makeHeightfield([
+      { asset: "terrain", x: 0, z: 0, y_level: 0 },
+      { asset: "terrain", x: 1, z: 0, y_level: 0 },
+    ]);
+    expect(hf.cellKeyAt(0.4, 0)).not.toBe(hf.cellKeyAt(0.6, 0));
+  });
+
+  it("returns null off the authored map (mirrors hasColumn's own off-map case)", () => {
+    const hf = makeHeightfield([{ asset: "terrain", x: 0, z: 0, y_level: 0 }]);
+    expect(hf.cellKeyAt(50, 50)).toBeNull();
+  });
+});
+
 describe("normRot / heightCellFor exports used directly by the diagnostic scan script", () => {
   it("normRot wraps to [0, 360)", () => {
     expect(normRot(-90)).toBe(270);

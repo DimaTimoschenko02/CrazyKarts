@@ -24,7 +24,7 @@ import { footprintHalfExtents, footprintPoints, resolveTerrainSlide } from "../p
 import { resolveKartVsStatic } from "../physics/staticSlide";
 import { STATIC_COLLISION_SKIN } from "../shared/staticColliders";
 import { computeAttitudeTarget, computeTipOverTarget, LEVEL } from "./attitude";
-import { wallAwareGroundHeight, sampleGroundProbes, clampHeightForAttitude, excludeGroundProbesForAttitude } from "./groundProbe";
+import { wallAwareGroundHeight, sampleGroundProbes, clampHeightForAttitude, excludeGroundProbesForAttitude, excludeSameCellWallProbes } from "./groundProbe";
 
 // Godot: forward = -Z rotated by yaw around +Y.
 export function forwardOf(yaw: number): THREE.Vector3 {
@@ -477,6 +477,10 @@ export class Kart {
         // Heightfield.wallBlocked doc. Same yRef closure as every other probe
         // this tick.
         wallBlocked: (x: number, z: number) => map.isWallBlocked(x, z, yRef),
+        // Road-tile curb fix (owner playtest, 2026-07-10) — see shared/
+        // heightfield.ts Heightfield.cellKeyAt doc and physics/terrainWall.ts
+        // TerrainSampler.sameCell doc for the full root-cause writeup.
+        sameCell: (x1: number, z1: number, x2: number, z2: number) => map.sameCell(x1, z1, x2, z2),
       };
       const afterTerrain = resolveTerrainSlide(
         terrainSampler,
@@ -595,7 +599,7 @@ export class Kart {
     // D1 (design/notes/ride-collision-v2.md): wallAwareGroundHeight also
     // excludes any probe reading like a wall (a neighbor's roof, not this
     // body's own ground) — see groundProbe.ts doc for the exact rule.
-    const groundProbes = sampleGroundProbes(
+    const groundProbesRaw = sampleGroundProbes(
       (x, z) => map?.sampleHeightAt(x, z, yRef, this.params.layerClimbThreshold) ?? null,
       this.state.pos.x,
       this.state.pos.z,
@@ -604,6 +608,27 @@ export class Kart {
       this.axle.wheelbase * 0.5,
       this.axle.trackWidth * 0.5
     );
+    // Road-tile curb fix (owner playtest, 2026-07-10) — see groundProbe.ts
+    // excludeSameCellWallProbes doc for the full root-cause writeup: an F/B/
+    // R/L probe reaching onto/past a curb's own steep, same-tile rise from a
+    // distance must not pull the body's Y up toward it, even while that rise
+    // is still within layerClimbThreshold (the same "within D5 climb reach"
+    // condition that let it through before). No-op (identity) when `map` is
+    // null (no sameCell to test against) or the center probe is off-map.
+    const groundProbes = map
+      ? excludeSameCellWallProbes(
+          groundProbesRaw,
+          this.state.pos.x,
+          this.state.pos.z,
+          fwdDir,
+          rightDir,
+          this.axle.wheelbase * 0.5,
+          this.axle.trackWidth * 0.5,
+          (x, z) => map.sampleHeightAt(x, z, yRef, this.params.layerClimbThreshold),
+          (x1, z1, x2, z2) => map.sameCell(x1, z1, x2, z2),
+          this.params.terrainWallGradientThreshold
+        )
+      : groundProbesRaw;
     const groundHeightNow = wallAwareGroundHeight(groundProbes, yRef, this.params.layerClimbThreshold);
     // D3 (design/notes/ride-collision-v2.md, 2026-07-09, symptom B1): the
     // launch/detach checks inside stepVertical read the CONTINUOUS center
