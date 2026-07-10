@@ -8,8 +8,9 @@
 import { Client, Room } from "colyseus";
 import { MatchState, Player, WeaponBox } from "../schema/MatchState";
 import { loadArena, type Arena, type WorldPoint } from "../config/arena";
+import { isBoxPickupInRange } from "./pickupRange";
 import { faceCenterYaw, pickInitialSpawn, pickRespawnSpawn } from "../spawn/spawnSelect";
-import { WEAPON_TYPES } from "../../src/weapons/stats";
+import { WEAPON_TYPES, type DynamiteStats, type MineStats, type ProjectileStats } from "../../src/weapons/stats";
 import {
   computeAoeDamage,
   computeLaunchPitchRad,
@@ -20,8 +21,34 @@ import {
   tiltDirection3D,
   type PlayerPoint,
 } from "../weapons/rocketSim";
+import { isMineArmed, isMineExpired, MINE_DROP_BACK_OFFSET_M, MINE_DROP_INTERVAL_S } from "../weapons/mineSim";
+import {
+  chargeFraction,
+  clampHoldMs,
+  computeLaunchDir3D,
+  computeLaunchSpeed,
+  dynamitePositionAtT,
+} from "../weapons/dynamiteSim";
 
-const ROCKET = WEAPON_TYPES.rocket;
+const ROCKET = WEAPON_TYPES.rocket as ProjectileStats;
+const MINES = WEAPON_TYPES.mines as MineStats;
+const DYNAMITE = WEAPON_TYPES.dynamite as DynamiteStats;
+
+// Pickup pool for weapon boxes (task spec 2026-07-10: "Боксы: подбор теперь
+// даёт СЛУЧАЙНОЕ из [rocket, mines, dynamite]"). No weights — uniform
+// random, same simplicity as the single-prize reference this replaces.
+const WEAPON_POOL = ["rocket", "mines", "dynamite"] as const;
+function pickRandomWeapon(): string {
+  return WEAPON_POOL[Math.floor(Math.random() * WEAPON_POOL.length)];
+}
+
+// Layer-aware ground sampling for a dropped mine (shared/heightfield.ts
+// Heightfield.sampleAt) — same "which floor is this body near" convention
+// rocketSim.ts's computeLaunchPitchRad uses (0.8 = KartPhysicsParams.
+// layerClimbThreshold's design default), kept as a local literal for the
+// same reason rocketSim.ts does: this module has no other dependency on
+// kart tuning.
+const MINE_GROUND_LAYER_CLIMB_THRESHOLD = 0.8;
 
 const MAX_COORD = 1000; // sanity bound — well outside any real arena extent
 
@@ -30,6 +57,12 @@ const MAX_COORD = 1000; // sanity bound — well outside any real arena extent
 const BOX_PICKUP_RADIUS_M = 1.2;
 const BOX_RESPAWN_MS = 10_000; // scripts/weapon_pickup.gd:3 RESPAWN_TIME — this one IS confirmed
 const BOX_HOVER_HEIGHT_M = 0.5; // cosmetic only — how high the box floats above the ground for rendering
+// Vertical pickup gate (see pickupRange.ts): karts are ~1m tall, boxes hover
+// BOX_HOVER_HEIGHT_M above their authored/ground Y, so 1.6 comfortably
+// covers "same floor" contact while still rejecting a kart driving UNDER a
+// bridge that has a box sitting on its deck (the bug this constant fixes —
+// tickBoxes used to be pure XZ distance, so it couldn't tell those apart).
+const BOX_PICKUP_VERTICAL_M = 1.6;
 
 const DEATH_RESPAWN_DELAY_MS = 3_000; // state_manager.gd:13 RESPAWN_DELAY (confirmed)
 const RESPAWN_INVULN_MS = 2_000; // state_manager.gd:14 RESPAWN_INVULN_DURATION (confirmed)
@@ -49,6 +82,9 @@ const MATCH_RESTART_DELAY_MS = 15_000;
 // carry their own local transform we don't have — our race.glb model
 // (kart/stats.ts KART_TYPES.racer, formerly craft_racer) has no launcher
 // meshes at all, see src/weapons/stats.ts volleyCount comment). Tune by feel.
+// Also reused as the dynamite throw origin (task spec doesn't call for a
+// separate offset — thrown from the same "muzzle" point a rocket launches
+// from keeps every projectile's spawn point consistent).
 const MUZZLE_FORWARD_OFFSET_M = 1.2;
 const MUZZLE_HEIGHT_OFFSET_M = 0.5;
 
@@ -114,6 +150,36 @@ interface ActiveRocket {
   lifetime: number;
 }
 
+// A mine dropped and sitting on the ground. Not mirrored into MatchState —
+// same "server broadcasts events, client renders them" pattern as rockets
+// (see ActiveRocket doc above); a mine doesn't move once dropped, so there's
+// nothing for the client to interpolate anyway.
+interface ActiveMine {
+  id: string;
+  ownerId: string;
+  x: number;
+  y: number;
+  z: number;
+  age: number; // seconds since drop
+}
+
+// A dynamite in flight or stuck. Flight position is recomputed each tick
+// from the closed-form parabola (dynamiteSim.ts dynamitePositionAtT) rather
+// than integrated incrementally — see that function's doc comment for why.
+interface ActiveDynamite {
+  id: string;
+  ownerId: string;
+  origin: { x: number; y: number; z: number };
+  vel0: { x: number; y: number; z: number };
+  age: number; // seconds since launch — frozen once stuck
+  x: number;
+  y: number;
+  z: number;
+  stuck: boolean;
+  stuckToId: string | null; // set only if it stuck to a kart, not the ground
+  fuseAge: number; // seconds since sticking — only advances once stuck
+}
+
 // Colyseus defaults patchRate to 50ms (20Hz, see @colyseus/core Room.ts
 // DEFAULT_PATCH_RATE) — slower than the 30Hz (~33ms) cadence clients already
 // send "state" at (netClient.ts SEND_INTERVAL_MS), so schema mutations from
@@ -142,7 +208,11 @@ export class MatchRoom extends Room<{ state: MatchState }> {
 
   private arena!: Arena;
   private rockets: ActiveRocket[] = [];
+  private mines: ActiveMine[] = [];
+  private dynamites: ActiveDynamite[] = [];
   private nextRocketId = 0;
+  private nextMineId = 0;
+  private nextDynamiteId = 0;
   private spawnIndex = 0;
   // Respawn invulnerability window, keyed by sessionId — server-only, not
   // mirrored to schema (no shield VFX in this pass, just damage immunity).
@@ -156,7 +226,13 @@ export class MatchRoom extends Room<{ state: MatchState }> {
       const box = new WeaponBox();
       box.x = p.x;
       box.z = p.z;
-      box.y = this.arena.groundHeightAt(p) + BOX_HOVER_HEIGHT_M;
+      // p.y is already the authored/ground-derived resting height (see
+      // arena.ts BoxPoint doc) — for hand-authored box_points this is
+      // y_level*level_height AS-IS (may legitimately be mid-air, e.g. a
+      // bridge deck), so this must NOT be re-derived from groundHeightAt(p)
+      // here like it used to be, which silently discarded that authored
+      // height and dropped every airborne box onto the terrain below it.
+      box.y = p.y + BOX_HOVER_HEIGHT_M;
       box.active = true;
       this.state.boxes.set(String(i), box);
     });
@@ -176,7 +252,9 @@ export class MatchRoom extends Room<{ state: MatchState }> {
       player.yaw = validated.yaw;
     });
 
-    this.onMessage("fire", client => this.handleFire(client));
+    // `data` only matters for dynamite (holdMs) — rocket/mines ignore it.
+    // Never trust it: handleFire re-validates/clamps everything itself.
+    this.onMessage("fire", (client, data: unknown) => this.handleFire(client, data));
 
     this.setSimulationInterval(dt => this.tick(dt), 1000 / ROCKET_SIM_HZ);
 
@@ -237,8 +315,13 @@ export class MatchRoom extends Room<{ state: MatchState }> {
   // Same room, same connections — just wipes stats/hp/weapons and
   // re-scatters everyone across the spawn points (round-robin, same as a
   // fresh join) rather than leaving corpses/mid-match positions lying around.
+  // Also clears every live projectile/mine/dynamite (task spec: "чистить все
+  // при restartMatch" — unlike death, which deliberately leaves an owner's
+  // mines/dynamite alive, a full match restart wipes everything).
   private restartMatch(): void {
     this.rockets = [];
+    this.mines = [];
+    this.dynamites = [];
     this.invulnerableUntil.clear();
     this.spawnIndex = 0;
     for (const player of this.state.players.values()) {
@@ -260,16 +343,36 @@ export class MatchRoom extends Room<{ state: MatchState }> {
   }
 
   // ── Fire ────────────────────────────────────────────────────────────
-  private handleFire(client: Client): void {
+  // Dispatches to the weapon-specific fire handler and consumes the ARMED
+  // slot up front (ARMED -> EMPTY), same "no ammo counter, no separate
+  // cooldown timer" contract every weapon shares — matches the rocket
+  // reference (docs/p2-port-notes.md §1) and extends it uniformly to mines/
+  // dynamite rather than special-casing consumption per weapon.
+  private handleFire(client: Client, data: unknown): void {
     if (this.state.phase !== "playing") return; // fire is disabled during the end-of-match freeze
     const player = this.state.players.get(client.sessionId);
     if (!player) return;
-    if (!player.alive || player.weapon !== "rocket") return; // can_fire() guard: alive AND armed
+    if (!player.alive || player.weapon === "") return; // can_fire() guard: alive AND armed
 
-    // Consume immediately (ARMED -> EMPTY), no ammo counter, no separate
-    // cooldown timer — matches the reference (docs/p2-port-notes.md §1).
+    const weapon = player.weapon;
     player.weapon = "";
 
+    switch (weapon) {
+      case "rocket":
+        this.fireRocket(client, player);
+        break;
+      case "mines":
+        this.fireMines(client);
+        break;
+      case "dynamite":
+        this.fireDynamite(client, player, data);
+        break;
+      default:
+        break; // unknown weapon string — already consumed, nothing to launch
+    }
+  }
+
+  private fireRocket(client: Client, player: Player): void {
     const fwd = { x: -Math.sin(player.yaw), z: -Math.cos(player.yaw) };
     const originX = player.x + fwd.x * MUZZLE_FORWARD_OFFSET_M;
     const originZ = player.z + fwd.z * MUZZLE_FORWARD_OFFSET_M;
@@ -318,17 +421,96 @@ export class MatchRoom extends Room<{ state: MatchState }> {
     }
   }
 
-  // ── Simulation tick (rockets + box pickup) ───────────────────────────
+  // Schedules MINES.count drops, T seconds apart (MINE_DROP_INTERVAL_S —
+  // see mineSim.ts for the formula), the first at T=0. Each drop reads the
+  // player's CURRENT x/y/z/yaw at the moment it fires (task spec: "Сервер
+  // дропает мину в текущей позиции игрока"), not a position frozen at the
+  // original fire() call — a player still driving while their mines trickle
+  // out lays a trail behind them, not 3 mines stacked on one spot.
+  private fireMines(client: Client): void {
+    const ownerId = client.sessionId;
+    for (let i = 0; i < MINES.count; i++) {
+      this.clock.setTimeout(() => this.dropMine(ownerId), i * MINE_DROP_INTERVAL_S * 1000);
+    }
+  }
+
+  private dropMine(ownerId: string): void {
+    if (this.state.phase !== "playing") return; // no new mines during the end-of-match freeze
+    const player = this.state.players.get(ownerId);
+    if (!player) return; // left the room mid-sequence
+
+    const fwd = { x: -Math.sin(player.yaw), z: -Math.cos(player.yaw) };
+    const dropX = player.x - fwd.x * MINE_DROP_BACK_OFFSET_M;
+    const dropZ = player.z - fwd.z * MINE_DROP_BACK_OFFSET_M;
+    const dropY =
+      this.arena.heightfield.sampleAt(dropX, dropZ, player.y, MINE_GROUND_LAYER_CLIMB_THRESHOLD) ?? player.y;
+
+    const id = `mn${this.nextMineId++}`;
+    const mine: ActiveMine = { id, ownerId, x: dropX, y: dropY, z: dropZ, age: 0 };
+    this.mines.push(mine);
+    this.broadcast("mine:spawn", { id, x: dropX, y: dropY, z: dropZ });
+  }
+
+  // Server clamps holdMs itself (dynamiteSim.clampHoldMs) — the client's
+  // reported value is only ever a hint, never trusted directly (a modified
+  // client could claim any hold length).
+  private fireDynamite(client: Client, player: Player, data: unknown): void {
+    const rawHoldMs =
+      typeof data === "object" && data !== null && isValidNumber((data as Record<string, unknown>).holdMs)
+        ? (data as { holdMs: number }).holdMs
+        : 0;
+    const holdMs = clampHoldMs(rawHoldMs, DYNAMITE.maxChargeMs);
+    const charge = chargeFraction(holdMs, DYNAMITE.maxChargeMs);
+    const speed = computeLaunchSpeed(charge, DYNAMITE.speedMin, DYNAMITE.speedMax);
+    const dir3d = computeLaunchDir3D(player.yaw, DYNAMITE.launchAngleDeg);
+    const vel0 = { x: dir3d.x * speed, y: dir3d.y * speed, z: dir3d.z * speed };
+
+    // Same throw origin as a rocket's muzzle (MUZZLE_FORWARD_OFFSET_M/
+    // MUZZLE_HEIGHT_OFFSET_M) — see that constant's doc comment.
+    const fwd = { x: -Math.sin(player.yaw), z: -Math.cos(player.yaw) };
+    const origin = {
+      x: player.x + fwd.x * MUZZLE_FORWARD_OFFSET_M,
+      y: player.y + MUZZLE_HEIGHT_OFFSET_M,
+      z: player.z + fwd.z * MUZZLE_FORWARD_OFFSET_M,
+    };
+
+    const id = `dy${this.nextDynamiteId++}`;
+    const dynamite: ActiveDynamite = {
+      id,
+      ownerId: client.sessionId,
+      origin,
+      vel0,
+      age: 0,
+      x: origin.x,
+      y: origin.y,
+      z: origin.z,
+      stuck: false,
+      stuckToId: null,
+      fuseAge: 0,
+    };
+    this.dynamites.push(dynamite);
+    this.broadcast("dynamite:spawn", {
+      id,
+      origin,
+      dir3d,
+      speed,
+      gravity: DYNAMITE.gravity,
+    });
+  }
+
+  // ── Simulation tick (rockets + mines + dynamite + box pickup) ────────
   private tick(deltaTimeMs: number): void {
     const dt = deltaTimeMs / 1000;
     this.tickRockets(dt);
+    this.tickMines(dt);
+    this.tickDynamite(dt);
     this.tickBoxes();
   }
 
   private alivePlayerPoints(): PlayerPoint[] {
     const out: PlayerPoint[] = [];
     for (const [id, p] of this.state.players.entries()) {
-      if (p.alive) out.push({ id, x: p.x, z: p.z });
+      if (p.alive) out.push({ id, x: p.x, y: p.y, z: p.z });
     }
     return out;
   }
@@ -373,9 +555,113 @@ export class MatchRoom extends Room<{ state: MatchState }> {
   // "direct hit" damage amount (matches the reference exactly).
   private explodeRocket(rocket: ActiveRocket, alive: readonly PlayerPoint[]): void {
     this.broadcast("rocket:explode", { id: rocket.id, x: rocket.x, y: rocket.y, z: rocket.z });
-    const damage = computeAoeDamage({ x: rocket.x, z: rocket.z }, alive, ROCKET, rocket.ownerId);
+    const damage = computeAoeDamage({ x: rocket.x, y: rocket.y, z: rocket.z }, alive, ROCKET, rocket.ownerId);
     for (const [victimId, dmg] of damage) {
       this.applyDamage(victimId, dmg, rocket.ownerId);
+    }
+  }
+
+  private tickMines(dt: number): void {
+    if (this.mines.length === 0) return;
+    const alive = this.alivePlayerPoints();
+    const remaining: ActiveMine[] = [];
+
+    for (const mine of this.mines) {
+      mine.age += dt;
+
+      if (isMineExpired(mine.age, MINES.lifetimeS)) {
+        this.broadcast("mine:despawn", { id: mine.id }); // silent — no AOE, no VFX
+        continue;
+      }
+
+      if (isMineArmed(mine.age, MINES.armDelayS)) {
+        // Task spec: an armed mine triggers on ANY living player, including
+        // its own owner — pass selfDamage=true unconditionally here (not
+        // MINES.selfDamage, which is a separate "does the blast actually
+        // hurt them" question resolved by computeAoeDamage below; they
+        // happen to share the value true today, but this call is about
+        // trigger eligibility, not damage).
+        const hitId = findProximityHit(mine, alive, MINES.triggerRadius, mine.ownerId, true);
+        if (hitId) {
+          this.explodeMine(mine, alive);
+          continue;
+        }
+      }
+      remaining.push(mine);
+    }
+    this.mines = remaining;
+  }
+
+  private explodeMine(mine: ActiveMine, alive: readonly PlayerPoint[]): void {
+    this.broadcast("mine:explode", { id: mine.id, x: mine.x, y: mine.y, z: mine.z });
+    const damage = computeAoeDamage({ x: mine.x, y: mine.y, z: mine.z }, alive, MINES, mine.ownerId);
+    for (const [victimId, dmg] of damage) {
+      this.applyDamage(victimId, dmg, mine.ownerId);
+    }
+  }
+
+  private tickDynamite(dt: number): void {
+    if (this.dynamites.length === 0) return;
+    const alive = this.alivePlayerPoints();
+    const remaining: ActiveDynamite[] = [];
+
+    for (const dyn of this.dynamites) {
+      if (!dyn.stuck) {
+        dyn.age += dt;
+        const pos = dynamitePositionAtT(dyn.origin, dyn.vel0, DYNAMITE.gravity, dyn.age);
+        dyn.x = pos.x;
+        dyn.y = pos.y;
+        dyn.z = pos.z;
+
+        // Ground first (matches rocketSim.ts's ground-block rule exactly —
+        // "off the map" reads as blocked too), then proximity to a kart —
+        // the first thing it touches wins (task spec: "прилипание к
+        // ПЕРВОМУ во что попал").
+        const grounded = isBlockedByTerrain(pos, this.arena.heightfield);
+        const hitId = grounded ? null : findProximityHit(pos, alive, DYNAMITE.stickRadius, dyn.ownerId, true);
+
+        if (grounded || hitId) {
+          dyn.stuck = true;
+          dyn.stuckToId = hitId;
+          this.broadcast("dynamite:stick", {
+            id: dyn.id,
+            x: dyn.x,
+            y: dyn.y,
+            z: dyn.z,
+            ...(hitId ? { stuckToId: hitId } : {}),
+          });
+        }
+      } else {
+        if (dyn.stuckToId) {
+          // Follows the victim (task spec: "координаты обновлять из позиции
+          // жертвы") — both for the AOE center at explosion time AND so the
+          // client can render it riding along. If the victim already left
+          // the room, keep the last known position frozen rather than
+          // erroring.
+          const victim = this.state.players.get(dyn.stuckToId);
+          if (victim) {
+            dyn.x = victim.x;
+            dyn.y = victim.y;
+            dyn.z = victim.z;
+            this.broadcast("dynamite:update", { id: dyn.id, x: dyn.x, y: dyn.y, z: dyn.z });
+          }
+        }
+        dyn.fuseAge += dt;
+        if (dyn.fuseAge >= DYNAMITE.fuseS) {
+          this.explodeDynamite(dyn, alive);
+          continue;
+        }
+      }
+      remaining.push(dyn);
+    }
+    this.dynamites = remaining;
+  }
+
+  private explodeDynamite(dyn: ActiveDynamite, alive: readonly PlayerPoint[]): void {
+    this.broadcast("dynamite:explode", { id: dyn.id, x: dyn.x, y: dyn.y, z: dyn.z });
+    const damage = computeAoeDamage({ x: dyn.x, y: dyn.y, z: dyn.z }, alive, DYNAMITE, dyn.ownerId);
+    for (const [victimId, dmg] of damage) {
+      this.applyDamage(victimId, dmg, dyn.ownerId);
     }
   }
 
@@ -408,6 +694,10 @@ export class MatchRoom extends Room<{ state: MatchState }> {
     }
     this.broadcast("kill", { victimId, killerId });
     this.clock.setTimeout(() => this.respawnPlayer(victimId), DEATH_RESPAWN_DELAY_MS);
+    // Mines/dynamite already dropped/thrown by this player are NOT cleared
+    // here (task spec: "мины и динамиты владельца НЕ чистить при его
+    // смерти") — they keep living/ticking independently; only restartMatch()
+    // wipes them.
   }
 
   private respawnPlayer(sessionId: string): void {
@@ -450,9 +740,8 @@ export class MatchRoom extends Room<{ state: MatchState }> {
       if (!box.active) continue;
       for (const player of this.state.players.values()) {
         if (!player.alive || player.weapon !== "") continue; // reference: pickup ignored while already ARMED, no replace-on-pickup
-        const dist = Math.hypot(player.x - box.x, player.z - box.z);
-        if (dist > BOX_PICKUP_RADIUS_M) continue;
-        player.weapon = "rocket";
+        if (!isBoxPickupInRange(player, box, BOX_PICKUP_RADIUS_M, BOX_PICKUP_VERTICAL_M)) continue;
+        player.weapon = pickRandomWeapon();
         box.active = false;
         this.scheduleBoxRespawn(boxId);
         break; // one pickup per box per tick

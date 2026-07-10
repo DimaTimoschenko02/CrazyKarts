@@ -105,3 +105,33 @@ describe("deriveSpawnGrid / deriveBoxGrid", () => {
     expect(spawns).toEqual([[1, 1]]);
   });
 });
+
+// Kenney Road Tiles flatness comes from the baked catalog (autoSpawn.ts
+// isFlatSpawnAsset), not the asset-name regex — regression for the
+// 2026-07-10 playtest bug where every roads-pack map derived ZERO spawn
+// candidates and MatchRoom crashed on join.
+describe("findFlatSpawnCandidates on roads-pack tiles", () => {
+  function roadsMap(center: string): MapJson {
+    // 3x3 patch of flat grass around one center tile under test.
+    const cells = [];
+    for (let x = 0; x < 3; x++) for (let z = 0; z < 3; z++) {
+      cells.push({ asset: x === 1 && z === 1 ? center : "roadTile_163", x, z, y_level: 0, rot: 0 });
+    }
+    return { meta: { tile_size: 3, level_height: 1.1, origin_offset: [0, 0, 0] }, cells };
+  }
+
+  it("accepts flat exact tiles (plain grass, roads with shoulder lips)", () => {
+    for (const asset of ["roadTile_163", "roadTile_025"]) {
+      const keys = new Set(findFlatSpawnCandidates(roadsMap(asset)).map(c => c.x + "," + c.z));
+      expect(keys.has("1,1")).toBe(true);
+    }
+  });
+
+  it("rejects slopes, water, and approx decorative tiles", () => {
+    // 018 = Slope −X rise 1.1 (exact but not level), 001 = water, 019 = trees (approx)
+    for (const asset of ["roadTile_018", "roadTile_001", "roadTile_019"]) {
+      const keys = new Set(findFlatSpawnCandidates(roadsMap(asset)).map(c => c.x + "," + c.z));
+      expect(keys.has("1,1")).toBe(false);
+    }
+  });
+});

@@ -2,10 +2,10 @@
 // edit doesn't silently drift both the client VFX prediction and the server
 // authoritative sim (server/weapons/rocketSim.ts) — both read WEAPON_TYPES.
 import { describe, expect, it } from "vitest";
-import { WEAPON_TYPES } from "./stats";
+import { WEAPON_TYPES, type ProjectileStats } from "./stats";
 
 describe("WEAPON_TYPES.rocket", () => {
-  const rocket = WEAPON_TYPES.rocket;
+  const rocket = WEAPON_TYPES.rocket as ProjectileStats;
 
   it("matches the real .tres values (NOT the stale GDD table)", () => {
     expect(rocket.speed).toBe(40); // GDD table says 28 — .tres (real code) says 40

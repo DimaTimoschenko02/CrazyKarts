@@ -1,0 +1,59 @@
+import { describe, expect, it } from "vitest";
+import { KART_TYPES } from "../../src/kart/stats";
+import { DEFAULT_KART_PHYSICS_PARAMS } from "../../src/physics/types";
+import {
+  computeMineDropIntervalS,
+  isMineArmed,
+  isMineExpired,
+  MINE_DROP_BACK_OFFSET_M,
+  MINE_DROP_INTERVAL_S,
+} from "./mineSim";
+
+describe("computeMineDropIntervalS", () => {
+  it("matches the task spec formula: (1.15 * modelLength / 2) / maxSpeed", () => {
+    // modelLength = 1.7 * KART_VISUAL_SCALE(1.5) = 2.55m, maxSpeed = 24.5 m/s
+    // (src/kart/stats.ts KART_TYPES.racer, src/physics/types.ts
+    // DEFAULT_KART_PHYSICS_PARAMS.maxSpeed) -> T = (1.15*2.55/2)/24.5
+    expect(computeMineDropIntervalS(2.55, 24.5)).toBeCloseTo(0.05985, 5);
+  });
+
+  it("scales linearly with modelLength and inversely with maxSpeed", () => {
+    expect(computeMineDropIntervalS(4, 10)).toBeCloseTo((1.15 * 4) / 2 / 10, 10);
+    expect(computeMineDropIntervalS(2, 20)).toBeCloseTo((1.15 * 2) / 2 / 20, 10);
+  });
+
+  it("MINE_DROP_INTERVAL_S is derived from the actual racer kart/physics constants", () => {
+    const expected = computeMineDropIntervalS(KART_TYPES.racer.modelLength, DEFAULT_KART_PHYSICS_PARAMS.maxSpeed);
+    expect(MINE_DROP_INTERVAL_S).toBeCloseTo(expected, 10);
+    // Sanity-pin the actual live value so a change to modelLength/maxSpeed is
+    // a visible, deliberate test update rather than a silent drift.
+    expect(MINE_DROP_INTERVAL_S).toBeCloseTo(0.05985, 5);
+  });
+
+  it("MINE_DROP_BACK_OFFSET_M is half the racer's body length", () => {
+    expect(MINE_DROP_BACK_OFFSET_M).toBeCloseTo(KART_TYPES.racer.modelLength / 2, 10);
+  });
+});
+
+describe("isMineArmed", () => {
+  it("false before the arm delay elapses", () => {
+    expect(isMineArmed(0, 0.8)).toBe(false);
+    expect(isMineArmed(0.79, 0.8)).toBe(false);
+  });
+
+  it("true once the arm delay elapses", () => {
+    expect(isMineArmed(0.8, 0.8)).toBe(true);
+    expect(isMineArmed(5, 0.8)).toBe(true);
+  });
+});
+
+describe("isMineExpired", () => {
+  it("false before lifetime elapses", () => {
+    expect(isMineExpired(29.9, 30)).toBe(false);
+  });
+
+  it("true once lifetime elapses", () => {
+    expect(isMineExpired(30, 30)).toBe(true);
+    expect(isMineExpired(31, 30)).toBe(true);
+  });
+});

@@ -22,29 +22,78 @@ export class InputController {
   private readonly keys: Record<string, boolean> = {};
   private script: ScriptCursor | null = null;
   private _scriptDone = true;
-  // Fire is edge-triggered (press, not hold) so holding the button down
-  // doesn't spam "fire" messages every frame — the server would just ignore
-  // the extras anyway (weapon already consumed after the first shot), but
-  // there's no reason to send them. Latched between consumeFire() polls.
-  private firePressed = false;
+
+  // Fire input needs BOTH edge-triggered semantics (instant weapons —
+  // rocket, mines: one press = one shot, holding down doesn't spam) AND
+  // hold-duration semantics (charge weapon — dynamite: combat/index.ts
+  // reads isFireHeld() every frame while charging, then consumeFireRelease()
+  // on release to get the actual throw strength). Two physical sources
+  // (Space + left click) are OR'd into one logical "fire" button, held true
+  // as long as EITHER is down.
+  private spaceDown = false;
+  private mouseDown = false;
+  private fireHeld = false;
+  private firePressed = false; // edge: went from up to down since last consume
+  private fireReleased = false; // edge: went from down to up since last consume
 
   constructor() {
     addEventListener("keydown", e => {
       this.keys[e.code] = true;
-      if (e.code === "Space") this.firePressed = true;
+      if (e.code === "Space") {
+        this.spaceDown = true;
+        this.refreshFireHeld();
+      }
     });
-    addEventListener("keyup", e => { this.keys[e.code] = false; });
+    addEventListener("keyup", e => {
+      this.keys[e.code] = false;
+      if (e.code === "Space") {
+        this.spaceDown = false;
+        this.refreshFireHeld();
+      }
+    });
     addEventListener("mousedown", e => {
-      if (e.button === 0) this.firePressed = true; // left click
+      if (e.button === 0) {
+        this.mouseDown = true;
+        this.refreshFireHeld();
+      }
+    });
+    addEventListener("mouseup", e => {
+      if (e.button === 0) {
+        this.mouseDown = false;
+        this.refreshFireHeld();
+      }
     });
   }
 
+  private refreshFireHeld(): void {
+    const held = this.spaceDown || this.mouseDown;
+    if (held && !this.fireHeld) this.firePressed = true;
+    if (!held && this.fireHeld) this.fireReleased = true;
+    this.fireHeld = held;
+  }
+
   // True at most once per press (Space or left-click), however long the
-  // button is held. Call once per rendered frame.
+  // button is held. Call once per rendered frame. Used by instant-fire
+  // weapons (rocket, mines).
   consumeFire(): boolean {
     if (!this.firePressed) return false;
     this.firePressed = false;
     return true;
+  }
+
+  // True exactly once, the frame the fire button goes back up — used by the
+  // charge-and-throw weapon (dynamite) to know when to send the actual
+  // throw. Call once per rendered frame.
+  consumeFireRelease(): boolean {
+    if (!this.fireReleased) return false;
+    this.fireReleased = false;
+    return true;
+  }
+
+  // Current physical state (not edge-triggered) — polled every frame while
+  // charging a throw to compute how long the button has been held.
+  isFireHeld(): boolean {
+    return this.fireHeld;
   }
 
   get scriptDone(): boolean {

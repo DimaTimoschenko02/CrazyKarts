@@ -34,7 +34,7 @@ export interface RemotePlayerState {
   kartType: string;
   hp: number;
   alive: boolean;
-  weapon: string; // "" | "rocket"
+  weapon: string; // "" | "rocket" | "mines" | "dynamite"
   kills: number;
   deaths: number;
 }
@@ -59,6 +59,61 @@ export interface RocketExplodeMsg {
   y: number;
   z: number;
 }
+
+// Mines (server/rooms/MatchRoom.ts dropMine/tickMines/explodeMine) — a mine
+// doesn't move once dropped, so unlike rockets/dynamite there's no analytic
+// motion for the client to extrapolate, just spawn/explode/despawn points.
+export interface MineSpawnMsg {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+}
+export interface MineExplodeMsg {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+}
+export interface MineDespawnMsg {
+  id: string; // lifetime expiry, no explosion — client just removes the mesh silently
+}
+
+// Dynamite (server/rooms/MatchRoom.ts fireDynamite/tickDynamite) — flight is
+// a deterministic gravity parabola, so (like rockets) the client can
+// extrapolate it analytically from one spawn message instead of needing a
+// per-tick position broadcast; see combat/dynamite.ts for the duplicated
+// closed-form math (same convention combat/rockets.ts already uses).
+export interface DynamiteSpawnMsg {
+  id: string;
+  origin: { x: number; y: number; z: number };
+  dir3d: { x: number; y: number; z: number }; // unit vector; vel0 = dir3d * speed
+  speed: number;
+  gravity: number;
+}
+export interface DynamiteStickMsg {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+  stuckToId?: string; // present only if it stuck to a kart, not the ground
+}
+// Only sent while stuck to a MOVING kart (server/rooms/MatchRoom.ts
+// tickDynamite) — one per tick until it explodes, so the client can keep the
+// mesh riding along on whoever it's stuck to.
+export interface DynamiteUpdateMsg {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+}
+export interface DynamiteExplodeMsg {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+}
+
 export interface KillMsg {
   victimId: string;
   killerId: string;
@@ -108,6 +163,13 @@ export interface NetCallbacks {
   // Combat events — see server/rooms/MatchRoom.ts for the authoritative side.
   onRocketSpawn?: (msg: RocketSpawnMsg) => void;
   onRocketExplode?: (msg: RocketExplodeMsg) => void;
+  onMineSpawn?: (msg: MineSpawnMsg) => void;
+  onMineExplode?: (msg: MineExplodeMsg) => void;
+  onMineDespawn?: (msg: MineDespawnMsg) => void;
+  onDynamiteSpawn?: (msg: DynamiteSpawnMsg) => void;
+  onDynamiteStick?: (msg: DynamiteStickMsg) => void;
+  onDynamiteUpdate?: (msg: DynamiteUpdateMsg) => void;
+  onDynamiteExplode?: (msg: DynamiteExplodeMsg) => void;
   onKill?: (msg: KillMsg) => void;
   // Targeted at this client only (teleport-on-respawn) — see MatchRoom.ts
   // respawnPlayer() for why this can't ride the normal schema pose channel.
@@ -151,10 +213,13 @@ export class NetClient {
 
   // Fire-and-forget: server validates alive+armed and silently no-ops
   // otherwise (see MatchRoom.handleFire) — the client doesn't need a
-  // request/response round trip, it just renders whatever "rocket:spawn"
-  // messages come back.
-  sendFire(): void {
-    this.room?.send("fire");
+  // request/response round trip, it just renders whatever spawn/explode
+  // messages come back. `holdMs` only matters for dynamite (charge-and-
+  // throw, see combat/index.ts) — rocket/mines ignore it server-side, so
+  // it's fine (and simpler) to always send the same "fire" message shape
+  // rather than branching the wire message by weapon type here.
+  sendFire(holdMs?: number): void {
+    this.room?.send("fire", holdMs !== undefined ? { holdMs } : undefined);
   }
 
   // Read directly off the schema (server/schema/MatchState.ts) rather than a
@@ -221,6 +286,13 @@ export class NetClient {
 
       if (callbacks.onRocketSpawn) room.onMessage("rocket:spawn", callbacks.onRocketSpawn);
       if (callbacks.onRocketExplode) room.onMessage("rocket:explode", callbacks.onRocketExplode);
+      if (callbacks.onMineSpawn) room.onMessage("mine:spawn", callbacks.onMineSpawn);
+      if (callbacks.onMineExplode) room.onMessage("mine:explode", callbacks.onMineExplode);
+      if (callbacks.onMineDespawn) room.onMessage("mine:despawn", callbacks.onMineDespawn);
+      if (callbacks.onDynamiteSpawn) room.onMessage("dynamite:spawn", callbacks.onDynamiteSpawn);
+      if (callbacks.onDynamiteStick) room.onMessage("dynamite:stick", callbacks.onDynamiteStick);
+      if (callbacks.onDynamiteUpdate) room.onMessage("dynamite:update", callbacks.onDynamiteUpdate);
+      if (callbacks.onDynamiteExplode) room.onMessage("dynamite:explode", callbacks.onDynamiteExplode);
       if (callbacks.onKill) room.onMessage("kill", callbacks.onKill);
       if (callbacks.onRespawn) room.onMessage("respawn", callbacks.onRespawn);
       if (callbacks.onMatchEnd) room.onMessage("match:end", callbacks.onMatchEnd);

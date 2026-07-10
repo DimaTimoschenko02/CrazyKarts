@@ -60,3 +60,15 @@ describe("faceCenterYaw", () => {
     expect(faceCenterYaw({ x: -9.5, z: 0 })).toBeCloseTo(-Math.PI / 2, 5);
   });
 });
+
+// Empty candidate list = map-authoring problem; both pickers must degrade to
+// the arena-center fallback instead of crashing the join path (regression
+// for the 2026-07-10 roads-pack offline-mode bug).
+describe("empty spawn-point fallback", () => {
+  it("pickInitialSpawn returns the center fallback", () => {
+    expect(pickInitialSpawn([], 3)).toEqual({ x: 0, z: 0 });
+  });
+  it("pickRespawnSpawn returns the center fallback", () => {
+    expect(pickRespawnSpawn([], [{ x: 5, z: 5 }])).toEqual({ x: 0, z: 0 });
+  });
+});

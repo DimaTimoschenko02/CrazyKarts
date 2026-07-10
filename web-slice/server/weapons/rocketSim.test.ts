@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Heightfield } from "../../src/shared/heightfield";
-import { WEAPON_TYPES } from "../../src/weapons/stats";
+import { WEAPON_TYPES, type ProjectileStats } from "../../src/weapons/stats";
 import {
   computeAoeDamage,
   computeLaunchPitchRad,
@@ -11,7 +11,7 @@ import {
   tiltDirection3D,
 } from "./rocketSim";
 
-const ROCKET = WEAPON_TYPES.rocket;
+const ROCKET = WEAPON_TYPES.rocket as ProjectileStats;
 
 describe("computeMuzzleDirections", () => {
   it("volleyCount=3 fans -spreadDeg/0/+spreadDeg around yaw=0 (forward = -Z)", () => {
@@ -178,41 +178,67 @@ describe("tiltDirection3D", () => {
 
 describe("findProximityHit", () => {
   const players = [
-    { id: "shooter", x: 0, z: -1 },
-    { id: "victim", x: 0, z: -5 },
+    { id: "shooter", x: 0, y: 0, z: -1 },
+    { id: "victim", x: 0, y: 0, z: -5 },
   ];
 
   it("excludes the shooter when selfDamage is false", () => {
-    const hit = findProximityHit({ x: 0, z: -1 }, players, 1.0, "shooter", false);
+    const hit = findProximityHit({ x: 0, y: 0, z: -1 }, players, 1.0, "shooter", false);
     expect(hit).toBeNull();
   });
 
   it("includes the shooter when selfDamage is true", () => {
-    const hit = findProximityHit({ x: 0, z: -1 }, players, 1.0, "shooter", true);
+    const hit = findProximityHit({ x: 0, y: 0, z: -1 }, players, 1.0, "shooter", true);
     expect(hit).toBe("shooter");
   });
 
   it("finds a non-shooter victim within hitRadius", () => {
-    const hit = findProximityHit({ x: 0, z: -5.3 }, players, 1.0, "shooter", false);
+    const hit = findProximityHit({ x: 0, y: 0, z: -5.3 }, players, 1.0, "shooter", false);
     expect(hit).toBe("victim");
   });
 
   it("returns null when nobody is within range", () => {
-    const hit = findProximityHit({ x: 100, z: 100 }, players, 1.0, "shooter", false);
+    const hit = findProximityHit({ x: 100, y: 0, z: 100 }, players, 1.0, "shooter", false);
     expect(hit).toBeNull();
+  });
+
+  // A single road-tile floor gap (1.1m, see .claude/rules/map-building.md)
+  // sits OUTSIDE the 1.0m proximity gate on purpose — a mine sitting on a
+  // bridge deck must NOT arm/trigger (wasting itself) on a kart passing on
+  // the road underneath. That waste-the-mine case is the exact playtest bug
+  // this vertical gate exists for.
+  it("does NOT trigger across a single road-tile floor gap (same XZ, 1.1m apart in Y)", () => {
+    const oneFloorUp = [{ id: "victim", x: 0, y: 0, z: 0 }];
+    const hit = findProximityHit({ x: 0, y: 1.1, z: 0 }, oneFloorUp, 1.1, "shooter", true);
+    expect(hit).toBeNull();
+  });
+
+  // In-flight rockets/dynamite fly MUZZLE_HEIGHT_OFFSET_M=0.5 above their
+  // target's floor-referenced Y — that genuine same-floor case must stay
+  // inside the gate.
+  it("still triggers on a same-floor target from muzzle height (dy=0.5)", () => {
+    const sameFloor = [{ id: "victim", x: 0, y: 0, z: 0 }];
+    const hit = findProximityHit({ x: 0, y: 0.5, z: 0 }, sameFloor, 1.1, "shooter", true);
+    expect(hit).toBe("victim");
+  });
+
+  it("still triggers on the same floor at the exact same Y", () => {
+    const sameFloor = [{ id: "victim", x: 0, y: 1.1, z: 0 }];
+    const hit = findProximityHit({ x: 0, y: 1.1, z: 0 }, sameFloor, 1.1, "shooter", true);
+    expect(hit).toBe("victim");
   });
 });
 
 describe("computeAoeDamage", () => {
   const players = [
-    { id: "shooter", x: 0, z: 0 },
-    { id: "close", x: 0, z: 0 }, // point-blank
-    { id: "mid", x: 1.75, z: 0 }, // half the 3.5m radius
-    { id: "far", x: 4, z: 0 }, // outside the radius
+    { id: "shooter", x: 0, y: 0, z: 0 },
+    { id: "close", x: 0, y: 0, z: 0 }, // point-blank
+    { id: "mid", x: 1.75, y: 0, z: 0 }, // half the 3.5m radius
+    { id: "far", x: 4, y: 0, z: 0 }, // outside the radius
   ];
 
   it("floor(baseDamage * falloff), skips the shooter, skips out-of-range", () => {
-    const dmg = computeAoeDamage({ x: 0, z: 0 }, players, ROCKET, "shooter");
+    const dmg = computeAoeDamage({ x: 0, y: 0, z: 0 }, players, ROCKET, "shooter");
     expect(dmg.get("shooter")).toBeUndefined();
     expect(dmg.get("close")).toBe(40); // dist=0 -> falloff=1 -> floor(40)=40
     expect(dmg.get("mid")).toBe(20); // falloff=0.5 -> floor(20)=20
@@ -221,7 +247,28 @@ describe("computeAoeDamage", () => {
 
   it("includes the shooter when selfDamage is true", () => {
     const selfDamageOn = { ...ROCKET, selfDamage: true };
-    const dmg = computeAoeDamage({ x: 0, z: 0 }, players, selfDamageOn, "shooter");
+    const dmg = computeAoeDamage({ x: 0, y: 0, z: 0 }, players, selfDamageOn, "shooter");
     expect(dmg.get("shooter")).toBe(40);
+  });
+
+  // Multi-layer (bridge deck): an explosion on the deck (y=1.1) directly
+  // above a player on the road (y=0, dx=dz=0) should deal only a small
+  // fraction of point-blank damage. With AOE_VERTICAL_WEIGHT=2.5, dy=1.1
+  // reads as an effective distance of 1.1*2.5=2.75m out of the rocket's
+  // 3.5m aoeRadius -> falloff = 1 - 2.75/3.5 = 0.2142... -> floor(40*0.2142)
+  // = 8. Not literally zero (per smooth-values.md a hard 0/full cutoff at
+  // the deck boundary would itself be a discontinuity) but a small
+  // fraction of the 40 point-blank hit, matching the task brief ("почти
+  // обнуляется falloff'ом").
+  it("explosion on a bridge deck deals only a small fraction of point-blank damage to the road below it", () => {
+    const below = [{ id: "victim", x: 0, y: 0, z: 0 }];
+    const dmg = computeAoeDamage({ x: 0, y: 1.1, z: 0 }, below, ROCKET, "shooter");
+    expect(dmg.get("victim")).toBe(8);
+  });
+
+  it("falloff-by-XZ-distance is unchanged when both points share the same Y (regression)", () => {
+    const sameFloor = [{ id: "victim", x: 1.75, y: 2.2, z: 0 }];
+    const dmg = computeAoeDamage({ x: 0, y: 2.2, z: 0 }, sameFloor, ROCKET, "shooter");
+    expect(dmg.get("victim")).toBe(20); // falloff=0.5 -> floor(20)=20, same as XZ-only mid case
   });
 });

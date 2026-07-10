@@ -16,6 +16,21 @@ const DEATH_RESPAWN_DELAY_S = 3;
 const KILL_FEED_MAX_LINES = 5;
 const KILL_FEED_LINE_TTL_MS = 6000;
 
+// Weapon codes -> HUD label (src/net/netClient.ts RemotePlayerState.weapon:
+// "" | "rocket" | "mines" | "dynamite").
+function weaponLabel(weapon: string): string {
+  switch (weapon) {
+    case "rocket":
+      return "ROCKET";
+    case "mines":
+      return "MINES";
+    case "dynamite":
+      return "DYNAMITE";
+    default:
+      return "--";
+  }
+}
+
 export class CombatHud {
   private wasAlive = true;
   private deathAt = 0;
@@ -24,7 +39,9 @@ export class CombatHud {
     private readonly statsEl: HTMLElement,
     private readonly respawnEl: HTMLElement,
     private readonly killFeedEl: HTMLElement,
-    private readonly timerEl: HTMLElement
+    private readonly timerEl: HTMLElement,
+    private readonly chargeBarEl: HTMLElement,
+    private readonly chargeFillEl: HTMLElement
   ) {}
 
   // Creates and appends its own DOM elements — no index.html changes needed
@@ -71,7 +88,26 @@ export class CombatHud {
     } satisfies Partial<CSSStyleDeclaration>);
     document.body.appendChild(timerEl);
 
-    return new CombatHud(statsEl, respawnEl, killFeedEl, timerEl);
+    // Dynamite charge bar — only shown while charge-and-throw is actually
+    // charging (updateCharge(null) hides it), positioned just below the
+    // stats box in the same top-right corner so the eye doesn't have to
+    // travel to check throw strength.
+    const chargeBarEl = document.createElement("div");
+    chargeBarEl.id = "charge-bar";
+    Object.assign(chargeBarEl.style, {
+      position: "fixed", top: "78px", right: "10px", zIndex: "10",
+      width: "140px", height: "10px", background: "rgba(0,0,0,.5)",
+      border: "1px solid #f664", borderRadius: "4px", overflow: "hidden",
+      display: "none", pointerEvents: "none",
+    } satisfies Partial<CSSStyleDeclaration>);
+    const chargeFillEl = document.createElement("div");
+    Object.assign(chargeFillEl.style, {
+      height: "100%", width: "0%", background: "#FFD633",
+    } satisfies Partial<CSSStyleDeclaration>);
+    chargeBarEl.appendChild(chargeFillEl);
+    document.body.appendChild(chargeBarEl);
+
+    return new CombatHud(statsEl, respawnEl, killFeedEl, timerEl, chargeBarEl, chargeFillEl);
   }
 
   // Call once per rendered frame with the local player's own schema state
@@ -86,7 +122,7 @@ export class CombatHud {
     }
     this.statsEl.textContent =
       `HP    ${Math.max(0, Math.round(self.hp))}\n` +
-      `WPN   ${self.weapon === "rocket" ? "ROCKET" : "--"}\n` +
+      `WPN   ${weaponLabel(self.weapon)}\n` +
       `K/D   ${self.kills} / ${self.deaths}`;
 
     if (self.alive) {
@@ -119,6 +155,18 @@ export class CombatHud {
     const mm = Math.floor(remainingS / 60);
     const ss = remainingS % 60;
     this.timerEl.textContent = `${mm}:${ss.toString().padStart(2, "0")}`;
+  }
+
+  // Call once per rendered frame while holding the dynamite charge (combat/
+  // index.ts). `fraction` is 0..1 (heldMs/maxChargeMs); pass null to hide the
+  // bar entirely (not charging / not holding dynamite / offline).
+  updateCharge(fraction: number | null): void {
+    if (fraction === null) {
+      this.chargeBarEl.style.display = "none";
+      return;
+    }
+    this.chargeBarEl.style.display = "block";
+    this.chargeFillEl.style.width = `${Math.round(Math.max(0, Math.min(1, fraction)) * 100)}%`;
   }
 
   pushKillFeed(msg: KillMsg): void {

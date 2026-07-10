@@ -23,7 +23,9 @@ export class Player extends Schema {
   @type("number") hp = 100;
   // Combat additions (P3 vertical slice, docs/p2-port-notes.md §1-3).
   @type("boolean") alive = true;
-  @type("string") weapon = ""; // "" (EMPTY) | "rocket" (ARMED) — single-slot, no ammo counter (reference behavior)
+  @type("string") weapon = ""; // "" (EMPTY) | "rocket" | "mines" | "dynamite" (ARMED) — single-slot, no ammo
+  // counter (reference behavior for rocket, extended the same way to the
+  // 2026-07-10 mines/dynamite additions — see src/weapons/stats.ts WEAPON_TYPES).
   // Match stats: server is the source of truth (not client-tallied) because
   // the next stage (match-end submit to master, /api/internal/match/submit)
   // needs these numbers to survive reconnect/late-join without drifting from
@@ -32,8 +34,10 @@ export class Player extends Schema {
   @type("number") deaths = 0;
 }
 
-// Weapon pickup box (docs/p2-port-notes.md §2). One "prize" only (rocket) —
-// the reference has no weighted pool, so there's nothing to pick between.
+// Weapon pickup box (docs/p2-port-notes.md §2). Gives a uniformly random
+// prize from ["rocket", "mines", "dynamite"] as of the 2026-07-10 task
+// (server/rooms/MatchRoom.ts pickRandomWeapon) — the reference itself has no
+// weighted pool, so unweighted-random is the simplest extension.
 export class WeaponBox extends Schema {
   @type("number") x = 0;
   @type("number") y = 0;

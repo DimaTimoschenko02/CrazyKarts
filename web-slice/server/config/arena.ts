@@ -20,7 +20,7 @@
 // one map (arena_slice) ever loaded; ACTIVE_MAP switching to mars_base
 // exposed that they don't generalize (wrong plateau height → spawns
 // underground / mid-air).
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { Heightfield, type MapJson } from "../../src/shared/heightfield";
@@ -43,10 +43,25 @@ export interface WorldPoint {
   z: number;
 }
 
+// Weapon-box world point, WITH an explicit Y (unlike WorldPoint, which is
+// XZ-only — spawns always sit on the ground so their Y is looked up
+// separately via groundHeightAt). Hand-authored box_points (map editor) are
+// legitimately allowed to float in the air (bridge/second-floor placements
+// are an intentional owner choice, not a mistake to correct), so a box's Y
+// has to travel WITH the point instead of being re-derived from the terrain
+// at spawn time — see loadArena's boxPoints construction below and
+// MatchRoom.ts onCreate, which now just adds BOX_HOVER_HEIGHT_M to this Y
+// instead of calling groundHeightAt(p) itself.
+export interface BoxPoint {
+  x: number;
+  y: number;
+  z: number;
+}
+
 export interface Arena {
   heightfield: Heightfield;
   spawnPoints: readonly WorldPoint[];
-  boxPoints: readonly WorldPoint[];
+  boxPoints: readonly BoxPoint[];
   // Ground height at any XZ point. spawnPoints/boxPoints are DERIVED from
   // findFlatSpawnCandidates (autoSpawn.ts), which only ever returns cells
   // clear of the island's edges, so this should always hit a real sample —
@@ -98,17 +113,33 @@ function resolveMapName(name: string | undefined): string {
   return ACTIVE_MAP;
 }
 
-// One Arena per distinct (resolved) map name, built once and reused for
-// every room that plays it — the heightfield + derived spawn/box grids are
-// pure functions of the map JSON, no reason to recompute per room.
-const cache = new Map<string, Arena>();
+// One Arena per distinct (resolved) map name, reused for every room that
+// plays it AS LONG AS the map file on disk hasn't changed since — the
+// heightfield + derived spawn/box grids are pure functions of the map JSON,
+// no reason to recompute per room for an unchanged file. Keyed by the file's
+// own mtimeMs (not just the name) so a map that gets overwritten in place —
+// e.g. the editor's "Drive" button POSTs a fresh editor_drive.json every time
+// the owner tweaks a layout, see vite.config.ts editorMapsFilePlugin — is
+// detected and reloaded instead of silently serving the stale Arena an
+// earlier room already built for that name. This was the actual root cause
+// of "placed boxes in the editor, hit Drive, no boxes in game": the SAME
+// server process had loaded that map name once already (e.g. a previous
+// Drive session, or another room), cached it forever, and kept returning
+// that first snapshot's box_points/heightfield no matter how many times the
+// file changed underneath it — only a full server restart ever picked up
+// the edit. statSync is a single cheap syscall per loadArena() call (room
+// creation, not per-tick), so checking it unconditionally costs nothing
+// worth avoiding.
+const cache = new Map<string, { arena: Arena; mtimeMs: number }>();
 
 export function loadArena(name?: string): Arena {
   const safeName = resolveMapName(name);
+  const mapPath = mapPathFor(safeName);
+  const mtimeMs = statSync(mapPath).mtimeMs;
   const cached = cache.get(safeName);
-  if (cached) return cached;
+  if (cached && cached.mtimeMs === mtimeMs) return cached.arena;
 
-  const mapJson = JSON.parse(readFileSync(mapPathFor(safeName), "utf-8")) as MapJson;
+  const mapJson = JSON.parse(readFileSync(mapPath, "utf-8")) as MapJson;
   const heightfield = Heightfield.fromMapJson(mapJson);
 
   // MIN_KART_SPAWNS in the reference (spawn_manager.gd) is 4; we ask for 6 —
@@ -119,26 +150,41 @@ export function loadArena(name?: string): Arena {
   const toWorldPoints = (grid: readonly GridPoint[]): WorldPoint[] =>
     grid.map(([gx, gz]) => heightfield.gridToWorld(gx, gz));
 
+  // spawn uses top-layer sample() intentionally; multi-layer spawn selection is out of scope
+  const groundHeightAt = (p: WorldPoint): number =>
+    heightfield.sample(p.x, p.z) ?? nearestWalkableHeight(heightfield, p);
+
   // Hand-authored box_points (map editor, "Маркеры" category) win outright
   // over the auto-derive when present — the owner placing boxes by hand is
   // explicitly opting that map OUT of the farthest-point-sampling heuristic.
-  // y_level isn't carried into WorldPoint (never was — the auto-derived path
-  // didn't track box height either, see the client's own box-height handling),
-  // only x/z through the same gridToWorld formula every other grid->world
-  // conversion in this file already uses. Absent/empty falls back to the old
-  // auto-derive so every pre-existing map keeps loading unchanged.
-  const boxPoints: WorldPoint[] =
+  // y_LEVEL IS carried through here (BoxPoint.y, above) unlike the old
+  // WorldPoint-only shape: the owner may legitimately place a box in the air
+  // (a bridge deck, a second-floor platform) and that placement must be
+  // trusted as-authored, NOT snapped down to whatever the terrain happens to
+  // read at that XZ (a box on a bridge over a canyon would otherwise fall to
+  // the canyon floor — see MatchRoom.ts onCreate, which used to re-derive Y
+  // via groundHeightAt and silently discarded this). Absent/empty falls back
+  // to the old auto-derive so every pre-existing map keeps loading
+  // unchanged; the auto path has no authored Y to trust, so it keeps using
+  // groundHeightAt exactly like before.
+  const boxPoints: BoxPoint[] =
     mapJson.box_points && mapJson.box_points.length > 0
-      ? mapJson.box_points.map(p => heightfield.gridToWorld(p.x, p.z))
-      : toWorldPoints(deriveBoxGrid(mapJson, 6, spawnGrid)); // excludes spawn cells so a box never stacks on a spawn point
+      ? mapJson.box_points.map(p => {
+          const world = heightfield.gridToWorld(p.x, p.z);
+          return { x: world.x, y: p.y_level * mapJson.meta.level_height, z: world.z };
+        })
+      : deriveBoxGrid(mapJson, 6, spawnGrid).map(([gx, gz]) => {
+          // excludes spawn cells so a box never stacks on a spawn point
+          const world = heightfield.gridToWorld(gx, gz);
+          return { x: world.x, y: groundHeightAt(world), z: world.z };
+        });
 
   const arena: Arena = {
     heightfield,
     spawnPoints: toWorldPoints(spawnGrid),
     boxPoints,
-    // spawn uses top-layer sample() intentionally; multi-layer spawn selection is out of scope
-    groundHeightAt: p => heightfield.sample(p.x, p.z) ?? nearestWalkableHeight(heightfield, p),
+    groundHeightAt,
   };
-  cache.set(safeName, arena);
+  cache.set(safeName, { arena, mtimeMs });
   return arena;
 }

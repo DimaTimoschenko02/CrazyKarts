@@ -6,7 +6,8 @@
 // "direct hit" damage — Area3D.body_entered just calls _apply_aoe_damage at
 // the collision point, same as the lifetime-expiry path).
 import type { Heightfield } from "../../src/shared/heightfield";
-import type { ProjectileStats } from "../../src/weapons/stats";
+import { anisotropicDist3D, withinProximity3D } from "../../src/shared/spatial3d";
+import type { AoeStats, ProjectileStats } from "../../src/weapons/stats";
 
 export interface Vec2 {
   x: number;
@@ -137,16 +138,48 @@ export function tiltDirection3D(dirX: number, dirZ: number, pitchRad: number): V
   return { x: dirX * cp, y: Math.sin(pitchRad), z: dirZ * cp };
 }
 
-export interface PlayerPoint extends Vec2 {
+export interface PlayerPoint extends Vec3 {
   id: string;
 }
 
+// Vertical gate for proximity TRIGGER events (direct rocket hit, mine arm,
+// dynamite stick) — these are genuine on/off events (something either
+// touches a body or it doesn't), which is exactly the smooth-values rule's
+// carve-out for a hard threshold (see shared/spatial3d.ts withinProximity3D
+// doc). Must be STRICTLY below a single road-tile floor gap (1.1m,
+// .claude/rules/map-building.md) — a mine on a bridge deck must NOT arm/
+// trigger (and waste itself) on a kart passing underneath, which is the
+// exact playtest bug this gate exists for. 1.0m still comfortably covers
+// every genuine same-floor case: player.y and a mine's y are both
+// floor-referenced (usually |dy|≈0, up to ~0.5 on slopes), and a rocket/
+// dynamite in flight sits MUZZLE_HEIGHT_OFFSET_M=0.5 (MatchRoom.ts) above
+// its target's floor-Y.
+const PROXIMITY_VERTICAL_M = 1.0;
+
+// Vertical weight for AOE falloff distance — unlike the proximity gate
+// above, this is a continuous quantity (damage falloff), so per
+// smooth-values.md it must never hard-cut to 0/full at a boundary. Instead
+// we make Y "count more" than XZ: one road-tile floor (1.1m) of vertical
+// separation reads as if it were 1.1 * 2.5 = 2.75m of horizontal
+// separation, which pushes a rocket's 3.5m-radius falloff down to
+// floor(40*(1-2.75/3.5)) = 8 damage (was 40 at point-blank) — "almost
+// obliterated by falloff" per the task brief, not a literal hard zero,
+// while a blast at the very edge of a deck (no floor between the two
+// points, small actual dy) still degrades smoothly rather than snapping.
+// Explosions do NOT raycast against terrain — a rocket exploding right next
+// to a thin wall still damages through it — this weighting is a cheap proxy
+// for "probably a different floor", not real occlusion.
+const AOE_VERTICAL_WEIGHT = 2.5;
+
 // Nearest alive, non-shooter (when selfDamage is false) kart within
-// hitRadius — proximity trigger for exploding on a body, mirrors
-// Area3D.body_entered in the reference (see file header: this only decides
-// WHERE to explode, not a separate damage amount).
+// hitRadius (XZ) AND PROXIMITY_VERTICAL_M (Y) — proximity trigger for
+// exploding on a body, mirrors Area3D.body_entered in the reference (see
+// file header: this only decides WHERE to explode, not a separate damage
+// amount). "Nearest" ranks candidates by XZ distance only, matching the old
+// pre-3D behavior — the vertical axis is purely a gate here, not part of
+// the ranking.
 export function findProximityHit(
-  pos: Vec2,
+  pos: Vec3,
   players: readonly PlayerPoint[],
   hitRadius: number,
   shooterId: string,
@@ -156,8 +189,9 @@ export function findProximityHit(
   let bestDist = Infinity;
   for (const p of players) {
     if (!selfDamage && p.id === shooterId) continue;
+    if (!withinProximity3D(pos, p, hitRadius, PROXIMITY_VERTICAL_M)) continue;
     const d = Math.hypot(p.x - pos.x, p.z - pos.z);
-    if (d <= hitRadius && d < bestDist) {
+    if (d < bestDist) {
       bestDist = d;
       best = p.id;
     }
@@ -168,17 +202,20 @@ export function findProximityHit(
 // AOE damage at an explosion center: linear falloff to 0 at aoeRadius,
 // floor()'d, shooter excluded unless selfDamage is true. Mirrors
 // `_apply_aoe_damage` in the reference exactly (docs/p2-port-notes.md §1
-// step 6).
+// step 6), with one deliberate addition vs. the reference: distance is now
+// anisotropicDist3D (see AOE_VERTICAL_WEIGHT above) instead of flat XZ, so
+// an explosion on a bridge deck doesn't full-damage a kart driving on the
+// road directly underneath it.
 export function computeAoeDamage(
-  center: Vec2,
+  center: Vec3,
   players: readonly PlayerPoint[],
-  stats: ProjectileStats,
+  stats: AoeStats,
   shooterId: string
 ): Map<string, number> {
   const result = new Map<string, number>();
   for (const p of players) {
     if (!stats.selfDamage && p.id === shooterId) continue;
-    const dist = Math.hypot(p.x - center.x, p.z - center.z);
+    const dist = anisotropicDist3D(p.x - center.x, p.y - center.y, p.z - center.z, AOE_VERTICAL_WEIGHT);
     if (dist > stats.aoeRadius) continue;
     const falloff = Math.max(0, 1 - dist / stats.aoeRadius);
     const dmg = Math.floor(stats.baseDamage * falloff);

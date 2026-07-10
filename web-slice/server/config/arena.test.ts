@@ -1,8 +1,44 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, afterEach } from "vitest";
+import { existsSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadArena } from "./arena";
 import { ACTIVE_MAP } from "../../src/shared/activeMap";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const MAPS_DIR = path.join(__dirname, "../../public/maps");
+
+// loadArena only ever reads from public/maps/<name>.json (mapPathFor), so the
+// mtime-invalidation test has to write its scratch fixture directly there —
+// cleaned up in afterEach so it never lingers as a real map option in the
+// lobby's map picker.
+const MTIME_TEST_MAP = "test_mtime_invalidate";
+const MTIME_TEST_MAP_PATH = path.join(MAPS_DIR, `${MTIME_TEST_MAP}.json`);
+
+function writeMtimeFixture(boxCount: 1 | 2): void {
+  const boxPoints =
+    boxCount === 1
+      ? [{ x: 2, z: 2, y_level: 1 }]
+      : [
+          { x: 2, z: 2, y_level: 1 },
+          { x: 0, z: 4, y_level: 1 },
+        ];
+  writeFileSync(
+    MTIME_TEST_MAP_PATH,
+    JSON.stringify({
+      _: "Scratch fixture for arena.test.ts mtime-invalidation — deleted in afterEach.",
+      meta: { tile_size: 1.0, level_height: 0.5, origin_offset: [-2, 0, -2] },
+      rect_fills: [{ asset: "terrain", x_min: 0, z_min: 0, x_max: 4, z_max: 4, y_level: 1, rot: 0 }],
+      box_points: boxPoints,
+    })
+  );
+}
+
 describe("loadArena", () => {
+  afterEach(() => {
+    if (existsSync(MTIME_TEST_MAP_PATH)) rmSync(MTIME_TEST_MAP_PATH);
+  });
+
   it("loads a valid, existing map name and derives spawn/box points from it", () => {
     const arena = loadArena("arena_slice");
     expect(arena.spawnPoints.length).toBeGreaterThan(0);
@@ -10,8 +46,32 @@ describe("loadArena", () => {
     expect(typeof arena.groundHeightAt({ x: 0, z: 0 })).toBe("number");
   });
 
-  it("returns the SAME cached instance for the same map name", () => {
+  it("returns the SAME cached instance for the same map name when the file hasn't changed", () => {
     expect(loadArena("mars_base")).toBe(loadArena("mars_base"));
+  });
+
+  it("re-reads the map when its mtime changes — the editor's Drive-button overwrite must not stay cached (bug 1)", () => {
+    writeMtimeFixture(1);
+    const before = loadArena(MTIME_TEST_MAP);
+    expect(before.boxPoints.length).toBe(1);
+
+    // Bump the mtime forward so the OS clock's own resolution can't coincide
+    // with the first write (utimesSync lets us set it explicitly rather than
+    // relying on wall-clock time actually advancing between the two writes).
+    writeMtimeFixture(2);
+    const bumpedMs = Date.now() / 1000 + 5;
+    utimesSync(MTIME_TEST_MAP_PATH, bumpedMs, bumpedMs);
+
+    const after = loadArena(MTIME_TEST_MAP);
+    expect(after).not.toBe(before);
+    expect(after.boxPoints.length).toBe(2);
+  });
+
+  it("keeps returning the cached Arena when the file is re-loaded without its mtime changing", () => {
+    writeMtimeFixture(1);
+    const first = loadArena(MTIME_TEST_MAP);
+    const second = loadArena(MTIME_TEST_MAP);
+    expect(second).toBe(first);
   });
 
   it("falls back to ACTIVE_MAP for a name that doesn't exist on disk", () => {
@@ -69,13 +129,22 @@ describe("loadArena", () => {
     const arena = loadArena("test_box_points");
     // Fixture: tile_size=1, origin_offset=[-2,0,-2] -> world = grid + origin.
     expect(arena.boxPoints).toEqual([
-      { x: 0, z: 0 }, // grid (2,2)
-      { x: -2, z: 2 }, // grid (0,4)
+      { x: 0, y: 0.5, z: 0 }, // grid (2,2), y_level=1 * level_height=0.5
+      { x: -2, y: 0.5, z: 2 }, // grid (0,4), y_level=1 * level_height=0.5
     ]);
   });
 
-  it("falls back to the auto-derive when box_points is absent (mars_base has none)", () => {
+  it("box_points y is y_level * meta.level_height (bug 2) — trusts the authored height, not groundHeightAt", () => {
+    writeMtimeFixture(1); // y_level=1, level_height=0.5 -> y=0.5
+    const arena = loadArena(MTIME_TEST_MAP);
+    expect(arena.boxPoints).toEqual([{ x: 0, y: 0.5, z: 0 }]); // grid (2,2) + origin [-2,0,-2]
+  });
+
+  it("falls back to the auto-derive when box_points is absent (mars_base has none), using groundHeightAt for y", () => {
     const arena = loadArena("mars_base");
     expect(arena.boxPoints.length).toBeGreaterThan(0);
+    for (const p of arena.boxPoints) {
+      expect(p.y).toBeCloseTo(arena.groundHeightAt({ x: p.x, z: p.z }), 6);
+    }
   });
 });

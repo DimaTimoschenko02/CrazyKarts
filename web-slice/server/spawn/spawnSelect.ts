@@ -7,9 +7,18 @@ export interface WorldPoint {
   z: number;
 }
 
+// A map with zero derived spawn candidates (authoring problem — e.g. no flat
+// cells at all) must degrade to "everyone spawns at the arena center", not
+// crash the room: MatchRoom.onJoin runs inside the websocket upgrade path,
+// and an exception there kills the join and strands the client in offline
+// mode with no visible error (playtest 2026-07-10, roads-pack maps before
+// autoSpawn.ts knew about roadTile_* flatness).
+const FALLBACK_SPAWN: WorldPoint = { x: 0, z: 0 };
+
 // Sequential round-robin — mirrors `_next_index % size` in the reference.
 // Caller owns the index (server increments it per join).
 export function pickInitialSpawn(points: readonly WorldPoint[], index: number): WorldPoint {
+  if (points.length === 0) return FALLBACK_SPAWN;
   return points[index % points.length];
 }
 
@@ -21,6 +30,7 @@ export function pickRespawnSpawn(
   points: readonly WorldPoint[],
   aliveEnemyPositions: readonly WorldPoint[]
 ): WorldPoint {
+  if (points.length === 0) return FALLBACK_SPAWN; // same authoring-problem fallback as pickInitialSpawn
   let best = points[0];
   let bestMinDist = -Infinity;
   for (const p of points) {

@@ -228,7 +228,11 @@ export class RemoteKartManager {
   getObstacles(): KartObstacle[] {
     const out: KartObstacle[] = [];
     for (const kart of this.karts.values()) {
-      out.push({ x: kart.group.position.x, z: kart.group.position.z, alive: kart.alive });
+      // y = the same rendered height driving this remote kart's own tilt
+      // above (kart.group.position.y) — feeds resolveKartPush's vertical
+      // push gate (physics/kartCollision.ts KART_PUSH_VERTICAL_M) so a kart
+      // on a bridge deck doesn't get shoved by one passing underneath it.
+      out.push({ x: kart.group.position.x, y: kart.group.position.y, z: kart.group.position.z, alive: kart.alive });
     }
     return out;
   }

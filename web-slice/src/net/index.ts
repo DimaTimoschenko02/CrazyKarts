@@ -34,7 +34,22 @@ export interface InitNetOptions {
   // straight through to NetClient.connect() alongside the movement-relay
   // callbacks above. Optional so net/ still works standalone (e.g. tests)
   // without a combat module attached.
-  combat?: Pick<NetCallbacks, "onRocketSpawn" | "onRocketExplode" | "onKill" | "onRespawn" | "onMatchEnd" | "onMatchRestart">;
+  combat?: Pick<
+    NetCallbacks,
+    | "onRocketSpawn"
+    | "onRocketExplode"
+    | "onMineSpawn"
+    | "onMineExplode"
+    | "onMineDespawn"
+    | "onDynamiteSpawn"
+    | "onDynamiteStick"
+    | "onDynamiteUpdate"
+    | "onDynamiteExplode"
+    | "onKill"
+    | "onRespawn"
+    | "onMatchEnd"
+    | "onMatchRestart"
+  >;
   // Which map this client resolved from ?map= (src/main.ts) — forwarded to
   // joinOrCreate() so a room's CREATOR picks the arena the server actually
   // builds (see server/rooms/MatchRoom.ts onCreate()). Later joiners' value

@@ -5,6 +5,7 @@
 // underground the moment the active map changed to anything else). Pure and
 // unit-testable: no Colyseus/schema deps, just MapJson in, grid coords out.
 import type { CellDef, MapJson, RectFill } from "../../src/shared/heightfield";
+import roadTilesCatalog from "../../src/shared/roadTilesCatalog.json";
 
 export interface GridCell {
   x: number;
@@ -19,6 +20,35 @@ export interface GridCell {
 // own more specific prefixes, so this must NOT just be `asset.startsWith
 // ("terrain")` — that would also match terrain_ramp, terrain_side, etc.
 const FLAT_ASSET_RE = /^terrain(_road.*)?$/;
+
+// Kenney Road Tiles (roadTile_*) flatness comes from the baked catalog, not
+// the asset name — this regex-only check silently yielded ZERO spawn
+// candidates on any roads-pack map (playtest 2026-07-10: MatchRoom.onJoin
+// crashed reading spawn.x, every roads map fell back to offline mode).
+// A tile is spawnable when its baked physics is exact (no approx plane-fit
+// guesswork), it isn't water, and its top surface is level: topMax−topMin
+// ≤ 0.15m cleanly splits the catalog — flat tiles (plain grass/roads with
+// shoulder lips) spread ≤ 0.10, the shallowest slope starts at 0.17.
+const FLAT_ROAD_TILE_MAX_TOP_SPREAD = 0.15;
+
+interface CatalogTileEntry {
+  kind?: string;
+  physics?: string;
+  topMin?: number;
+  topMax?: number;
+}
+const ROAD_TILES = roadTilesCatalog as Record<string, CatalogTileEntry>;
+
+function isFlatSpawnAsset(asset: string): boolean {
+  if (FLAT_ASSET_RE.test(asset)) return true;
+  const tile = ROAD_TILES[asset];
+  if (!tile) return false;
+  return (
+    tile.physics === "exact" &&
+    tile.kind !== "water" &&
+    (tile.topMax ?? 0) - (tile.topMin ?? 0) <= FLAT_ROAD_TILE_MAX_TOP_SPREAD
+  );
+}
 
 function collectCells(map: MapJson): GridCell[] {
   const out: GridCell[] = [];
@@ -49,7 +79,7 @@ export function findFlatSpawnCandidates(map: MapJson): GridCell[] {
 
   const candidates: GridCell[] = [];
   for (const c of index.values()) {
-    if (!FLAT_ASSET_RE.test(c.asset)) continue;
+    if (!isFlatSpawnAsset(c.asset)) continue;
     const neighbors: [number, number][] = [
       [c.x + 1, c.z], [c.x - 1, c.z], [c.x, c.z + 1], [c.x, c.z - 1],
     ];
