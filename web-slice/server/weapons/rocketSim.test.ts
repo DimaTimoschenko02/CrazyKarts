@@ -237,7 +237,11 @@ describe("computeAoeDamage", () => {
     { id: "far", x: 4, y: 0, z: 0 }, // outside the radius
   ];
 
-  it("floor(baseDamage * falloff), skips the shooter, skips out-of-range", () => {
+  // Real WEAPON_TYPES.rocket.selfDamage is false (owner decision 2026-07-10:
+  // no weapon ever damages its own shooter) — the true branch of the
+  // formula still needs coverage, so it's exercised via a local override
+  // rather than the real stats.
+  it("floor(baseDamage * falloff), skips the shooter, skips out-of-range (real rocket stats)", () => {
     const dmg = computeAoeDamage({ x: 0, y: 0, z: 0 }, players, ROCKET, "shooter");
     expect(dmg.get("shooter")).toBeUndefined();
     expect(dmg.get("close")).toBe(40); // dist=0 -> falloff=1 -> floor(40)=40
@@ -245,7 +249,7 @@ describe("computeAoeDamage", () => {
     expect(dmg.has("far")).toBe(false);
   });
 
-  it("includes the shooter when selfDamage is true", () => {
+  it("includes the shooter when selfDamage is true (formula branch, local override)", () => {
     const selfDamageOn = { ...ROCKET, selfDamage: true };
     const dmg = computeAoeDamage({ x: 0, y: 0, z: 0 }, players, selfDamageOn, "shooter");
     expect(dmg.get("shooter")).toBe(40);

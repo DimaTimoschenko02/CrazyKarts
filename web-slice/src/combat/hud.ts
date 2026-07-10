@@ -89,15 +89,19 @@ export class CombatHud {
     document.body.appendChild(timerEl);
 
     // Dynamite charge bar — only shown while charge-and-throw is actually
-    // charging (updateCharge(null) hides it), positioned just below the
-    // stats box in the same top-right corner so the eye doesn't have to
-    // travel to check throw strength.
+    // charging (updateCharge(null) hides it). Bottom-center, right where the
+    // player's eyes already are (on their own kart) — it originally lived in
+    // the top-right corner next to the stats box and the owner never noticed
+    // it existed during a live playtest (2026-07-10), which is the whole
+    // reason for the size/placement below.
     const chargeBarEl = document.createElement("div");
     chargeBarEl.id = "charge-bar";
     Object.assign(chargeBarEl.style, {
-      position: "fixed", top: "78px", right: "10px", zIndex: "10",
-      width: "140px", height: "10px", background: "rgba(0,0,0,.5)",
-      border: "1px solid #f664", borderRadius: "4px", overflow: "hidden",
+      position: "fixed", bottom: "96px", left: "50%", zIndex: "10",
+      transform: "translateX(-50%)",
+      width: "260px", height: "16px", background: "rgba(0,0,0,.55)",
+      border: "1px solid #FFD633", borderRadius: "8px", overflow: "hidden",
+      boxShadow: "0 0 10px rgba(255,214,51,.35)",
       display: "none", pointerEvents: "none",
     } satisfies Partial<CSSStyleDeclaration>);
     const chargeFillEl = document.createElement("div");

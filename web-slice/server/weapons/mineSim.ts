@@ -14,14 +14,19 @@ export function computeMineDropIntervalS(modelLength: number, maxSpeed: number):
   return (1.15 * modelLength) / 2 / maxSpeed;
 }
 
+// Owner feedback 2026-07-10: mines were dropping too close together — "not
+// even a full kart body's length between them" — widen every drop interval
+// by this factor (spacing scales linearly with T, so this scales the gap
+// between mines by the same 1.25x too).
+const MINE_DROP_INTERVAL_SPACING_MULT = 1.25;
+
 // Single source of truth for the interval actually used in play. "racer" is
 // the only kart type that exists today (src/kart/stats.ts) — same
 // assumption server/rooms/MatchRoom.ts already makes for other kart-derived
 // constants (e.g. MUZZLE_FORWARD_OFFSET_M).
-export const MINE_DROP_INTERVAL_S = computeMineDropIntervalS(
-  KART_TYPES.racer.modelLength,
-  DEFAULT_KART_PHYSICS_PARAMS.maxSpeed
-);
+export const MINE_DROP_INTERVAL_S =
+  computeMineDropIntervalS(KART_TYPES.racer.modelLength, DEFAULT_KART_PHYSICS_PARAMS.maxSpeed) *
+  MINE_DROP_INTERVAL_SPACING_MULT;
 
 // Half the kart's body length — how far behind the kart's reported x/z each
 // mine drops (task spec: "смещение назад на ~полкорпуса"), so mines land

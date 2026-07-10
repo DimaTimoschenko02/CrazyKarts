@@ -70,6 +70,9 @@ export const WEAPON_TYPES: Readonly<Record<string, WeaponStats>> = {
     lifetime: 6.0,
     baseDamage: 40,
     aoeRadius: 3.5,
+    // Owner decision 2026-07-10 (final): NO weapon ever damages its own
+    // shooter — resolves the GDD "open question" in favor of zero
+    // self-damage across the whole kit (rocket/mines/dynamite alike).
     selfDamage: false,
     spreadDeg: 10,
     volleyCount: 3,
@@ -82,30 +85,38 @@ export const WEAPON_TYPES: Readonly<Record<string, WeaponStats>> = {
     triggerRadius: 1.1,
     lifetimeS: 30,
     // Slightly less damage/radius than a rocket's direct AOE (a mine is a
-    // placed trap, not an aimed shot) but selfDamage=true — it's YOUR mine,
-    // driving over it should hurt just as much as an enemy doing it. Tune by
-    // feel, not derived from any formula.
+    // placed trap, not an aimed shot). Owner decision 2026-07-10: no weapon
+    // self-damages — your own mine neither triggers on you nor hurts you
+    // (see MatchRoom.tickMines, which passes MINES.selfDamage as the
+    // trigger's owner-eligibility flag).
     baseDamage: 45,
     aoeRadius: 3.0,
-    selfDamage: true,
+    selfDamage: false,
   },
   dynamite: {
     id: "dynamite",
-    speedMin: 8,
-    speedMax: 16,
+    speedMin: 8, // m/s at a bare tap — kept short, makes the full charge feel dramatic by contrast
+    // m/s at full charge (owner feedback 2026-07-10: "throw distance at full
+    // hold must be at least 3x what it was"). Ballistic range scales with
+    // speed^2 (range = v^2*sin(2*angle)/gravity), so tripling range needs
+    // speedMax * sqrt(3) ~= 27.7 -> rounded up to 28 (was 16, ~3.06x range).
+    // speedMin/launchAngleDeg/gravity intentionally untouched.
+    speedMax: 28,
     maxChargeMs: 1100,
     launchAngleDeg: 40,
     gravity: 20,
     stickRadius: 1.0,
     fuseS: 0.9,
     // Biggest single-hit AOE in the kit (task spec: "radius/urон больше
-    // ракеты") — selfDamage=true is a gameplay-programmer ASSUMPTION (not
-    // explicitly stated in the task spec): a thrown grenade you lob too
-    // close to yourself should be able to hurt you, matching the mine's
-    // selfDamage=true rather than the rocket's false. Flag for game-designer
-    // confirmation if this doesn't match intent.
+    // ракеты"). Owner decision 2026-07-10: no weapon self-damages — your own
+    // dynamite neither sticks to you nor hurts you (see MatchRoom.
+    // tickDynamite, which passes DYNAMITE.selfDamage as the stick check's
+    // owner-eligibility flag).
     baseDamage: 65,
-    aoeRadius: 4.5,
-    selfDamage: true,
+    // aoeRadius x1.5 (owner feedback 2026-07-10: dynamite's blast should feel
+    // noticeably bigger than a rocket's, was too close to it at 4.5m — now
+    // 6.75m vs. the rocket's 3.5m).
+    aoeRadius: 6.75,
+    selfDamage: false,
   },
 };

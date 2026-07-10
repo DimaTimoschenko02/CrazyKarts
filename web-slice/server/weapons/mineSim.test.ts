@@ -22,12 +22,16 @@ describe("computeMineDropIntervalS", () => {
     expect(computeMineDropIntervalS(2, 20)).toBeCloseTo((1.15 * 2) / 2 / 20, 10);
   });
 
-  it("MINE_DROP_INTERVAL_S is derived from the actual racer kart/physics constants", () => {
-    const expected = computeMineDropIntervalS(KART_TYPES.racer.modelLength, DEFAULT_KART_PHYSICS_PARAMS.maxSpeed);
-    expect(MINE_DROP_INTERVAL_S).toBeCloseTo(expected, 10);
-    // Sanity-pin the actual live value so a change to modelLength/maxSpeed is
-    // a visible, deliberate test update rather than a silent drift.
-    expect(MINE_DROP_INTERVAL_S).toBeCloseTo(0.05985, 5);
+  it("MINE_DROP_INTERVAL_S is the raw formula value widened by the 1.25x spacing multiplier", () => {
+    // Owner feedback 2026-07-10: mines dropped too close together — spacing
+    // widened by 1.25x on top of the task-spec formula (see mineSim.ts
+    // MINE_DROP_INTERVAL_SPACING_MULT).
+    const rawFormula = computeMineDropIntervalS(KART_TYPES.racer.modelLength, DEFAULT_KART_PHYSICS_PARAMS.maxSpeed);
+    expect(MINE_DROP_INTERVAL_S).toBeCloseTo(rawFormula * 1.25, 10);
+    // Sanity-pin the actual live value so a change to modelLength/maxSpeed/the
+    // spacing multiplier is a visible, deliberate test update rather than a
+    // silent drift. Raw formula was ~0.05985 -> widened to ~0.074813.
+    expect(MINE_DROP_INTERVAL_S).toBeCloseTo(0.074813, 5);
   });
 
   it("MINE_DROP_BACK_OFFSET_M is half the racer's body length", () => {

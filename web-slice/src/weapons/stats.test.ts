@@ -12,11 +12,21 @@ describe("WEAPON_TYPES.rocket", () => {
     expect(rocket.lifetime).toBe(6.0); // GDD says 3.5s
     expect(rocket.baseDamage).toBe(40);
     expect(rocket.aoeRadius).toBe(3.5);
-    expect(rocket.selfDamage).toBe(false); // GDD "open question" resolved to true; code says false
+    // Owner decision 2026-07-10 (final): NO weapon self-damages its shooter
+    // — pinned for the whole kit below.
+    expect(rocket.selfDamage).toBe(false);
     expect(rocket.spreadDeg).toBe(10);
   });
 
   it("always fires the full 3-rocket fan (feel-preserving simplification, no launcher sockets)", () => {
     expect(rocket.volleyCount).toBe(3);
+  });
+});
+
+describe("self-damage is off across the whole kit (owner decision 2026-07-10)", () => {
+  it("no weapon ever damages its own shooter", () => {
+    for (const [name, stats] of Object.entries(WEAPON_TYPES)) {
+      expect(stats.selfDamage, `${name}.selfDamage`).toBe(false);
+    }
   });
 });

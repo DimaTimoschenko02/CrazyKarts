@@ -575,13 +575,12 @@ export class MatchRoom extends Room<{ state: MatchState }> {
       }
 
       if (isMineArmed(mine.age, MINES.armDelayS)) {
-        // Task spec: an armed mine triggers on ANY living player, including
-        // its own owner — pass selfDamage=true unconditionally here (not
-        // MINES.selfDamage, which is a separate "does the blast actually
-        // hurt them" question resolved by computeAoeDamage below; they
-        // happen to share the value true today, but this call is about
-        // trigger eligibility, not damage).
-        const hitId = findProximityHit(mine, alive, MINES.triggerRadius, mine.ownerId, true);
+        // Owner decision 2026-07-10: no weapon self-damages — and a mine
+        // that CAN'T hurt its owner must not trigger on them either, or
+        // driving over your own mine would waste it for zero damage. Pass
+        // MINES.selfDamage (false) as the trigger-eligibility flag so the
+        // two rules can never drift apart.
+        const hitId = findProximityHit(mine, alive, MINES.triggerRadius, mine.ownerId, MINES.selfDamage);
         if (hitId) {
           this.explodeMine(mine, alive);
           continue;
@@ -617,8 +616,12 @@ export class MatchRoom extends Room<{ state: MatchState }> {
         // "off the map" reads as blocked too), then proximity to a kart —
         // the first thing it touches wins (task spec: "прилипание к
         // ПЕРВОМУ во что попал").
+        // DYNAMITE.selfDamage (false, owner decision 2026-07-10) doubles as
+        // the stick-eligibility flag: a throw that can't hurt its owner must
+        // not stick to them either (it would just ride along harmlessly and
+        // waste the shot).
         const grounded = isBlockedByTerrain(pos, this.arena.heightfield);
-        const hitId = grounded ? null : findProximityHit(pos, alive, DYNAMITE.stickRadius, dyn.ownerId, true);
+        const hitId = grounded ? null : findProximityHit(pos, alive, DYNAMITE.stickRadius, dyn.ownerId, DYNAMITE.selfDamage);
 
         if (grounded || hitId) {
           dyn.stuck = true;

@@ -18,8 +18,12 @@ const DYNAMITE_COLOR = 0xcc2222;
 const EXPLOSION_COLOR = 0xff8822;
 const EXPLOSION_DURATION_MS = 380;
 // Bigger than a rocket/mine's blast — matches WEAPON_TYPES.dynamite's larger
-// aoeRadius (src/weapons/stats.ts), purely cosmetic scaling here.
-const EXPLOSION_MAX_SCALE = 11;
+// aoeRadius (src/weapons/stats.ts), purely cosmetic scaling here (same
+// hand-tuned-per-weapon convention as rockets.ts/mines.ts's own
+// EXPLOSION_MAX_SCALE, not a formula derived from aoeRadius). Bumped 11->16.5
+// in step with the 2026-07-10 aoeRadius buff (4.5m -> 6.75m, x1.5) to keep
+// the blast looking proportionally as big as it now hits.
+const EXPLOSION_MAX_SCALE = 16.5;
 
 interface LiveDynamite {
   mesh: THREE.Mesh;

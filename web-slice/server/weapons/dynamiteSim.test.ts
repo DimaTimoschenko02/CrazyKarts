@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { WEAPON_TYPES, type DynamiteStats } from "../../src/weapons/stats";
 import {
   chargeFraction,
   clampHoldMs,
@@ -6,6 +7,8 @@ import {
   computeLaunchSpeed,
   dynamitePositionAtT,
 } from "./dynamiteSim";
+
+const DYNAMITE = WEAPON_TYPES.dynamite as DynamiteStats;
 
 describe("clampHoldMs", () => {
   it("clamps to [0, maxChargeMs]", () => {
@@ -78,5 +81,26 @@ describe("dynamitePositionAtT", () => {
     expect(apex.y).toBeCloseTo(2.5, 10);
     const landing = dynamitePositionAtT({ x: 0, y: 0, z: 0 }, { x: 0, y: 10, z: 0 }, 20, 1);
     expect(landing.y).toBeCloseTo(0, 10);
+  });
+
+  // Owner feedback 2026-07-10: full-charge throw distance must be at least
+  // 3x what it was before (speedMax 16 -> 28, see WEAPON_TYPES.dynamite in
+  // src/weapons/stats.ts). Computes ground-to-ground range analytically:
+  // launch at y=0 with computeLaunchDir3D/DYNAMITE's real angle+gravity,
+  // find the landing time (y returns to 0, closed-form t = 2*vy0/gravity for
+  // a flat launch/landing height), then measure the horizontal distance
+  // dynamitePositionAtT reaches at that time.
+  function groundRangeAt(speed: number): number {
+    const dir = computeLaunchDir3D(0, DYNAMITE.launchAngleDeg);
+    const vel0 = { x: dir.x * speed, y: dir.y * speed, z: dir.z * speed };
+    const landingT = (2 * vel0.y) / DYNAMITE.gravity;
+    const landing = dynamitePositionAtT({ x: 0, y: 0, z: 0 }, vel0, DYNAMITE.gravity, landingT);
+    return Math.hypot(landing.x, landing.z);
+  }
+
+  it("full-charge (speedMax) ground range is at least 3x the old speed=16 range", () => {
+    const oldRange = groundRangeAt(16); // pre-buff full-charge speed
+    const newRange = groundRangeAt(DYNAMITE.speedMax); // current full-charge speed (28)
+    expect(newRange).toBeGreaterThanOrEqual(oldRange * 3);
   });
 });
