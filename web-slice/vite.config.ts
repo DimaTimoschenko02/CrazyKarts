@@ -65,6 +65,19 @@ function devParamsFilePlugin(): Plugin {
 //   - never unlinks: moves the file into public/maps/.backup/<name>.<ts>.json,
 //     the exact same recoverable-rename trick the overwrite path already uses,
 //     so a mis-click never destroys a map for good.
+//
+// "editor_drive" is a special, reserved name: the editor's Drive button (see
+// src/editor/main.ts btnDrive handler) POSTs the current in-editor map to
+// this exact name on every click so the game/server can load it as a real
+// map file (bug fix 2026-07-10 — a browser-only localStorage snapshot never
+// reached the Colyseus server, so server-side entities like weapon boxes
+// never spawned when testing via Drive). Because it's overwritten on every
+// single Drive click, it's excluded from the normal backup-on-overwrite
+// dance (it would otherwise flood public/maps/.backup/ with one file per
+// click) and from the Load menu's map list (GET) — it's a scratch file, not
+// a map the owner authored.
+const DRIVE_SNAPSHOT_NAME = "editor_drive";
+
 function editorMapsFilePlugin(): Plugin {
   const mapsDir = resolve(__dirname, "public/maps");
   const backupDir = resolve(mapsDir, ".backup");
@@ -74,7 +87,8 @@ function editorMapsFilePlugin(): Plugin {
     try {
       return readdirSync(mapsDir)
         .filter(f => f.endsWith(".json"))
-        .map(f => f.slice(0, -".json".length));
+        .map(f => f.slice(0, -".json".length))
+        .filter(name => name !== DRIVE_SNAPSHOT_NAME);
     } catch {
       return [];
     }
@@ -103,7 +117,10 @@ function editorMapsFilePlugin(): Plugin {
                 return;
               }
               const targetPath = resolve(mapsDir, `${name}.json`);
-              if (existsSync(targetPath)) {
+              // Skip the backup-on-overwrite dance for the Drive scratch file
+              // — see DRIVE_SNAPSHOT_NAME's doc above, every Drive click
+              // overwrites it and a backup per click is pure noise.
+              if (existsSync(targetPath) && name !== DRIVE_SNAPSHOT_NAME) {
                 if (!existsSync(backupDir)) mkdirSync(backupDir, { recursive: true });
                 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
                 renameSync(targetPath, resolve(backupDir, `${name}.${stamp}.json`));

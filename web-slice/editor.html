@@ -20,6 +20,7 @@
   button:hover, .file-btn:hover { background: #00ffee22; }
   button:disabled { opacity: 0.35; cursor: default; }
   button:disabled:hover { background: #12122a; }
+  #topbar button.active { background: #00ffee33; border-color: #00ffee; color: #00ffee; }
 
   #topbar select, #topbar input[type="number"] {
     background: #12122a; color: #00ffee; border: 1px solid #00ffee88;
@@ -255,6 +256,7 @@
     <span id="serverStatus"></span>
     <button id="btnUndo" title="Undo (Z or Cmd/Ctrl+Z)" disabled>Undo</button>
     <button id="btnCenterMap" title="Shift everything so the map's bounding box is centered on the grid">Center Map</button>
+    <button id="btnSnapSurface" title="Прикрепить новый тайл к уже стоящей поверхности под курсором (hotkey: F). Для декоративных road-tile ассетов (деревья/трава 019/020), чья база не кратна этажу — снимает вертикальную дыру/парение">🧲 К поверхности</button>
     <button id="btnClear">Clear</button>
     <button id="btnDrive">Drive</button>
     <label class="inline" for="gridSizeInput">Grid size
@@ -287,6 +289,7 @@
         <b>G</b> — двигать выделенное: ЛКМ фиксирует, Esc отменяет, Q/E — уровень группы<br>
         <b>B</b> — asset browser (крупные превью, фильтры по категории/материалу, поиск)<br>
         <b>C</b>+ЛКМ — пипетка: взять ассет/поворот/уровень с блока на карте<br>
+        <b>F</b> / 🧲 — прикрепить к поверхности: новый тайл садится на уже стоящую под курсором поверхность (для декоративных ассетов с некратной базой)<br>
         <b>Маркеры → Weapon Box</b> — точка спавна оружия (золотой куб): ЛКМ ставит (без дублей в клетке+уровне), ПКМ удаляет ПЕРВЫМ приоритетом
       </div>
       <div id="marqueeBox" class="hidden"></div>

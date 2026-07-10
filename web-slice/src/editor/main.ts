@@ -14,9 +14,10 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { loadAssetLibrary } from "../map/assetLoader";
 import type { AssetLibrary } from "../map/assetLoader";
 import type { MapJson } from "../map/mapLoader";
-import { TWO_CELL_ASSETS, longAxis } from "../shared/heightfield";
+import { TWO_CELL_ASSETS, longAxis, Heightfield, tileBottomY } from "../shared/heightfield";
 import { shouldDeletePropFirst, topCellYLevelAt } from "./deletePriority";
 import { cellsAlongLine } from "./paintLine";
+import { worldPointToCell, snapOffsetFromSurface } from "./snapCell";
 import { filterBrowserAssets, type BrowserAssetInfo, type BrowserFilterState } from "./assetBrowserFilter";
 // Palette data (categories/items/isProp) is shared with the game's preload
 // list (src/main.ts) — see shared/mapAssets.ts header comment for why.
@@ -63,6 +64,7 @@ const mapsMenuPanel = document.getElementById("mapsMenuPanel") as HTMLDivElement
 const serverStatus = document.getElementById("serverStatus")!;
 const btnUndo = document.getElementById("btnUndo") as HTMLButtonElement;
 const btnCenterMap = document.getElementById("btnCenterMap") as HTMLButtonElement;
+const btnSnapSurface = document.getElementById("btnSnapSurface") as HTMLButtonElement;
 const mapNameLabel = document.getElementById("mapNameLabel")!;
 const boxCounter = document.getElementById("boxCounter")!;
 const marqueeBox = document.getElementById("marqueeBox") as HTMLDivElement;
@@ -186,7 +188,14 @@ function isTextInputFocused(): boolean {
 }
 
 // ── Editor state ─────────────────────────────────────────────────────────
-interface CellRecord { asset: string; x: number; z: number; y_level: number; rot: number; mirror?: boolean }
+interface CellRecord {
+  asset: string; x: number; z: number; y_level: number; rot: number; mirror?: boolean;
+  // "Snap to surface" (F / 🧲 toggle, see computeSnapOffset below) — a
+  // fractional-meter vertical shift, mirrors CellDef.y_offset in
+  // shared/heightfield.ts exactly (same key name, same "omit when 0"
+  // contract carried straight into buildMapJson's export).
+  y_offset?: number;
+}
 interface PropRecord { asset: string; x: number; z: number; y_level: number; rot: number; scale: number }
 // Weapon-box spawn marker — hand-authored (owner request 2026-07-09, see
 // design/notes and MapJson.box_points in shared/heightfield.ts). Deliberately
@@ -207,6 +216,7 @@ let activeAsset: string | null = null;
 let rotIndex = 0;
 let yLevel = 0;
 let mirrorState = false; // reflect the piece across local X (Space) — see CellDef.mirror
+let snapToSurface = false; // "attach to surface" (F / 🧲 toggle) — see computeSnapOffset below
 let ghost: THREE.Object3D | null = null;
 
 let lastClientX = innerWidth / 2;
@@ -262,6 +272,7 @@ function applyCellTransform(inst: THREE.Object3D, rec: CellRecord): void {
     inst.position.x += dx * 0.5 * TILE_SIZE;
     inst.position.z += dz * 0.5 * TILE_SIZE; // sit on 2 whole cells, not straddling — matches mapLoader
   }
+  inst.position.y += rec.y_offset ?? 0; // snap-to-surface shift — matches mapLoader's y_offset handling
   inst.rotation.y = THREE.MathUtils.degToRad(rec.rot);
   inst.scale.x = rec.mirror ? -1 : 1; // reflect-then-rotate, matches mapLoader
 }
@@ -958,6 +969,55 @@ function rebuildGhost(): void {
   scene.add(ghost);
 }
 
+// ── Snap to surface (F / 🧲 toggle) ─────────────────────────────────────
+// Owner spec 2026-07-10 (design doc: y_offset dробный vertical shift):
+// decorative road tiles (roadTile_019/020 — trees baked on an irregular
+// grass clump) have a baked base that isn't a multiple of any floor height
+// or level_height step, so they can never sit flush just by picking a
+// y_level. This toggle samples the ALREADY-PLACED map under the cursor and
+// computes the fractional shift that puts the new tile's own lowest point
+// exactly on that surface.
+//
+// Heightfield.fromMapJson rebuilds the WHOLE map's height data from scratch
+// (no incremental update), so rebuilding it on every pointermove would be
+// wasteful — cache it and invalidate (snapHeightfieldDirty) whenever
+// placeCell/removeCell actually change the terrain. Only paid for while the
+// toggle is on (computeSnapOffset short-circuits to 0 otherwise, so the
+// common case — toggle off — never touches this cache at all).
+let snapHeightfield: Heightfield | null = null;
+let snapHeightfieldDirty = true;
+
+function getSnapHeightfield(): Heightfield {
+  if (snapHeightfieldDirty || !snapHeightfield) {
+    snapHeightfield = Heightfield.fromMapJson(buildMapJson());
+    snapHeightfieldDirty = false;
+  }
+  return snapHeightfield;
+}
+
+// The fractional y_offset (meters) to store on a CellRecord being placed at
+// (x, z, yLvl) so the tile's own lowest mesh point (tileBottomY — the baked
+// slab bottom for road tiles, the pivot plane for space-kit assets) lands
+// flush on whatever surface is already there. Returns 0 (no offset) when the
+// toggle is off, and NULL when the toggle is on but the sampled spot has no
+// authored surface — callers place at the plain y_level height and the status
+// bar shows "snap: n/a". Owner bug 2026-07-10: both failure modes used to
+// collapse into a silent 0, indistinguishable from a real snap, and the base
+// wrongly subtracted the physics heightGrid's minimum (top-surface data —
+// see tileBottomY's doc in shared/heightfield.ts for the full story), which
+// sank roadTile_019 trees ~1m under the grass they were aimed at.
+function computeSnapOffset(asset: string, x: number, z: number, yLvl: number): number | null {
+  if (!snapToSurface) return 0;
+  const worldX = (x - HALF) * TILE_SIZE;
+  const worldZ = (z - HALF) * TILE_SIZE;
+  return snapOffsetFromSurface({
+    floorHeight: getSnapHeightfield().sample(worldX, worldZ),
+    yLevel: yLvl,
+    levelHeight: LEVEL_HEIGHT,
+    bottomY: tileBottomY(asset),
+  });
+}
+
 // Position + rotation + scale for a placed prop object — mirrors
 // applyCellTransform above. Factored out so the grab-move ghost preview (see
 // updateGrabGhostTransforms) can reuse the exact same transform logic
@@ -986,6 +1046,7 @@ function placeCell(rec: CellRecord): void {
   scene.add(inst);
   cells.set(key, rec);
   cellObjs.set(key, inst);
+  snapHeightfieldDirty = true; // terrain changed — see getSnapHeightfield below
 }
 
 function removeCell(key: string): boolean {
@@ -994,6 +1055,7 @@ function removeCell(key: string): boolean {
   scene.remove(obj);
   cellObjs.delete(key);
   cells.delete(key);
+  snapHeightfieldDirty = true; // terrain changed — see getSnapHeightfield below
   return true;
 }
 
@@ -1344,6 +1406,27 @@ function raycastPreciseTarget(): PreciseTarget | null {
     return { kind: "prop", rec: obj.userData.mapRec as PropRecord, root: obj };
   }
   return null;
+}
+
+// Snap-to-surface cell picking (owner bug report 2026-07-10) — see the doc in
+// snapCell.ts. Reuses the EXACT same candidate set + hit-testing as
+// raycastPreciseTarget above (placed cells + props, recursive) because that
+// raycast already correctly answers "what is the camera looking at"; this
+// just converts the hit POINT into a grid cell instead of walking up to a
+// tagged record. Returns null when nothing is under the cursor (empty
+// space/sky) so callers can fall back to the plane-based cell.
+function raycastSnapCell(): { x: number; z: number } | null {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const ndc = new THREE.Vector2(
+    ((lastClientX - rect.left) / rect.width) * 2 - 1,
+    -((lastClientY - rect.top) / rect.height) * 2 + 1
+  );
+  raycaster.setFromCamera(ndc, camera);
+  const candidates: THREE.Object3D[] = [...cellObjs.values(), ...propObjs];
+  const hits = raycaster.intersectObjects(candidates, true);
+  if (hits.length === 0) return null;
+  const point = hits[0].point;
+  return worldPointToCell(point.x, point.z, TILE_SIZE, HALF, GRID_SIZE);
 }
 
 function updatePreciseStatusBar(): void {
@@ -1785,6 +1868,26 @@ function refreshCursor(clientX: number, clientY: number): void {
     return;
   }
 
+  // Snap-to-surface mode (🧲): the plane-based cell picked above assumes the
+  // cursor is aimed at the abstract y_level plane, which is wrong whenever
+  // the cursor is actually aimed at a raised/lowered surface — see
+  // raycastSnapCell's doc. Retarget the cell to whatever the camera ray
+  // actually hits on the ALREADY-PLACED map instead, so the ghost/placement/
+  // status bar and computeSnapOffset (called below with these same
+  // lastCellX/lastCellZ) all agree on the surface the user is looking at.
+  // Props and the box marker keep their own float-grid picking untouched —
+  // they were never part of this bug (computeSnapOffset is skipped for the
+  // box marker, and isPropAsset assets don't use lastCellX/lastCellZ at all).
+  // Falls back to the plane-based cell already set above when the ray hits
+  // nothing (empty space) so this never leaves lastCellX/lastCellZ stale.
+  if (snapToSurface && activeAsset && !isPropAsset(activeAsset) && activeAsset !== WEAPON_BOX_MARKER_ASSET) {
+    const meshCell = raycastSnapCell();
+    if (meshCell) {
+      lastCellX = meshCell.x;
+      lastCellZ = meshCell.z;
+    }
+  }
+
   if (ghost && activeAsset) {
     ghost.visible = true;
     if (isPropAsset(activeAsset)) {
@@ -1795,6 +1898,13 @@ function refreshCursor(clientX: number, clientY: number): void {
         const [dx, dz] = longAxis(rot);
         ghost.position.x += dx * 0.5 * TILE_SIZE;
         ghost.position.z += dz * 0.5 * TILE_SIZE; // preview the 2-cell footprint offset
+      }
+      // Snap-to-surface preview — box markers are excluded (they're not a
+      // CellRecord/terrain layer at all, see BoxMarkerRecord doc). A null
+      // offset (snap on, but no surface under the cell) previews at the
+      // plain y_level height, matching what placement will actually do.
+      if (activeAsset !== WEAPON_BOX_MARKER_ASSET) {
+        ghost.position.y += computeSnapOffset(activeAsset, lastCellX, lastCellZ, yLevel) ?? 0;
       }
     }
     ghost.rotation.y = THREE.MathUtils.degToRad(rot);
@@ -1838,8 +1948,18 @@ function hintFor(asset: string | null): string {
 function updateStatusBar(rot: number): void {
   const assetLabel = activeAsset ?? "(none)";
   const mir = mirrorState ? "  mirror: ON" : "";
+  const snapOffset = activeAsset && activeAsset !== WEAPON_BOX_MARKER_ASSET
+    ? computeSnapOffset(activeAsset, lastCellX, lastCellZ, yLevel)
+    : 0;
+  // null = snap is on but found no surface under the cell — say so instead of
+  // printing a fake "+0.00m" (silent-zero ban, see computeSnapOffset doc).
+  const snap = snapToSurface
+    ? snapOffset === null
+      ? "  snap: n/a"
+      : `  snap: ${snapOffset >= 0 ? "+" : ""}${snapOffset.toFixed(2)}m`
+    : "";
   statusMain.textContent =
-    `asset: ${assetLabel}  rot: ${rot}${mir}  y_level: ${yLevel}  cell: (${lastCellX}, ${lastCellZ})`;
+    `asset: ${assetLabel}  rot: ${rot}${mir}${snap}  y_level: ${yLevel}  cell: (${lastCellX}, ${lastCellZ})`;
   statusHint.textContent = hintFor(activeAsset);
 }
 
@@ -1953,6 +2073,10 @@ function paintCellAt(stroke: PaintStroke, x: number, z: number): void {
   if (before && before.asset === activeAsset && before.rot === rot && !!before.mirror === mirrorState) return;
   const rec: CellRecord = { asset: activeAsset, x, z, y_level: yLevel, rot };
   if (mirrorState) rec.mirror = true;
+  // null (snap found no surface) and 0 both mean "no fractional shift" —
+  // the record stays at its plain y_level height, no y_offset key written.
+  const offset = computeSnapOffset(activeAsset, x, z, yLevel);
+  if (offset !== null && offset !== 0) rec.y_offset = offset;
   placeCell(rec);
   stroke.batch.push({ kind: "cell", key, before, after: rec });
 }
@@ -2065,6 +2189,9 @@ renderer.domElement.addEventListener("pointerdown", e => {
       const before = cells.get(key) ?? null;
       const rec: CellRecord = { asset: activeAsset, x: lastCellX, z: lastCellZ, y_level: yLevel, rot };
       if (mirrorState) rec.mirror = true;
+      // Same null/0 handling as paintCellAt — no surface means no shift.
+      const offset = computeSnapOffset(activeAsset, lastCellX, lastCellZ, yLevel);
+      if (offset !== null && offset !== 0) rec.y_offset = offset;
       placeCell(rec);
       pushUndo({ kind: "cell", key, before, after: rec });
       scheduleAutosave();
@@ -2192,6 +2319,9 @@ addEventListener("keydown", e => {
   } else if (e.code === "KeyR") {
     rotIndex = (rotIndex + 1) % ROT_CYCLE.length;
     refreshCursor(lastClientX, lastClientY);
+  } else if (e.code === "KeyF") {
+    // Snap-to-surface toggle — see computeSnapOffset doc above.
+    setSnapToSurface(!snapToSurface);
   } else if (e.code === "Space") {
     // Mirror the piece across its local X axis — the 4 orientations rotation
     // can't reach on chiral tiles (roadCorner/Split, sideEnd, detailed ramps).
@@ -2282,6 +2412,17 @@ btnUndo.addEventListener("click", () => undo());
 updateUndoButton();
 btnCenterMap.addEventListener("click", () => centerMap());
 
+// Snap-to-surface toggle — see computeSnapOffset doc above for what this
+// actually changes. Only the button's visual state + refreshCursor need
+// updating here; every placement path (paintCellAt, the TWO_CELL_ASSETS
+// click branch) reads the module-level `snapToSurface` flag directly.
+function setSnapToSurface(on: boolean): void {
+  snapToSurface = on;
+  btnSnapSurface.classList.toggle("active", on);
+  refreshCursor(lastClientX, lastClientY);
+}
+btnSnapSurface.addEventListener("click", () => setSnapToSurface(!snapToSurface));
+
 // ── Export / Import / Clear / Drive ─────────────────────────────────────
 function buildMapJson(): MapJson {
   return {
@@ -2321,6 +2462,7 @@ function loadMapJson(data: MapJson): void {
   for (const cell of data.cells ?? []) {
     const rec: CellRecord = { asset: cell.asset, x: cell.x, z: cell.z, y_level: cell.y_level, rot: cell.rot ?? 0 };
     if (cell.mirror) rec.mirror = true;
+    if (cell.y_offset) rec.y_offset = cell.y_offset;
     placeCell(rec);
   }
   for (const prop of data.props ?? []) {
@@ -2402,16 +2544,42 @@ document.getElementById("btnNew")!.addEventListener("click", () => {
 });
 
 document.getElementById("btnDrive")!.addEventListener("click", () => {
-  // Stamp WHICH map + WHEN alongside the snapshot. The game route (?map=editor)
-  // drives this frozen snapshot, NOT the live disk map — so if the disk copy
-  // changes later, Drive still shows the old bits until re-loaded here. The
-  // meta lets the game show an "editor snapshot · name · age" badge so a stale
-  // snapshot can never masquerade as the live map again (the bug where a
-  // pre-edit mars_base kept rendering after the disk map was regenerated).
-  localStorage.setItem("editor-drive-map", JSON.stringify(buildMapJson()));
+  // Stamp WHICH map + WHEN — the game shows this as an "editor snapshot ·
+  // name · age" badge (src/main.ts showEditorSnapshotBadge) for BOTH paths
+  // below, so a stale Drive run can never masquerade as the live map.
   localStorage.setItem("editor-drive-meta",
     JSON.stringify({ name: loadedMapName ?? "unsaved", ts: Date.now() }));
-  window.open("/?map=editor", "_blank");
+
+  // Bug fix 2026-07-10 (owner report): Drive used to ONLY stash the map in
+  // localStorage and open ?map=editor — a browser-only snapshot the
+  // Colyseus server never saw. MatchRoom builds the arena (including
+  // box_points -> weapon boxes) from public/maps/<name>.json on disk (see
+  // server/config/arena.ts loadArena/MAPS_DIR), so anything server-side
+  // silently never showed up when testing via Drive. Instead, write the
+  // current in-editor map to disk as public/maps/editor_drive.json (reusing
+  // the same /__editor-maps endpoint Save/Save As already use — see
+  // vite.config.ts editorMapsFilePlugin) and open it as a REAL map name,
+  // so both the client's GameMap.load and the server's loadArena read the
+  // exact same file.
+  const data = buildMapJson();
+  fetch("/__editor-maps", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "editor_drive", data }),
+  })
+    .then(res => {
+      if (!res.ok) return res.text().then(msg => { throw new Error(msg || String(res.status)); });
+      window.open("/?map=editor_drive", "_blank");
+    })
+    .catch(err => {
+      // Dev server not reachable / write failed for some reason — fall back
+      // to the old browser-only snapshot so Drive still shows SOMETHING,
+      // just without server-side entities (boxes, other players, etc).
+      console.warn("[editor] Drive: couldn't save editor_drive.json to the dev server, " +
+        "falling back to a localStorage-only snapshot (no server-side entities like weapon boxes):", err);
+      localStorage.setItem("editor-drive-map", JSON.stringify(data));
+      window.open("/?map=editor", "_blank");
+    });
 });
 
 gridPresetSelect?.addEventListener("change", () => {

@@ -9,3 +9,7 @@ dev-params.local.json
 # Editor "Save to server" backups (vite.config.ts editorMapsFilePlugin) —
 # timestamped copies of overwritten maps, not meant to be committed.
 public/maps/.backup/
+
+# Editor "Drive" button scratch snapshot (src/editor/main.ts btnDrive
+# handler) — overwritten on every click, not an authored map.
+public/maps/editor_drive.json

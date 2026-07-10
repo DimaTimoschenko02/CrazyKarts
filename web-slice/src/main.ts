@@ -99,8 +99,13 @@ const hud = document.getElementById("hud")!;
 // and the fire button is a no-op.
 const combat = createCombat(scene, kart);
 
-// Which map this session plays on: `?map=editor` is the frozen-snapshot
-// preview path (unchanged below, see the asset-load IIFE), `?map=<name>`
+// Which map this session plays on: `?map=editor` is the LEGACY frozen-
+// snapshot preview path (browser-localStorage only, unchanged below, see the
+// asset-load IIFE), `?map=editor_drive` is the CURRENT editor Drive path
+// (bug fix 2026-07-10 — a real file on disk, public/maps/editor_drive.json,
+// written by the editor's btnDrive handler so the Colyseus server sees it
+// too and server-side entities like weapon boxes actually spawn; it's still
+// resolved as an ordinary named map below, just with a badge), `?map=<name>`
 // is the lobby's Create-Room map picker (src/lobby/main.ts) riding along on
 // the invite link, and no param at all is the plain default. Resolved once,
 // up here, so the SAME name can be handed to both the map loader below and
@@ -108,7 +113,8 @@ const combat = createCombat(scene, kart);
 // MatchRoom.ts onCreate() for how the server decides the room's actual map).
 const MAP_NAME_RE = /^[a-z0-9_-]+$/i;
 const rawMapParam = new URLSearchParams(location.search).get("map");
-const isEditorSnapshot = rawMapParam === "editor";
+const isEditorSnapshot = rawMapParam === "editor"; // legacy localStorage-only fallback path
+const isDriveSnapshot = rawMapParam === "editor_drive"; // current disk-backed Drive path — still badge-worthy
 let mapName = ACTIVE_MAP;
 if (rawMapParam && !isEditorSnapshot) {
   if (MAP_NAME_RE.test(rawMapParam)) {
@@ -130,9 +136,11 @@ const net = initNet({
   map: mapName,
 });
 
-// Corner badge shown when driving a FROZEN editor snapshot (?map=editor) so a
-// stale snapshot can't be mistaken for the live disk map (see editor Drive
-// handler). Reads editor-drive-meta {name, ts} stamped at Drive time.
+// Corner badge shown when driving an editor Drive snapshot — either the
+// current disk-backed path (?map=editor_drive) or the legacy localStorage-
+// only fallback (?map=editor) — so a stale/frozen Drive run can't be
+// mistaken for the live disk map (see editor Drive handler). Reads
+// editor-drive-meta {name, ts} stamped at Drive time.
 function showEditorSnapshotBadge(): void {
   let name = "unsaved", ageMin = 0;
   try {
@@ -163,6 +171,11 @@ let map: GameMap | null = null;
     } else {
       try {
         map = await GameMap.load(`/maps/${mapName}.json`, lib);
+        // editor_drive is a real map file, but still a Drive-authored
+        // scratch snapshot (overwritten on every click, not something the
+        // owner saved under its own name) — badge it the same as the legacy
+        // localStorage path so it's never mistaken for a "real" saved map.
+        if (isDriveSnapshot) showEditorSnapshotBadge();
       } catch (e) {
         console.warn(`[boot] failed to load map "${mapName}", falling back to "${ACTIVE_MAP}"`, e);
         map = await GameMap.load(`/maps/${ACTIVE_MAP}.json`, lib);
