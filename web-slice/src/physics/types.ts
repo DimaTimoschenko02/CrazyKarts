@@ -522,8 +522,18 @@ export const DEFAULT_KART_PHYSICS_PARAMS: KartPhysicsParams = {
 
   driftSteerGateLo: 0.35,
   driftSteerGateHi: 0.55,
-  driftSpeedGateLo: 1.5,
-  driftSpeedGateHi: 3,
+  // Raised 1.5/3 -> 4/7 (owner playtest 2026-07-10, "low-speed jerkiness"):
+  // with Hi=3 the whole drift stack (rear grip drop to ~0.17, the ±28°
+  // visual yaw offset) was FULLY armed from 3 m/s — 12% of maxSpeed — so
+  // shuffling WASD on the spot whipped the body around. Diagnosed in
+  // tools/diag_lowspeed_jerk.ts: 55% of the worst per-tick omega jumps came
+  // from tire torque on the drift-reduced rear grip, and the visual offset
+  // swung faster (~170°/s) than the physical yaw itself. 4/7 keeps parking
+  // maneuvers 100% drift-free and asks for ~30% of maxSpeed before the full
+  // drift feel unlocks — drift at cruise speed is untouched (gate is 1
+  // everywhere above 7 m/s).
+  driftSpeedGateLo: 4,
+  driftSpeedGateHi: 7,
   driftThrottleGate: 0.1,
   driftHeatTau: 0.8,
   driftGripReleasePeak: 0.6,

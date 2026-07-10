@@ -330,15 +330,18 @@ describe("ContinuousDrift v4.1 — driftReversalRate (mid-drift direction flip)"
 });
 
 describe("ContinuousDrift v4.0 — req 4: low-speed drift pickup (no ~1s wait)", () => {
-  it("full steer+throttle at a low, drift-gate-open speed (~2.5 m/s) engages substantially within a few tenths of a second", () => {
+  it("full steer+throttle at the lowest fully-gate-open speed engages substantially within a few tenths of a second", () => {
     const drift = makeDrift();
     const p = DEFAULT_KART_PHYSICS_PARAMS;
-    const speed = 2.5; // within [driftSpeedGateLo, driftSpeedGateHi] = [1.5, 3] by default
+    // Parameterized on the gate (not a literal) since the gate window moved
+    // 1.5/3 -> 4/7 (owner playtest 2026-07-10, low-speed jerkiness — see
+    // types.ts driftSpeedGateLo comment). The requirement under test is
+    // unchanged: once speed clears the gate, pickup is fast (no ~1s wait).
+    const speed = p.driftSpeedGateHi;
     const outs = run(drift, Math.round(0.35 / DT), { speed, steer: 1, throttle: 1 }); // 0.35s
     expect(outs[outs.length - 1].engageFactor).toBeGreaterThan(0.5);
     // and it actually produces a nonzero yaw bonus at this speed (speedGate is open)
     expect(Math.abs(outs[outs.length - 1].yawBonusRadPerSec)).toBeGreaterThan(0);
-    void p;
   });
 
   it("stays gated near-zero just below driftSpeedGateLo, confirming the pickup above isn't from steer/throttle gates alone", () => {
