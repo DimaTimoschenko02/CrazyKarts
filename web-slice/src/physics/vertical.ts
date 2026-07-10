@@ -135,6 +135,31 @@ export interface VerticalInput {
   // stepVertical), same fallback kart.ts's own call site also applies at the
   // source (defensive: fallback applied twice is still just a fallback).
   detachRefHeight: number | null;
+  // D2 follow-up (2026-07-10, "клевок носом на обрыве" fix, design/notes/
+  // ride-collision-v2.md): the body's own SUPPORT (this module's
+  // `groundHeight` param, the wall-aware MAX of every F/B/R/L probe) can
+  // keep reading high long after the body's center AND the direction it's
+  // actually driving toward have both cleared a cliff lip — a REAR probe
+  // still resting on the deck behind the kart props up groundHeight
+  // indefinitely, so the OLD groundHeight-AND-detachRef gate below could
+  // never fire (this is D5's groundProbe.ts "own support isn't a wall" fix
+  // turning into a NEW problem one level up: a real support keeps the body
+  // artificially grounded, hanging its tail out over open air, while
+  // attitude reads the resulting front/rear height gap as a steep downward
+  // slope and pitches the nose down — the "клевок" the body-relative gate
+  // fix introduced). This is the probe in the body's CURRENT direction of
+  // travel (kart.ts picks probes.hF/hB by the sign of forward speed) — the
+  // D2 detach check below now requires BOTH the center probe AND this
+  // leading probe to have cleared the lip, replacing its old groundHeight-
+  // based half. A binary hF/hB choice is fine here: detachment is a discrete
+  // state flip by nature, same "OK to be binary" carve-out
+  // .claude/rules/smooth-values.md lists for on/off physics events (not a
+  // continuous physics VALUE). Optional and falls back to detachRefHeight
+  // itself when omitted — every existing caller/test that never
+  // differentiated groundHeight from detachRefHeight sees byte-identical
+  // behavior (see stepVertical's D2 doc for why that fallback is safe, not a
+  // silent behavior change).
+  leadingProbeHeight?: number | null;
   dt: number;
 }
 
@@ -179,17 +204,36 @@ export function stepVertical(state: VerticalState, inp: VerticalInput, p: Vertic
     // D2 positional detachment — see header comment above. Only fires when
     // the rate detector above didn't already; carries the current vy exactly
     // like that branch (no snap-down, no re-derivation from the new sample).
-    // D3: BOTH signals must agree the ground left from under the body:
-    //  - groundHeight alone dropping (a corner probe crossing the exclusion
-    //    threshold at a ramp foot) is a probe artifact, not a cliff — the
-    //    center probe still reads ground right under the body;
+    // D2 follow-up (2026-07-10, see VerticalInput.leadingProbeHeight doc):
+    // BOTH the center probe AND the LEADING probe (the one in the body's
+    // current direction of travel) must agree the ground left from under the
+    // body — replaces the old groundHeight(wall-aware MAX)-AND-detachRef
+    // gate, which could never fire once a REAR probe kept propping up
+    // groundHeight after the body had already driven its center and nose
+    // past a lip (the straddle/"клевок" case).
+    //
+    // `leadingProbeHeight` is OPT-IN, not merely nullable: when the field is
+    // literally omitted (`undefined` — every existing test/caller that
+    // predates this fix), the gate falls back to the EXACT old formula
+    // (groundHeight AND detachRef) byte-for-byte, because some of those
+    // callers deliberately drive groundHeight and detachRef apart (see the
+    // D3 "follow-filter vy spike is capped" test) in ways that rely on
+    // groundHeight staying part of this AND. Only when a caller explicitly
+    // wires the new field (kart.ts always does) does the gate switch to the
+    // new center-AND-leading rule; a `null` leading value (probe legitimately
+    // off the map) still falls back to detachRef within that new rule.
     //  - detachRef alone sitting below y is just the body riding a corner
-    //    bump (front wheel on a kerb lifts y above the center's ground) —
-    //    the highest contact point is still carrying the kart.
-    // A genuine crest/cliff drops both (on a convex crest the corner probes
-    // read BELOW center, so MAX==center there and the two conditions
-    // coincide — the original D2 behavior).
-    if (inp.groundHeight < state.y - p.groundSnapDistance && detachRef < state.y - p.groundSnapDistance) {
+    //    bump (rear wheel on a kerb lifts y above the center's ground) —
+    //    the highest contact point behind is still carrying the kart, and
+    //    the leading probe (still on solid ground ahead) confirms it.
+    //  - leadingProbeHeight alone sitting below y is the nose already over a
+    //    lip while the body's own center hasn't crossed it yet — not a
+    //    detach on its own (this is exactly the "front probe on a bump/pit"
+    //    case: don't detach just because ONE probe found a dip).
+    // A genuine crest/cliff/straddle drops both.
+    const usesLeadingGate = inp.leadingProbeHeight !== undefined;
+    const leadingRef = usesLeadingGate ? (inp.leadingProbeHeight ?? detachRef) : inp.groundHeight;
+    if (detachRef < state.y - p.groundSnapDistance && leadingRef < state.y - p.groundSnapDistance) {
       return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: detachRef };
     }
 
@@ -224,8 +268,40 @@ export function stepVertical(state: VerticalState, inp: VerticalInput, p: Vertic
   // caller supplied one, falling back to groundHeight/stale-prev exactly as
   // before when it didn't (airborne callers don't have to populate it).
   const groundHeightPrev = inp.detachRefHeight ?? inp.groundHeight ?? state.groundHeightPrev;
-  if (inp.groundHeight !== null && vy <= 0 && y <= inp.groundHeight + p.landingMargin) {
-    return { y: inp.groundHeight, vy: 0, airborne: false, groundHeightPrev }; // no bounce
+
+  // D2 fake-land fix (2026-07-10, design/notes/ride-collision-v2.md, found
+  // via tools/diag_attitude_trace.ts --synth on a wide dropoff with a lower
+  // second floor underneath): a body that just detached through the grounded
+  // branch's center-AND-leading gate above could swing straight into THIS
+  // landing check on the very next tick and re-attach against the raw
+  // wall-aware `groundHeight` param (MAX of every probe) — a REAR probe still
+  // resting on the deck the body just drove off of kept propping that MAX up
+  // long after the center and leading probes had both cleared the lip, so
+  // the kart detached, immediately "fake-landed" on that phantom rear
+  // support, detached again next tick, and repeated: an airborne/grounded
+  // oscillation (15 ticks on the synthetic repro) with pitch swinging past
+  // -20 degrees every cycle, instead of one clean launch arc. Fix mirrors the
+  // SAME leading-probe opt-in pattern the detach gate above already uses:
+  // when the caller supplies `leadingProbeHeight`, landing is judged against
+  // the MAX of the center probe and the leading probe ONLY — the same two
+  // probes the detach gate required to BOTH clear the lip before letting the
+  // body leave the ground, so re-landing now requires those same two to
+  // agree the ground is back (a trailing probe drifting back under the body
+  // doesn't count — same "own support isn't what's behind you" logic as the
+  // detach side). `leadingProbeHeight` omitted (every pre-existing caller/
+  // test) falls back to the exact old formula byte-for-byte — same opt-in
+  // contract as the detach gate, see VerticalInput.leadingProbeHeight doc for
+  // why that fallback is safe, not a silent behavior change.
+  const usesLeadingGate = inp.leadingProbeHeight !== undefined;
+  const detachRefForLanding = inp.detachRefHeight ?? inp.groundHeight;
+  const landingRef = usesLeadingGate
+    ? detachRefForLanding === null
+      ? null
+      : Math.max(detachRefForLanding, inp.leadingProbeHeight ?? detachRefForLanding)
+    : inp.groundHeight;
+
+  if (landingRef !== null && vy <= 0 && y <= landingRef + p.landingMargin) {
+    return { y: landingRef, vy: 0, airborne: false, groundHeightPrev }; // no bounce
   }
   return { y, vy, airborne: true, groundHeightPrev };
 }

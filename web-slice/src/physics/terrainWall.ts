@@ -44,6 +44,37 @@
 // ordinary drivable slope this game authors, regardless of which two cells
 // the probe base happens to straddle.
 //
+// D5 (body-relative wall gate, 2026-07-10, design/notes/ride-collision-v2.md
+// follow-up — see tools/diagnose_edge_bugs_survey.ts / _sim.ts / _solid.ts):
+// GRAD and STEP below both compare two SURFACE heights to each other and
+// used to fire purely on that local shape, with no awareness of where the
+// kart's own BODY actually is (yRef). Two false positives came from that:
+//   (a) a heightfield cell-seam gradient blip right at the FOOT of an
+//       ordinary drivable slope (Δ0.42 over the 0.15m base > 0.27) blocked a
+//       climbable ramp before the kart had risen at all — the "wall" point
+//       was well within the body's own reach.
+//   (b) a canal's far bank read as a wall while the kart was still airborne
+//       over open water or resting on a DECK well above the canal floor —
+//       the surface-only diff had no idea the body wasn't anywhere near that
+//       height yet.
+// Both criteria now additionally require the "wall" sample itself (hB for
+// GRAD, hNext for STEP — whichever one is the higher/destination point of
+// its pair) to sit more than `climbThreshold` above yRef: the SAME "how tall
+// a step can this body actually reach" cutoff sampleAt's own layer selection
+// already uses (KartPhysicsParams.layerClimbThreshold), passed in by the
+// caller (kart/kart.ts binds it from this tick's yRef closure, mirroring how
+// solidBlocked below is already wired). A rise that's still within the
+// body's own climb reach is, by definition, not something the body needs a
+// "wall" escape hatch for — either it's a genuine climbable ramp (GRAD/STEP
+// simply shouldn't have blocked it) or it's exactly what sampleAt would
+// already resolve as this body's own floor a moment from now. Only gates the
+// SURFACE-diff heuristics — solidBlocked (D3a3) stays untouched, it already
+// tests the real 3D interval against [yRef, yRef+bodyHeight] and needs no
+// second gate.
+function isWallHeight(h: number, yRef: number, climbThreshold: number): boolean {
+  return h > yRef + climbThreshold;
+}
+
 // D4 (design/notes/ride-collision-v2.md, 2026-07-09): the slide loop used to
 // have a hard freeze on two failure paths — "opposing corners cancel"
 // (len<1e-9, e.g. a kart wedged between two obstacles on opposite sides) and
@@ -104,6 +135,14 @@ export interface TerrainSampler {
   // Optional so every existing hand-rolled TerrainSampler in tests (which
   // only cover the gradient path) keeps compiling unchanged.
   solidBlocked?(x: number, z: number): boolean;
+  // D5 follow-up (2026-07-10, wall_block regression fix — see
+  // shared/heightfield.ts Heightfield.wallBlocked doc): a wall_block* side is
+  // an EXPLICIT always-a-wall authoring choice, not an ordinary terrain rise
+  // — it must never be relaxed by the body-relative climb gate the GRAD/STEP
+  // checks below now use (D5), unlike solidBlocked above which still shares
+  // that gate. Optional for the same "old hand-rolled test samplers keep
+  // compiling" reason as solidBlocked.
+  wallBlocked?(x: number, z: number): boolean;
 }
 
 // One footprint corner's before/after check — returns true if this corner's
@@ -111,7 +150,15 @@ export interface TerrainSampler {
 // wall by the D3b local-gradient criterion — cube sides included, see module
 // doc). `dir` is the BODY's movement direction this iteration (same for
 // every corner, not a per-corner offset direction) — see module doc D3b.
-function cornerBlocked(sampler: TerrainSampler, cur: Vec2, next: Vec2, dir: Vec2, gradientThreshold: number): boolean {
+function cornerBlocked(
+  sampler: TerrainSampler,
+  cur: Vec2,
+  next: Vec2,
+  dir: Vec2,
+  gradientThreshold: number,
+  yRef: number,
+  climbThreshold: number
+): boolean {
   const hNext = sampler.sample(next.x, next.z);
   if (hNext === null) {
     // Off-map at the destination. hasColumn is redundant with sample===null
@@ -146,7 +193,19 @@ function cornerBlocked(sampler: TerrainSampler, cur: Vec2, next: Vec2, dir: Vec2
   // source it used to be: bilinear grid sampling (D3a) made in-tile heights
   // continuous, and the known cell-seam artifacts top out around 0.2 —
   // under the 0.27 threshold.
-  if (hB - hA > gradientThreshold || hNext - hCur > gradientThreshold) return true;
+  // D5: gate each surface-diff criterion on its own "wall" sample actually
+  // being out of the body's climb reach (see D5 doc comment above) — a rise
+  // the body itself is already within `climbThreshold` of isn't a wall this
+  // check should be inventing an escape hatch for.
+  const gradWall = hB - hA > gradientThreshold && isWallHeight(hB, yRef, climbThreshold);
+  const stepWall = hNext - hCur > gradientThreshold && isWallHeight(hNext, yRef, climbThreshold);
+  if (gradWall || stepWall) return true;
+
+  // D5 follow-up: wall_block* sides are an explicit, never-climb-gated wall
+  // (see TerrainSampler.wallBlocked doc) — OR-ed in as an ADDITIONAL way to
+  // be blocked, same "never suppresses, skipped when unwired" convention as
+  // solidBlocked below.
+  if (sampler.wallBlocked?.(next.x, next.z)) return true;
 
   // D3a3: honest solid intersection at the destination — see TerrainSampler.
   // solidBlocked doc. OR-ed in as an ADDITIONAL way to be blocked (never
@@ -180,7 +239,9 @@ export function tryEscape(
   halfLength: number,
   halfWidth: number,
   escapeDist: number,
-  gradientThreshold: number
+  gradientThreshold: number,
+  yRef: number,
+  climbThreshold: number
 ): { x: number; z: number; dir: Vec2 } | null {
   const candidates: Vec2[] = [
     { x: -fwd.x, z: -fwd.z },
@@ -195,7 +256,7 @@ export function tryEscape(
     const nextPts = footprintPoints(ex, ez, fwd, right, halfLength, halfWidth);
     let blocked = false;
     for (let i = 0; i < curPts.length; i++) {
-      if (cornerBlocked(sampler, curPts[i], nextPts[i], dir, gradientThreshold)) {
+      if (cornerBlocked(sampler, curPts[i], nextPts[i], dir, gradientThreshold, yRef, climbThreshold)) {
         blocked = true;
         break;
       }
@@ -219,6 +280,8 @@ export function resolveTerrainSlide(
   halfLength: number,
   halfWidth: number,
   wallGradientThreshold: number,
+  yRef: number,
+  climbThreshold: number,
   maxIters = 4
 ): { pos: Vec2; vel: Vec2 } {
   let px = pos.x;
@@ -241,7 +304,7 @@ export function resolveTerrainSlide(
     let sumZ = 0;
     let blockedCount = 0;
     for (let i = 0; i < curPts.length; i++) {
-      if (!cornerBlocked(sampler, curPts[i], nextPts[i], dir, wallGradientThreshold)) continue;
+      if (!cornerBlocked(sampler, curPts[i], nextPts[i], dir, wallGradientThreshold, yRef, climbThreshold)) continue;
       blockedCount++;
       // Body-relative offset direction of this corner (not world axis) —
       // the actual P1 fix: a diagonal wall clips a ROTATED corner, and the
@@ -288,7 +351,7 @@ export function resolveTerrainSlide(
   // the table with zero position change — see module doc.
   if (!moved && inputSpeed > 1e-6 && Math.hypot(vx, vz) > 1e-3) {
     const escapeDist = inputSpeed * dt;
-    const escaped = tryEscape(sampler, px, pz, fwd, right, halfLength, halfWidth, escapeDist, wallGradientThreshold);
+    const escaped = tryEscape(sampler, px, pz, fwd, right, halfLength, halfWidth, escapeDist, wallGradientThreshold, yRef, climbThreshold);
     if (escaped) {
       px = escaped.x;
       pz = escaped.z;

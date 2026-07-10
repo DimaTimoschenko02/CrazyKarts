@@ -37,6 +37,19 @@ export interface CellDef {
   // families are unaffected by this flag either way, matching their
   // genuinely X-symmetric meshes.
   mirror?: boolean;
+  // "Snap to surface" (editor F / 🧲 toggle, 2026-07-10): a fractional
+  // vertical shift in METERS applied on top of y_level*level_height, for
+  // tiles whose baked base isn't a multiple of any floor height or
+  // level_height step — decorative road tiles (roadTile_019/020, trees on a
+  // grass clump) are the motivating case, see tileBottomY() below.
+  // Default 0 (omitted entirely when 0 — see editor/main.ts computeSnapOffset
+  // callers, which only ever set this key to a nonzero value), so every
+  // pre-existing map with no y_offset field loads bit-for-bit unchanged.
+  // Applied uniformly to BOTH this HeightCell's `base` and `solidBase` in
+  // fromMapJson below — shifting `base` alone would move the visible/
+  // sampled surface but leave a stale solidBase, silently reopening the
+  // D3a2 burial-filter bug this field predates.
+  y_offset?: number;
 }
 
 export interface RectFill {
@@ -127,6 +140,23 @@ export interface HeightCell {
   gridRot?: number;
   gridMirror?: boolean;
   solidBase: number;
+  // "Genuine wall" tag (2026-07-10 follow-up to D5, design/notes/
+  // ride-collision-v2.md — see Heightfield.wallBlocked() below): set ONLY on
+  // wall_block* cells (heightCellFor's ground_block/wall_block branch below).
+  // D5 gated physics/terrainWall.ts's GRAD/STEP checks on layerClimbThreshold
+  // — correct for an ordinary heightfield step (a real, climbable rise), but
+  // it also silently let a wall_block's half-level (0.5m) side stop counting
+  // as a wall whenever climbThreshold (default 0.8) exceeds that height,
+  // since Heightfield.solidBlocked() already carried the exact same gate.
+  // wall_block* cells are an EXPLICIT authoring choice ("solid from the
+  // side, walkable on top", commit ef6c224) — not a plain terrain rise that
+  // should ever be climb-gated — so they get their own always-on check
+  // (wallBlocked()) instead of relying on the climb-relative one.
+  // ground_block does NOT get this flag: it shares wall_block's geometry
+  // branch (same cube shape) but was never the "genuinely impassable from
+  // the side" family — only its top-edge fillet differs visually from
+  // wall_block, per heightCellFor's own doc comment.
+  isWall?: boolean;
 }
 
 // Ascent direction per rotation table above (side descends → ascent is opposite).
@@ -366,6 +396,30 @@ interface RoadTileCatalogEntry {
 
 const ROAD_TILES = roadTilesCatalog as unknown as Record<string, RoadTileCatalogEntry>;
 
+// "Snap to surface" support (CellDef.y_offset doc above): the tile's own
+// lowest MESH point (baked `minY`, local meters above the pivot — 0 for all
+// 302 tiles as of this pass, the slab bottom IS the pivot plane). This is the
+// tile's true floor contact point for snapping: shift the tile so this point
+// lands on the sampled surface and its underside sits flush.
+//
+// History (owner bug 2026-07-10, roads_v1): the first cut of snap used the
+// minimum of the physics heightGrid instead. That grid samples the TOP
+// (walkable) surface — for roadTile_019 (trees on a grass clump) its minimum
+// is 1.577, the lowest point of the clump's top, NOT the mesh bottom.
+// Subtracting it drove the offset to floor − 1.577, sinking the tree ~1m
+// under the grass ("прикрепилось к нулю, торчит из-под травы"). Snapping must
+// use the mesh bottom; the walkable-surface grid belongs to physics sampling
+// (heightCellFor) only.
+//
+// Returns null for assets not in the road-tile catalog (space-kit assets):
+// their pivot already sits on their base plane, so editor/main.ts
+// computeSnapOffset falls back to the plain yLevel*level_height base.
+export function tileBottomY(asset: string): number | null {
+  const entry = ROAD_TILES[asset];
+  if (!entry) return null;
+  return entry.minY ?? 0;
+}
+
 export function isRoadTileAsset(asset: string): boolean {
   return asset.startsWith("roadTile_");
 }
@@ -476,7 +530,10 @@ export function heightCellFor(
     // solidBase (the flat BOTTOM, one full level_height below it) genuinely
     // differ — the cube has real thickness, unlike every thin-quad terrain
     // family above.
-    return { base: (yLevel + 1) * lh, rise: 0, ax: 0, az: 0, solidBase: yLevel * lh };
+    // isWall (2026-07-10, see HeightCell.isWall doc): only the wall_block*
+    // half of this shared branch is tagged — ground_block was never meant to
+    // be an always-solid side, see that doc comment for the full rationale.
+    return { base: (yLevel + 1) * lh, rise: 0, ax: 0, az: 0, solidBase: yLevel * lh, isWall: asset.startsWith("wall_block") };
   }
   // Flat terrain / roads: a thin quad with zero thickness — solidBase equals
   // the surface height itself (base, since rise=0 here means the surface
@@ -521,6 +578,13 @@ export class Heightfield {
     }
     for (const cell of data.cells ?? []) {
       const rot = normRot(cell.rot);
+      // y_offset (CellDef doc above): shifts this cell's whole layer — both
+      // the sampled surface (`base`) and its solid's lower face
+      // (`solidBase`) — by a fractional number of meters. Applied uniformly
+      // to whichever branch below produced the HeightCell(s), so burial
+      // filtering/solidBlocked (which read solidBase, not base) stay correct
+      // for an offset tile exactly like for an unoffset one.
+      const offset = cell.y_offset ?? 0;
       if (TWO_CELL_ASSETS.has(cell.asset)) {
         // Expand a 2-cell ramp into two half-height ramp cells: the clicked
         // cell (low half, base = y_level) and the next cell along the long
@@ -529,14 +593,19 @@ export class Heightfield {
         // slope, matching the mesh (its Y-span is one level over two cells).
         const [dx, dz] = longAxis(rot);
         const half = hf.levelHeight / 2;
-        const base = cell.y_level * hf.levelHeight;
+        const base = cell.y_level * hf.levelHeight + offset;
         // solidBase (D3a2): same above-pivot family as terrain_ramp — each
         // half's own base IS its solid's lower face (no separate thickness
         // below it, matching the single-cell ramp branch above).
         hf.setCell(cell.x, cell.z, { base, rise: half, ax: dx, az: dz, solidBase: base });
         hf.setCell(cell.x + dx, cell.z + dz, { base: base + half, rise: half, ax: dx, az: dz, solidBase: base + half });
       } else {
-        hf.setCell(cell.x, cell.z, heightCellFor(cell.asset, cell.y_level, rot, hf.levelHeight, cell.mirror));
+        const hc = heightCellFor(cell.asset, cell.y_level, rot, hf.levelHeight, cell.mirror);
+        if (offset !== 0) {
+          hc.base += offset;
+          hc.solidBase += offset;
+        }
+        hf.setCell(cell.x, cell.z, hc);
       }
     }
     return hf;
@@ -595,7 +664,7 @@ export class Heightfield {
   // or null when nothing was authored there. Factored out of sample()/
   // sampleAt()/solidBlocked() so all three share the exact same per-cell math
   // (grid lookup or linear base+rise+MAX ax2/az2 model).
-  private columnLayers(wx: number, wz: number): Array<{ h: number; solidBase: number }> | null {
+  private columnLayers(wx: number, wz: number): Array<{ h: number; solidBase: number; isWall?: boolean }> | null {
     const fx = (wx - this.originX) / this.tile;
     const fz = (wz - this.originZ) / this.tile;
     const cx = Math.round(fx);
@@ -604,7 +673,7 @@ export class Heightfield {
     if (!stack) return null;
     const lx = fx - cx;
     const lz = fz - cz;
-    const layers: Array<{ h: number; solidBase: number }> = [];
+    const layers: Array<{ h: number; solidBase: number; isWall?: boolean }> = [];
     for (const cell of stack) {
       let h: number;
       if (cell.grid) {
@@ -619,7 +688,7 @@ export class Heightfield {
         }
         h = cell.base + cell.rise * t;
       }
-      layers.push({ h, solidBase: cell.solidBase });
+      layers.push({ h, solidBase: cell.solidBase, isWall: cell.isWall });
     }
     return layers;
   }
@@ -732,6 +801,36 @@ export class Heightfield {
     if (layers === null) return false;
     for (const l of layers) {
       if (l.h > yRef + climbThreshold && l.solidBase < kartTop && l.h > yRef) return true;
+    }
+    return false;
+  }
+
+  // D5 follow-up (2026-07-10, design/notes/ride-collision-v2.md — wall_block
+  // regression fix): an explicit, NEVER climb-gated check for the wall_block*
+  // family (HeightCell.isWall doc above). Unlike solidBlocked()/sampleAt()'s
+  // `climbThreshold`, this deliberately does NOT scale with
+  // KartPhysicsParams.layerClimbThreshold — a wall_block's side is an
+  // authored "always a wall" decision (commit ef6c224: "solid from the side,
+  // walkable on top"), not an ordinary terrain rise that should ever become
+  // climbable just because a designer tunes climb reach up for curbs/decks
+  // elsewhere on the map.
+  //
+  // WALL_TOP_TOLERANCE (0.25m): a body standing/driving ON TOP of a
+  // wall_block has yRef essentially equal to that same cell's own top (h) —
+  // without slack this cell's OWN layer would immediately re-trigger itself
+  // as "a wall right under me" the instant sub-meter float noise or a
+  // shallow probe offset put yRef a hair below h, freezing a kart that's
+  // already standing on the block. 0.25 is comfortably larger than any such
+  // noise (position quantization, probe half-extents) while staying well
+  // under a half-level step (0.5m default), so a genuinely DIFFERENT,
+  // taller wall_block one level up is still caught.
+  private static readonly WALL_TOP_TOLERANCE = 0.25;
+
+  wallBlocked(wx: number, wz: number, yRef: number): boolean {
+    const layers = this.columnLayers(wx, wz);
+    if (layers === null) return false;
+    for (const l of layers) {
+      if (l.isWall && l.h > yRef + Heightfield.WALL_TOP_TOLERANCE) return true;
     }
     return false;
   }

@@ -367,3 +367,83 @@ describe("stepVertical — D3 (design/notes/ride-collision-v2.md, 2026-07-09, sy
     expect(s.airborne).toBe(true); // falls back to the groundHeight-based rate, same as the pre-D3 cliff-edge test
   });
 });
+
+describe("stepVertical — D2 landing-gate fix (2026-07-10, wide dropoff fake-land oscillation)", () => {
+  // Regression for the bug found via tools/diag_attitude_trace.ts --synth: on
+  // a wide cliff (a REAR probe still resting on the upper deck long after the
+  // center+leading probes cross the lip), the OLD landing check re-attached
+  // against the raw wall-aware groundHeight (still propped up by that rear
+  // probe) on the very tick after the D2 detach gate fired, producing an
+  // airborne/grounded oscillation instead of one clean launch. Sequence
+  // below mirrors that shape directly at the stepVertical level (no map/
+  // heightfield needed): center+leading (the body's own footprint) both
+  // clear the lip while a trailing groundHeight value (what a rear probe
+  // would still read) stays high.
+  const UPPER = 1.0; // upper deck height (what a rear probe would still read)
+  const LOWER = 0.0; // lower floor height, far below
+
+  it("does not fake-land while a trailing probe still props up raw groundHeight, only when center+leading agree", () => {
+    let s = createVerticalState(UPPER);
+    // Settle grounded on the upper deck first (leading gate wired every tick,
+    // matching kart.ts's real call site).
+    for (let i = 0; i < 10; i++) {
+      s = stepVertical(
+        s,
+        { groundHeight: UPPER, detachRefHeight: UPPER, leadingProbeHeight: UPPER, dt: DT },
+        P
+      );
+    }
+    expect(s.airborne).toBe(false);
+
+    let firstAirborneTick = -1;
+    let sawRelandBeforeRealFloor = false;
+    for (let i = 0; i < 40; i++) {
+      // Center + leading (own footprint) crossed the lip immediately; raw
+      // groundHeight stays propped at UPPER by a trailing (rear) probe for a
+      // while, exactly like a wide dropoff's rear-probe straggler.
+      const trailingStillPropped = i < 20;
+      s = stepVertical(
+        s,
+        {
+          groundHeight: trailingStillPropped ? UPPER : LOWER,
+          detachRefHeight: LOWER,
+          leadingProbeHeight: LOWER,
+          dt: DT,
+        },
+        P
+      );
+      if (s.airborne && firstAirborneTick === -1) firstAirborneTick = i;
+      // Once genuinely airborne, must stay airborne for as long as the
+      // trailing prop is still artificially propping up raw groundHeight —
+      // any grounded tick in that window is exactly the fake-land bug.
+      if (firstAirborneTick !== -1 && trailingStillPropped && !s.airborne) sawRelandBeforeRealFloor = true;
+    }
+
+    expect(firstAirborneTick).toBeGreaterThanOrEqual(0); // did detach
+    expect(sawRelandBeforeRealFloor).toBe(false); // never fake-landed on the phantom rear support
+  });
+
+  it("still lands normally once center+leading themselves reach the real floor (no regression to the launch/landing contract)", () => {
+    let s: VerticalState = { y: LOWER + 0.5, vy: -3, airborne: true, groundHeightPrev: null };
+    for (let i = 0; i < 100 && s.airborne; i++) {
+      s = stepVertical(
+        s,
+        { groundHeight: LOWER, detachRefHeight: LOWER, leadingProbeHeight: LOWER, dt: DT },
+        P
+      );
+    }
+    expect(s.airborne).toBe(false);
+    expect(s.vy).toBe(0);
+    expect(s.y).toBeCloseTo(LOWER, 6);
+  });
+
+  it("byte-identical old landing behavior when leadingProbeHeight is omitted (pre-existing callers/tests)", () => {
+    let s: VerticalState = { y: 0.5, vy: -1, airborne: true, groundHeightPrev: null };
+    for (let i = 0; i < 200 && s.airborne; i++) {
+      s = stepVertical(s, { groundHeight: 0, detachRefHeight: 0, dt: DT }, P);
+    }
+    expect(s.airborne).toBe(false);
+    expect(s.vy).toBe(0);
+    expect(s.y).toBeCloseTo(0, 6);
+  });
+});

@@ -15,8 +15,8 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { GameMap, type MapJson } from "../map/mapLoader";
-import { computeAirborneFactor, computeAttitudeTarget } from "./attitude";
-import { sampleGroundProbes, clampGroundProbesForAttitude, type GroundProbes } from "./groundProbe";
+import { computeAirborneFactor, computeAttitudeTarget, computeTipOverTarget } from "./attitude";
+import { sampleGroundProbes, clampGroundProbesForAttitude, excludeGroundProbesForAttitude, type GroundProbes } from "./groundProbe";
 
 function stubLib(names: string[]): Map<string, THREE.Group> {
   return new Map(names.map(n => [n, new THREE.Group()]));
@@ -308,5 +308,164 @@ describe("clampGroundProbesForAttitude — cliff-edge nose-dive fix", () => {
     expect(rawMaxStep).toBeGreaterThan(1.0); // raw: confirms this reproduces the reported near-vertical pop
     expect(clampedMaxStep).toBeLessThan(0.6); // clamped: still a visible dip at the lip, nowhere near a dive
     expect(clampedMaxStep).toBeLessThan(rawMaxStep * 0.4); // and a large, unambiguous reduction versus raw
+  });
+});
+
+// Cliff-edge nose-dive fix, take 2 (owner playtest report, 2026-07-10 —
+// "клюёт носом на скорости при съезде с обрыва"). groundProbe.ts
+// excludeGroundProbesForAttitude — the harder sibling of
+// clampGroundProbesForAttitude above: a probe past the drop limit is folded
+// back to `center` (ZERO slope contribution), not merely capped to a small
+// residual slope.
+describe("excludeGroundProbesForAttitude — probe past the cliff contributes NOTHING to slope-follow", () => {
+  const DROP_LIMIT = 0.35;
+  const HALF_WHEELBASE = 0.6;
+  const HALF_TRACK = 0.5;
+
+  it("pitch target is exactly LEVEL (not just capped) when the front probe has cleared the edge and the rest of the body is flat", () => {
+    const probes: GroundProbes = { center: 0.0, hF: -6.0, hB: 0.0, hR: 0.0, hL: 0.0 };
+    const excludedPitch = computeAttitudeTarget(
+      excludeGroundProbesForAttitude(probes, DROP_LIMIT),
+      HALF_WHEELBASE,
+      HALF_TRACK
+    ).pitch;
+    // Contrast with the OLD clamp behavior (still capped to a small nonzero
+    // slope) — exclude collapses it all the way to 0.
+    const clampedPitch = computeAttitudeTarget(
+      clampGroundProbesForAttitude(probes, DROP_LIMIT),
+      HALF_WHEELBASE,
+      HALF_TRACK
+    ).pitch;
+    expect(excludedPitch).toBe(0);
+    expect(clampedPitch).toBeLessThan(0); // the OLD fix still left a small residual dive — this is exactly the gap the new fix closes
+  });
+
+  it("does not touch a probe reading within the drop limit — an ordinary downhill slope still slope-follows normally", () => {
+    const probes: GroundProbes = { center: 0.0, hF: -0.1, hB: 0.0, hR: 0.0, hL: 0.0 };
+    const rawPitch = computeAttitudeTarget(probes, HALF_WHEELBASE, HALF_TRACK).pitch;
+    const excludedPitch = computeAttitudeTarget(
+      excludeGroundProbesForAttitude(probes, DROP_LIMIT),
+      HALF_WHEELBASE,
+      HALF_TRACK
+    ).pitch;
+    expect(excludedPitch).toBeCloseTo(rawPitch, 10);
+  });
+
+  it("does not touch a probe reading meaningfully HIGHER (climbing a slope is unaffected, same as the clamp version)", () => {
+    const probes: GroundProbes = { center: 0.0, hF: 2.0, hB: 0.0, hR: 0.0, hL: 0.0 };
+    const rawPitch = computeAttitudeTarget(probes, HALF_WHEELBASE, HALF_TRACK).pitch;
+    const excludedPitch = computeAttitudeTarget(
+      excludeGroundProbesForAttitude(probes, DROP_LIMIT),
+      HALF_WHEELBASE,
+      HALF_TRACK
+    ).pitch;
+    expect(excludedPitch).toBeCloseTo(rawPitch, 10);
+  });
+
+  it("C0-continuous at the drop-limit boundary — a probe right at the limit gives the same result excluded or raw", () => {
+    const justInside: GroundProbes = { center: 0.0, hF: -DROP_LIMIT * 0.999, hB: 0.0, hR: 0.0, hL: 0.0 };
+    const raw = computeAttitudeTarget(justInside, HALF_WHEELBASE, HALF_TRACK).pitch;
+    const excluded = computeAttitudeTarget(excludeGroundProbesForAttitude(justInside, DROP_LIMIT), HALF_WHEELBASE, HALF_TRACK).pitch;
+    expect(excluded).toBeCloseTo(raw, 3);
+  });
+});
+
+// Tip-over ("качели через кромку") — the SEPARATE, slow signal that
+// re-introduces a nose-down lean for a kart genuinely resting with part of
+// its footprint hanging (as opposed to a fast crossing, which excludeGround-
+// ProbesForAttitude above keeps at exactly 0). See kart/attitude.ts
+// computeTipOverTarget's doc comment for the full physical model (center
+// probe drives magnitude — "is the body past its own tipping point" — front/
+// back probes drive direction only).
+describe("computeTipOverTarget — see-saw over the edge", () => {
+  const EDGE_BAND = 0.35;
+  const MAX_TIP = (22 * Math.PI) / 180;
+
+  it("returns LEVEL when every probe is still resting on the support surface", () => {
+    const probes: GroundProbes = { center: 0, hF: 0, hB: 0, hR: 0, hL: 0 };
+    const t = computeTipOverTarget(probes, 0, EDGE_BAND, MAX_TIP);
+    expect(t.pitch).toBeCloseTo(0, 10);
+    expect(t.roll).toBeCloseTo(0, 10);
+  });
+
+  it("dead zone: front probe fully hanging but CENTER still fully supported -> pitch stays exactly 0 (design brief S1 — 'nose ~25% over the edge, standing still, nothing happens', not just small, ZERO)", () => {
+    const probes: GroundProbes = { center: 0, hF: -10, hB: 0, hR: 0, hL: 0 };
+    const t = computeTipOverTarget(probes, 0, EDGE_BAND, MAX_TIP);
+    expect(t.pitch).toBeCloseTo(0, 10);
+  });
+
+  it("ramps up smoothly (not a step) once the CENTER probe itself starts crossing the support edge, capped at maxTipAngle", () => {
+    const fractions = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.5, 3.0];
+    const pitches = fractions.map(f => {
+      const probes: GroundProbes = { center: -f * EDGE_BAND, hF: -10, hB: 0, hR: 0, hL: 0 };
+      return computeTipOverTarget(probes, 0, EDGE_BAND, MAX_TIP).pitch;
+    });
+    // Monotonically more nose-down (more negative) as the center probe sinks
+    // further below the support surface.
+    for (let i = 1; i < pitches.length; i++) expect(pitches[i]).toBeLessThanOrEqual(pitches[i - 1] + 1e-9);
+    // Bounded: never exceeds -maxTipAngle even far past the edge.
+    for (const p of pitches) expect(p).toBeGreaterThanOrEqual(-MAX_TIP - 1e-9);
+    // Genuinely reaches close to the cap once well past the edge.
+    expect(pitches[pitches.length - 1]).toBeLessThan(-MAX_TIP * 0.9);
+  });
+
+  it("direction follows which probe is hanging — a REAR-hanging kart (reversing off a ledge) tips the OTHER way", () => {
+    const probes: GroundProbes = { center: -EDGE_BAND, hF: 0, hB: -10, hR: 0, hL: 0 };
+    const t = computeTipOverTarget(probes, 0, EDGE_BAND, MAX_TIP);
+    expect(t.pitch).toBeGreaterThan(0); // tail hanging -> nose UP, not down
+  });
+
+  it("roll follows the same model on the side axis — a right-hanging kart tips right-side-down (negative roll)", () => {
+    const probes: GroundProbes = { center: -EDGE_BAND, hF: 0, hB: 0, hR: -10, hL: 0 };
+    const t = computeTipOverTarget(probes, 0, EDGE_BAND, MAX_TIP);
+    expect(t.roll).toBeLessThan(0);
+    expect(t.pitch).toBeCloseTo(0, 10); // isolated axis — no cross-talk into pitch
+  });
+
+  it("returns LEVEL when off the map entirely (center or support height null) — nothing to judge a tipping point against", () => {
+    const probes: GroundProbes = { center: null, hF: -10, hB: 0, hR: 0, hL: 0 };
+    expect(computeTipOverTarget(probes, 0, EDGE_BAND, MAX_TIP)).toEqual({ pitch: 0, roll: 0 });
+    const probes2: GroundProbes = { center: 0, hF: -10, hB: 0, hR: 0, hL: 0 };
+    expect(computeTipOverTarget(probes2, null, EDGE_BAND, MAX_TIP)).toEqual({ pitch: 0, roll: 0 });
+  });
+
+  it("filtered over time at a fixed ~50%-past-center overhang converges monotonically with NO tick-to-tick jump greater than 1.5deg (design brief S2 acceptance bound), using the SAME attitudeTipOverRate default and dt kart.ts runs at", () => {
+    const DT = 1 / 120;
+    const RATE = 1.0; // DEFAULT_KART_PHYSICS_PARAMS.attitudeTipOverRate
+    const probes: GroundProbes = { center: -0.5 * EDGE_BAND, hF: -10, hB: 0, hR: 0, hL: 0 };
+    const target = computeTipOverTarget(probes, 0, EDGE_BAND, MAX_TIP);
+    expect(target.pitch).toBeLessThan(0); // sanity: this fixture is meant to be past the dead zone
+
+    let pitchSm = 0;
+    let prev = 0;
+    let maxStepDeg = 0;
+    const deg = (r: number) => (r * 180) / Math.PI;
+    for (let t = 0; t < 300; t++) {
+      const alpha = 1 - Math.exp(-RATE * DT);
+      pitchSm += (target.pitch - pitchSm) * alpha;
+      if (t > 0) maxStepDeg = Math.max(maxStepDeg, Math.abs(deg(pitchSm) - deg(prev)));
+      // monotonic: each tick must be <= the previous in signed value (getting
+      // MORE negative or staying put, never bouncing back up) while
+      // approaching a fixed negative target from 0.
+      expect(pitchSm).toBeLessThanOrEqual(prev + 1e-9);
+      prev = pitchSm;
+    }
+    expect(maxStepDeg).toBeLessThan(1.5);
+  });
+
+  it("a FAST crossing (target present for only ~0.1s, matching a kart driving over a cliff lip at speed) barely moves the slow filter — stays under 4deg (design brief S3 acceptance bound)", () => {
+    const DT = 1 / 120;
+    const RATE = 1.0;
+    const probes: GroundProbes = { center: -EDGE_BAND, hF: -10, hB: 0, hR: 0, hL: 0 }; // fully past the dead zone, worst case
+    const target = computeTipOverTarget(probes, 0, EDGE_BAND, MAX_TIP);
+
+    let pitchSm = 0;
+    const deg = (r: number) => (r * 180) / Math.PI;
+    const fastCrossingTicks = 12; // ~0.1s at 120Hz — the straddle window a 7 m/s kart with a ~0.9m half-wheelbase actually spends with the front probe hanging
+    for (let t = 0; t < fastCrossingTicks; t++) {
+      const alpha = 1 - Math.exp(-RATE * DT);
+      pitchSm += (target.pitch - pitchSm) * alpha;
+    }
+    expect(Math.abs(deg(pitchSm))).toBeLessThan(4);
   });
 });

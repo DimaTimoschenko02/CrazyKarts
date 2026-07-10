@@ -6,7 +6,7 @@
 // client renderer (map/mapLoader.ts wraps it) and the Colyseus match server
 // (server/config/arena.ts).
 import { describe, expect, it } from "vitest";
-import { Heightfield, heightCellFor, normRot, type MapJson } from "./heightfield";
+import { Heightfield, heightCellFor, normRot, tileBottomY, type MapJson } from "./heightfield";
 
 function makeHeightfield(cells: MapJson["cells"]): Heightfield {
   return Heightfield.fromMapJson({
@@ -519,5 +519,113 @@ describe("Heightfield.listCellCoords — drivable-footprint enumeration used by 
     const coords = hf.listCellCoords();
     expect(coords).toHaveLength(3);
     expect(coords).toEqual(expect.arrayContaining([{ x: 0, z: 0 }, { x: 1, z: 0 }, { x: 2, z: 0 }]));
+  });
+});
+
+// CellDef.y_offset — "snap to surface" fractional vertical shift (editor F /
+// 🧲 toggle, 2026-07-10). See shared/heightfield.ts CellDef doc and
+// editor/main.ts computeSnapOffset for the full feature.
+describe("CellDef.y_offset — fractional vertical shift applied on top of y_level*level_height", () => {
+  it("shifts a flat cell's sampled surface AND solidBase by the offset (sample/sampleAt)", () => {
+    const withOffset = makeHeightfield([{ asset: "terrain", x: 0, z: 0, y_level: 1, y_offset: 0.45 }]);
+    const withoutOffset = makeHeightfield([{ asset: "terrain", x: 0, z: 0, y_level: 1 }]);
+    // y_level(1) * level_height(0.5) = 0.5, plus the 0.45 offset.
+    expect(withOffset.sample(0, 0)).toBeCloseTo(0.95, 6);
+    expect(withoutOffset.sample(0, 0)).toBeCloseTo(0.5, 6);
+
+    // sampleAt uses the SAME shifted height as its floor candidate — a mover
+    // sitting right at the offset surface should read it back unchanged.
+    expect(withOffset.sampleAt(0, 0, 0.95, 0.3)).toBeCloseTo(0.95, 6);
+
+    // solidBase moved too: a flat terrain quad has zero thickness (solidBase
+    // === its own surface height, see heightCellFor's "flat terrain" branch
+    // doc), so a body's kartTop must clear the OFFSET surface (0.95), not
+    // just the un-offset one (0.5), to be blocked — proves solidBase, not
+    // just `base`, shifted (the CellDef.y_offset doc's "both" contract).
+    expect(withOffset.solidBlocked(0, 0, 0.5, 1.0, 0.05)).toBe(true);
+    // The corresponding UNoffset column at the same query heights is NOT
+    // blocked — its surface (0.5) doesn't clear yRef + climbThreshold (0.55).
+    expect(withoutOffset.solidBlocked(0, 0, 0.5, 1.0, 0.05)).toBe(false);
+  });
+
+  it("shifts a sloped cell's whole gradient, not just its base at the cell center", () => {
+    // terrain_ramp rot=0: ax=0, az=1, base=y_level*lh, rise=lh — ascends
+    // toward local +Z. Offsetting must shift the low AND high edge equally
+    // (a pure vertical translation of the ramp, not a shape change).
+    const hf = makeHeightfield([{ asset: "terrain_ramp", x: 0, z: 0, y_level: 0, rot: 0, y_offset: 0.2 }]);
+    const baseline = makeHeightfield([{ asset: "terrain_ramp", x: 0, z: 0, y_level: 0, rot: 0 }]);
+    expect(hf.sample(0, -0.49)).toBeCloseTo((baseline.sample(0, -0.49) ?? 0) + 0.2, 6); // low edge
+    expect(hf.sample(0, 0.49)).toBeCloseTo((baseline.sample(0, 0.49) ?? 0) + 0.2, 6); // high edge
+  });
+
+  it("shifts BOTH half-cells of a TWO_CELL_ASSETS expansion by the same offset", () => {
+    // terrain_rampLarge rot=0 expands into two half-height ramp cells along
+    // +Z (longAxis(0) = [0, 1]) — both halves must carry the SAME y_offset,
+    // not just the clicked cell's half.
+    const hf = makeHeightfield([{ asset: "terrain_rampLarge", x: 0, z: 0, y_level: 0, rot: 0, y_offset: 0.3 }]);
+    const baseline = makeHeightfield([{ asset: "terrain_rampLarge", x: 0, z: 0, y_level: 0, rot: 0 }]);
+    expect(hf.sample(0, 0)).toBeCloseTo((baseline.sample(0, 0) ?? 0) + 0.3, 6); // clicked (low) half
+    expect(hf.sample(0, 1)).toBeCloseTo((baseline.sample(0, 1) ?? 0) + 0.3, 6); // next (high) half
+  });
+
+  it("a cell with no y_offset field behaves EXACTLY like offset 0 (regression — pre-existing maps unaffected)", () => {
+    const noField = makeHeightfield([{ asset: "terrain", x: 0, z: 0, y_level: 2 }]);
+    const explicitZero = makeHeightfield([{ asset: "terrain", x: 0, z: 0, y_level: 2, y_offset: 0 }]);
+    expect(noField.sample(0, 0)).toBeCloseTo(1.0, 6);
+    expect(explicitZero.sample(0, 0)).toBeCloseTo(1.0, 6);
+    expect(noField.sample(0, 0)).toBe(explicitZero.sample(0, 0));
+  });
+});
+
+// Format contract (CellDef.y_offset doc, editor/main.ts CellRecord doc):
+// "default 0, omitted entirely when 0" — the editor only ever sets the key
+// on a CellRecord when computeSnapOffset returned nonzero (see paintCellAt /
+// the TWO_CELL_ASSETS click branch), so this is really testing plain
+// optional-property JSON semantics, but it's the exact contract every writer
+// (editor) and reader (Heightfield.fromMapJson, mapLoader.ts) relies on —
+// worth pinning explicitly so a future refactor that starts always setting
+// the key (e.g. `rec.y_offset = offset` unconditionally) fails loudly here
+// instead of silently bloating every exported map with `"y_offset": 0`.
+describe("CellDef.y_offset serialization contract", () => {
+  it("a cell with offset 0 (or omitted) does not serialize the key at all", () => {
+    const cellNoField = { asset: "terrain", x: 0, z: 0, y_level: 1 };
+    expect(JSON.stringify(cellNoField)).not.toContain("y_offset");
+    expect(JSON.parse(JSON.stringify(cellNoField)).y_offset).toBeUndefined();
+  });
+
+  it("a cell with a nonzero offset serializes and round-trips exactly", () => {
+    const cell = { asset: "roadTile_019", x: 2, z: 3, y_level: 0, y_offset: 0.876 };
+    const roundTripped = JSON.parse(JSON.stringify(cell));
+    expect(JSON.stringify(cell)).toContain("y_offset");
+    expect(roundTripped.y_offset).toBe(0.876);
+    // Feeding the round-tripped record straight into fromMapJson reproduces
+    // the exact same sampled height as the original object — the value
+    // survives the export/import cycle unchanged, not just structurally
+    // present.
+    const original = makeHeightfield([cell]);
+    const restored = makeHeightfield([roundTripped]);
+    // Sample at the cell's own world position (x=2, z=3 — tile_size=1,
+    // origin_offset=[0,0,0] per the makeHeightfield helper above).
+    expect(restored.sample(2, 3)).toBeCloseTo(original.sample(2, 3) ?? NaN, 6);
+  });
+});
+
+describe("tileBottomY — snap-to-surface base lookup (editor computeSnapOffset)", () => {
+  it("returns the baked mesh bottom (minY), not the heightGrid's walkable-top minimum", () => {
+    // roadTile_019 ("Misc grass", trees on a clump): its physics heightGrid
+    // bottoms out at 1.577 (lowest point of the WALKABLE TOP), but the mesh
+    // itself sits on its pivot plane — minY = 0. Snapping must use the mesh
+    // bottom; using the grid minimum sank trees ~1m under the surface they
+    // were snapped to (owner bug 2026-07-10, roads_v1).
+    expect(tileBottomY("roadTile_019")).toBe(0);
+  });
+
+  it("returns the mesh bottom for flat/slope 'exact' road tiles too", () => {
+    expect(tileBottomY("roadTile_002")).toBe(0);
+  });
+
+  it("returns null for an asset not in the road-tile catalog at all (space-kit assets)", () => {
+    expect(tileBottomY("terrain")).toBeNull();
+    expect(tileBottomY("wall_block")).toBeNull();
   });
 });

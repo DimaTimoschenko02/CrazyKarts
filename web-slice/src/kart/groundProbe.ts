@@ -67,25 +67,36 @@ export function sampleGroundProbes(
 // Wall-aware max of the non-null, non-wall probes — the height-follow target
 // per I3 (see D1 in the module doc above for the wall-exclusion addition).
 //
-// Classification rule: a probe counts as a WALL (excluded from the max) when
-// the CENTER probe is available AND this probe reads more than
-// `stepExcludeThreshold` HIGHER than center. When center itself is null (the
-// body's own XZ point isn't on any authored cell — the narrow-gap case I3
-// already handled) there's nothing to classify against, so every probe is
-// kept exactly like the old plain-MAX behavior — this preserves the "narrow
-// gap: center null, corners still read real ground -> NOT a freefall" fix.
+// D5 (body-relative wall gate, 2026-07-10, follow-up to D1 — see
+// tools/diagnose_edge_bugs_sim.ts scenario B): D1's original classification
+// compared each probe to the CENTER probe — but the center probe drifts with
+// the body's own XZ position mid-crossing, and right at a deck's edge that
+// drift is exactly what let a probe reading the deck the kart is STILL
+// PHYSICALLY RESTING ON (e.g. the rear axle probe, still squarely on a 2.75m
+// deck) get excluded as a "wall" the instant the center probe itself dipped
+// toward the lower terrain ahead — the body fell through its own support.
+// Classification rule is now: a probe counts as a WALL (excluded from the
+// max) when it reads more than `climbThreshold` ABOVE the body's own current
+// reference height `kartY` (yRef, the same per-tick reference height passed
+// to physics/terrainWall.ts and shared/heightfield.ts's own layer-selection
+// climb cutoff — KartPhysicsParams.layerClimbThreshold) — i.e. "is this
+// probe reporting a floor meaningfully out of this body's own reach", not
+// "is this probe higher than some OTHER probe on the same body". A real
+// support surface the body is resting on is by definition within reach of
+// yRef, so it can never be excluded by this rule regardless of what the
+// center probe happens to read that tick.
 //
 // Falls back to the CENTER probe alone when literally every F/B/R/L probe
-// gets excluded as a wall (center present but boxed in — e.g. a kart sitting
-// in a 1-cell pit/trench with a wall_block on every side): the design doc
-// calls this out explicitly ("если ВСЕ угловые пробы выше порога — земля =
-// центральная проба"), and it falls out for free here since `center` is
-// always considered first.
+// gets excluded as a wall (kart genuinely boxed in — e.g. a 1-cell pit with
+// a wall_block on every side, all four edge probes reading a neighbor's
+// roof out of climb reach): the design doc calls this out explicitly ("если
+// ВСЕ угловые пробы выше порога — земля = центральная проба"), and it falls
+// out for free here since `center` is always considered first.
 //
 // Returns null ONLY when every single probe is null (no ground info
 // anywhere near the body at all), matching physics/vertical.ts's existing
 // "no data -> fail-safe freefall" convention for a null groundHeight input.
-export function wallAwareGroundHeight(probes: GroundProbes, stepExcludeThreshold: number): number | null {
+export function wallAwareGroundHeight(probes: GroundProbes, kartY: number, climbThreshold: number): number | null {
   const center = probes.center;
   let best: number | null = null;
   const consider = (h: number | null): void => {
@@ -95,7 +106,7 @@ export function wallAwareGroundHeight(probes: GroundProbes, stepExcludeThreshold
   consider(center);
   for (const h of [probes.hF, probes.hB, probes.hR, probes.hL]) {
     if (h === null) continue;
-    if (center !== null && h - center > stepExcludeThreshold) continue; // wall probe — terrainWall.ts owns this, not ground-follow
+    if (h - kartY > climbThreshold) continue; // wall probe — terrainWall.ts owns this, not ground-follow
     consider(h);
   }
   return best;
@@ -159,5 +170,54 @@ export function clampGroundProbesForAttitude(probes: GroundProbes, dropLimit: nu
     hB: clampHeightForAttitude(probes.hB, center, dropLimit),
     hR: clampHeightForAttitude(probes.hR, center, dropLimit),
     hL: clampHeightForAttitude(probes.hL, center, dropLimit),
+  };
+}
+
+// Cliff-edge NOSE-DIVE fix, take 2 (owner playtest report, 2026-07-10 —
+// "клюёт носом на скорости", see design/notes/ride-collision-v2.md follow-up
+// and kart/attitude.ts's computeTipOverTarget doc for the full picture).
+// clampHeightForAttitude/clampGroundProbesForAttitude above still CAP a
+// hanging probe at `center - dropLimit`, which keeps feeding a small but
+// real downward slope target into the FAST slope-follow filter
+// (attitudeFollowRate=20) the instant a probe crosses the lip — at cruise
+// speed the body has time to visibly dip before the vertical step (physics/
+// vertical.ts) even detects a launch, because the fast filter reacts within
+// a couple ticks. This sibling function is the harder version: any probe
+// reading past `dropLimit` below center is EXCLUDED entirely from the
+// slope-follow target (folded back to `center` itself, i.e. zero
+// contribution) rather than capped to a small residual slope — the body's
+// grounded attitude is then driven only by whatever probes are still
+// genuinely resting on the support surface, exactly like a rigid chassis
+// that's lost contact on one corner: the OTHER wheels decide the tilt, not
+// the missing one. A probe within the limit is untouched (same C0/C1 match
+// at the boundary as the clamp version — reuses the identical smoothstep
+// band shape, just blends toward `center` instead of the capped value).
+//
+// The slow, SEPARATE "tip-over" signal (computeTipOverTarget) is what
+// re-introduces a nose-down lean for a kart that's genuinely hanging its
+// support past the edge — on its own much slower rate, so a fast crossing
+// never has time to accumulate it before going airborne (see that
+// function's doc comment for the full model). This function's job is only
+// to make sure the FAST filter stops seeing hanging probes as ordinary
+// slope at all.
+export function excludeHeightForAttitude(h: number | null, center: number, dropLimit: number): number | null {
+  if (h === null) return null;
+  const drop = center - h;
+  const band = dropLimit * 0.5;
+  const t = 1 - smoothstep(dropLimit, dropLimit + band, drop);
+  return h * t + center * (1 - t); // fully excluded -> collapses to `center` (zero slope contribution)
+}
+
+// Probe-set version of excludeHeightForAttitude — same "one probe set, one
+// clamp-against-center tick" convention as clampGroundProbesForAttitude.
+export function excludeGroundProbesForAttitude(probes: GroundProbes, dropLimit: number): GroundProbes {
+  if (probes.center === null) return probes;
+  const center = probes.center;
+  return {
+    center,
+    hF: excludeHeightForAttitude(probes.hF, center, dropLimit),
+    hB: excludeHeightForAttitude(probes.hB, center, dropLimit),
+    hR: excludeHeightForAttitude(probes.hR, center, dropLimit),
+    hL: excludeHeightForAttitude(probes.hL, center, dropLimit),
   };
 }

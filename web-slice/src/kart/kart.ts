@@ -23,8 +23,8 @@ import { createVerticalState, stepVertical, type VerticalState } from "../physic
 import { footprintHalfExtents, footprintPoints, resolveTerrainSlide } from "../physics/terrainWall";
 import { resolveKartVsStatic } from "../physics/staticSlide";
 import { STATIC_COLLISION_SKIN } from "../shared/staticColliders";
-import { computeAttitudeTarget } from "./attitude";
-import { wallAwareGroundHeight, sampleGroundProbes, clampHeightForAttitude, clampGroundProbesForAttitude } from "./groundProbe";
+import { computeAttitudeTarget, computeTipOverTarget, LEVEL } from "./attitude";
+import { wallAwareGroundHeight, sampleGroundProbes, clampHeightForAttitude, excludeGroundProbesForAttitude } from "./groundProbe";
 
 // Godot: forward = -Z rotated by yaw around +Y.
 export function forwardOf(yaw: number): THREE.Vector3 {
@@ -128,7 +128,15 @@ export class Kart {
   // one can also detect a launch and fly a real parabola.
   private vertical: VerticalState = createVerticalState(0);
   // Body attitude (pitch/roll) follow state — see kart/attitude.ts for the
-  // heightfield-probe math and sign convention.
+  // heightfield-probe math and sign convention. Two ADDITIVE components
+  // (2026-07-10 tip-over fix, see step 8d): `*GroundSm` is the ordinary fast
+  // slope-follow filter, `*TipSm` is the separate slow "see-saw over a
+  // cliff edge" filter; `pitchSm`/`rollSm` are their sum, recomputed every
+  // tick in step 8d and read by syncVisual() below.
+  private pitchGroundSm = 0;
+  private rollGroundSm = 0;
+  private pitchTipSm = 0;
+  private rollTipSm = 0;
   private pitchSm = 0;
   private rollSm = 0;
   // Smoothed longitudinal ground slope (radians, +uphill) fed to
@@ -221,6 +229,10 @@ export class Kart {
     this.visualDriftAngle = 0;
     this.driftVisualYaw = 0;
     this.vertical = createVerticalState(this.spawn.y);
+    this.pitchGroundSm = 0;
+    this.rollGroundSm = 0;
+    this.pitchTipSm = 0;
+    this.rollTipSm = 0;
     this.pitchSm = 0;
     this.rollSm = 0;
     this.slopeSm = 0;
@@ -258,6 +270,10 @@ export class Kart {
     this.visualDriftAngle = 0;
     this.driftVisualYaw = 0;
     this.vertical = createVerticalState(this.vertical.y);
+    this.pitchGroundSm = 0;
+    this.rollGroundSm = 0;
+    this.pitchTipSm = 0;
+    this.rollTipSm = 0;
     this.pitchSm = 0;
     this.rollSm = 0;
     this.slopeSm = 0;
@@ -455,6 +471,12 @@ export class Kart {
         // uses, see the yRef doc comment at the top of update()).
         solidBlocked: (x: number, z: number) =>
           map.isSolidBlocked(x, z, yRef, yRef + KART_BODY_HEIGHT, this.params.layerClimbThreshold),
+        // D5 follow-up (2026-07-10, wall_block regression fix): wall_block*
+        // sides always block regardless of layerClimbThreshold — see
+        // terrainWall.ts TerrainSampler.wallBlocked doc / heightfield.ts
+        // Heightfield.wallBlocked doc. Same yRef closure as every other probe
+        // this tick.
+        wallBlocked: (x: number, z: number) => map.isWallBlocked(x, z, yRef),
       };
       const afterTerrain = resolveTerrainSlide(
         terrainSampler,
@@ -465,7 +487,9 @@ export class Kart {
         { x: rightNow.x, z: rightNow.z },
         this.footprintHalf.halfLength,
         this.footprintHalf.halfWidth,
-        this.params.terrainWallGradientThreshold
+        this.params.terrainWallGradientThreshold,
+        yRef,
+        this.params.layerClimbThreshold
       );
       const afterStatic = resolveKartVsStatic(
         map.getStaticColliders(),
@@ -494,6 +518,14 @@ export class Kart {
     // a wall/prop: the pushed position is re-validated against the SAME SAT
     // static colliders (design doc §3.4 step 4 — "толчок не должен
     // пропихнуть в стену").
+    //
+    // REAL BUG #3 (collision audit, 2026-07-10): resolveKartPush is now
+    // height-gated (physics/kartCollision.ts KART_PUSH_VERTICAL_M) — pass our
+    // own current Y so a kart on a bridge deck doesn't get shoved by one
+    // driving underneath it. `this.state.pos.y` here is last tick's vertical
+    // result (step 8b-vertical below hasn't run yet this tick) — same
+    // one-tick lag every other reading in this step already carries (see the
+    // step 8b comment further down), not a new inconsistency.
     if (obstacles.length > 0) {
       const preX = this.state.pos.x;
       const preZ = this.state.pos.z;
@@ -503,7 +535,13 @@ export class Kart {
       let pushedVelZ = this.state.vel.z;
       for (const o of obstacles as readonly ObstacleWithOptionalRadius[]) {
         const radius = o.radius !== undefined ? (KART_COLLISION_RADIUS + o.radius) / 2 : KART_COLLISION_RADIUS;
-        const res = resolveKartPush({ x: pushedX, z: pushedZ }, { x: pushedVelX, z: pushedVelZ }, [o], radius);
+        const res = resolveKartPush(
+          { x: pushedX, z: pushedZ },
+          { x: pushedVelX, z: pushedVelZ },
+          [o],
+          radius,
+          this.state.pos.y
+        );
         pushedX = res.pos.x;
         pushedZ = res.pos.z;
         pushedVelX = res.vel.x;
@@ -566,7 +604,7 @@ export class Kart {
       this.axle.wheelbase * 0.5,
       this.axle.trackWidth * 0.5
     );
-    const groundHeightNow = wallAwareGroundHeight(groundProbes, this.params.groundStepExcludeThreshold);
+    const groundHeightNow = wallAwareGroundHeight(groundProbes, yRef, this.params.layerClimbThreshold);
     // D3 (design/notes/ride-collision-v2.md, 2026-07-09, symptom B1): the
     // launch/detach checks inside stepVertical read the CONTINUOUS center
     // probe instead of the wall-aware MAX (groundHeightNow) — see
@@ -576,7 +614,15 @@ export class Kart {
     // back defensively at its own end for the same null, so this is belt-
     // and-braces, not the only place the fallback happens.
     const detachRefHeightNow = groundProbes.center ?? groundHeightNow;
-    this.vertical = stepVertical(this.vertical, { groundHeight: groundHeightNow, detachRefHeight: detachRefHeightNow, dt }, {
+    // D2 follow-up (2026-07-10, "клевок носом на обрыве" fix — see
+    // physics/vertical.ts VerticalInput.leadingProbeHeight doc): the probe in
+    // the body's CURRENT direction of travel — hF while moving/coasting
+    // forward, hB while reversing. A binary hF/hB pick by fwdSigned's sign is
+    // fine here (detach is a discrete event, see the doc comment's
+    // smooth-values.md carve-out), not a continuous value that needs
+    // smoothing.
+    const leadingProbeHeightNow = fwdSigned >= 0 ? groundProbes.hF : groundProbes.hB;
+    this.vertical = stepVertical(this.vertical, { groundHeight: groundHeightNow, detachRefHeight: detachRefHeightNow, leadingProbeHeight: leadingProbeHeightNow, dt }, {
       gravity: this.params.verticalGravity,
       groundFollowRate: this.params.verticalGroundFollowRate,
       airborneDropThreshold: this.params.verticalAirborneDropThreshold,
@@ -585,29 +631,67 @@ export class Kart {
     });
     this.state.pos.y = this.vertical.y;
 
-    // 8d. Body attitude (pitch/roll) — follows the heightfield slope under
-    // the kart while grounded (see kart/attitude.ts for the probe math and
-    // verified sign convention), relaxes to level while airborne. Two-rate
-    // exp filter (grounded/airborne), same "different rate each side"
-    // pattern as the drift engage/exit rates elsewhere in this codebase.
-    // Reuses the SAME groundProbes sampled above for the vertical step (P3).
-    // Cliff-edge fix (owner playtest report, 2026-07-09): attitude gets its
-    // OWN clamped copy of groundProbes (clampGroundProbesForAttitude,
-    // groundProbe.ts) so a probe reading a floor meters below on the far side
-    // of a cliff lip can't yank the body's pitch/roll into a hard nose-dive —
-    // the vertical/height-follow step above already consumed the RAW
-    // groundProbes for launch detection and must keep seeing the real depth.
-    const attitudeTarget = this.vertical.airborne
-      ? { pitch: 0, roll: 0 }
+    // 8d. Body attitude (pitch/roll) — TWO separately-filtered, additive
+    // components (owner playtest report, 2026-07-10, "клюёт носом на
+    // скорости при съезде с обрыва" — see kart/attitude.ts
+    // computeTipOverTarget doc comment and groundProbe.ts
+    // excludeGroundProbesForAttitude doc comment for the full model this
+    // replaces the single-target 2026-07-09 clamp fix with):
+    //
+    //  - `pitchGroundSm`/`rollGroundSm`: ordinary FAST slope-follow
+    //    (attitudeFollowRate=20), fed a target built from groundProbes with
+    //    any probe past attitudeCliffDropLimit EXCLUDED entirely (folded
+    //    back to the center reading, zero contribution) rather than merely
+    //    capped — a probe that's cleared the edge no longer reads as "a
+    //    little bit of downhill" to this fast filter at all, which is what
+    //    let a fast cliff crossing dip the nose before the kart was even
+    //    airborne.
+    //  - `pitchTipSm`/`rollTipSm`: a separate, much SLOWER
+    //    (attitudeTipOverRate ~1/s) "see-saw over the edge" lean, driven by
+    //    computeTipOverTarget off the SAME raw groundProbes + the support
+    //    surface height (groundHeightNow, already sampled above for the
+    //    vertical step — one probe budget, P3's existing convention). A fast
+    //    crossing never gives this slow filter enough time to move; a kart
+    //    genuinely resting with part of its footprint hanging does.
+    //
+    // The two components are summed for the actually-rendered pitchSm/
+    // rollSm (see syncVisual) — additive layering of two independently
+    // filtered continuous signals, not a nested/chained filter of the same
+    // signal (smooth-values.md rule #5 is about the latter, not this).
+    //
+    // Airborne: BOTH components relax toward LEVEL at the same slow
+    // attitudeAirborneRelaxRate (lowered 3 -> 1.0 alongside this fix, see
+    // that field's doc comment in physics/types.ts) — a kart that just
+    // launched keeps roughly its launch-moment pitch for the whole flight
+    // (design brief S3), rather than snapping level mid-air. The target is
+    // continuous through the grounded/airborne flip (both branches ease
+    // toward whatever's already in pitchGroundSm/pitchTipSm at that instant
+    // — grounded eases toward a freshly-computed target, airborne eases
+    // toward 0 — only the RATE and TARGET value change at the flip, the
+    // filtered values themselves never jump).
+    const groundedTarget = this.vertical.airborne
+      ? LEVEL
       : computeAttitudeTarget(
-          clampGroundProbesForAttitude(groundProbes, this.params.attitudeCliffDropLimit),
+          excludeGroundProbesForAttitude(groundProbes, this.params.attitudeCliffDropLimit),
           this.axle.wheelbase * 0.5,
           this.axle.trackWidth * 0.5
         );
-    const attitudeRate = this.vertical.airborne ? this.params.attitudeAirborneRelaxRate : this.params.attitudeFollowRate;
-    const attitudeAlpha = 1 - Math.exp(-attitudeRate * dt);
-    this.pitchSm += (attitudeTarget.pitch - this.pitchSm) * attitudeAlpha;
-    this.rollSm += (attitudeTarget.roll - this.rollSm) * attitudeAlpha;
+    const tipOverTarget = this.vertical.airborne
+      ? LEVEL
+      : computeTipOverTarget(
+          groundProbes,
+          groundHeightNow,
+          this.params.attitudeCliffDropLimit,
+          (this.params.attitudeTipOverMaxAngleDeg * Math.PI) / 180
+        );
+    const groundAlpha = 1 - Math.exp(-(this.vertical.airborne ? this.params.attitudeAirborneRelaxRate : this.params.attitudeFollowRate) * dt);
+    const tipAlpha = 1 - Math.exp(-(this.vertical.airborne ? this.params.attitudeAirborneRelaxRate : this.params.attitudeTipOverRate) * dt);
+    this.pitchGroundSm += (groundedTarget.pitch - this.pitchGroundSm) * groundAlpha;
+    this.rollGroundSm += (groundedTarget.roll - this.rollGroundSm) * groundAlpha;
+    this.pitchTipSm += (tipOverTarget.pitch - this.pitchTipSm) * tipAlpha;
+    this.rollTipSm += (tipOverTarget.roll - this.rollTipSm) * tipAlpha;
+    this.pitchSm = this.pitchGroundSm + this.pitchTipSm;
+    this.rollSm = this.rollGroundSm + this.rollTipSm;
 
     // airborne/vy telemetry refreshed every tick regardless of grounded
     // state — the rest of lastOut (bicycle-derived fields) is only updated

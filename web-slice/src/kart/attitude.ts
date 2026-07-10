@@ -98,3 +98,76 @@ export function computeAirborneFactor(
   if (groundHeight === null) return 1;
   return smoothstep(threshold - band, threshold + band, y - groundHeight);
 }
+
+// Tip-over ("качели через кромку") — owner playtest report 2026-07-10,
+// "клюёт носом на скорости при съезде с обрыва". Root cause was that the
+// ordinary grounded slope-follow target (computeAttitudeTarget fed
+// clampGroundProbesForAttitude's output) still let a probe that had just
+// cleared a cliff lip pull the body toward a real (if capped) nose-down
+// slope, and the FAST filter (attitudeFollowRate) had time to act on it
+// before physics/vertical.ts's own launch detector caught up — see
+// groundProbe.ts excludeGroundProbesForAttitude's doc comment for that half
+// of the fix (the grounded target now reads exactly 0 contribution from any
+// probe past the edge, full stop).
+//
+// This function is the OTHER half: a kart that's genuinely resting with
+// part of its own footprint hanging past a support edge for real TIME (not
+// just a fast crossing) should still visibly see-saw over, like a plank
+// balanced on a ledge — that's what a much slower, separately-filtered
+// target computed here (attitudeTipOverRate, ~1/s — an order of magnitude
+// slower than attitudeFollowRate's 20/s) reproduces.
+//
+// Physical model: whether the body is past ITS OWN tipping point is judged
+// by the CENTER probe specifically, not by the front/back probes alone. A
+// plank still resting on solid ground at its own middle can't tip no matter
+// how far its overhanging end sticks out — gravity has nothing to rotate
+// around yet (design brief S1: "nose ~25% over the edge, standing still ->
+// nothing happens", stays that way forever, not just briefly). Only once
+// the CENTER probe itself starts reading past the support surface (S2:
+// "~40-50% hang") does `mag` below leave its dead zone and the slow filter
+// start carrying pitch/roll toward `maxTipAngle`.
+//
+// `hang(h)` is a plain 0..1 measure of how far a probe's raw reading has
+// fallen below `supportHeight` (the wall-aware MAX-of-probes surface that's
+// actually holding the body up — kart/kart.ts's groundHeightNow, the SAME
+// value physics/vertical.ts's ground-follow step already computed this
+// tick, no extra sampling), smoothstepped over `edgeBand` — callers pass
+// KartPhysicsParams.attitudeCliffDropLimit here (the exact same "how far
+// below counts as fully off the ledge" definition excludeGroundProbesForAttitude
+// uses one layer up, so the two halves of this fix agree on where the edge
+// is) rather than introducing a third tunable for the same concept.
+//
+// Direction is a plain signed difference between the two probes on each
+// axis (hangF-hangB for pitch, hangR-hangL for roll) — continuous, no
+// discrete branch (.claude/rules/smooth-values.md rules #1/#4): right at the
+// symmetric point (hangF==hangB) the raw direction value is 0, which only
+// matters once `mag` is non-zero, and even then just yields target 0
+// (level) rather than a sign-flip artifact.
+export function computeTipOverTarget(
+  probes: GroundProbes,
+  supportHeight: number | null,
+  edgeBand: number,
+  maxTipAngle: number
+): AttitudeTarget {
+  if (probes.center === null || supportHeight === null) return LEVEL;
+  const hang = (h: number | null): number => (h === null ? 1 : smoothstep(0, edgeBand, supportHeight - h));
+  const hangC = hang(probes.center);
+  const hangF = hang(probes.hF);
+  const hangB = hang(probes.hB);
+  const hangR = hang(probes.hR);
+  const hangL = hang(probes.hL);
+
+  // Dead zone: near-zero effect until the CENTER probe itself is
+  // meaningfully past the support edge (S1's "~25% overhang -> nothing"
+  // requirement is satisfied by hangC staying ~0 well before the center
+  // probe crosses), then a pow-shaped ramp toward full tip as it does.
+  const mag = Math.pow(smoothstep(0.15, 0.9, hangC), 1.5);
+
+  const pitchDir = hangF - hangB; // >0: nose is the side hanging -> tip nose down
+  const rollDir = hangR - hangL; // >0: right side is hanging -> tip right side down
+
+  return {
+    pitch: -pitchDir * mag * maxTipAngle,
+    roll: -rollDir * mag * maxTipAngle,
+  };
+}

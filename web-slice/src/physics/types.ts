@@ -173,20 +173,20 @@ export interface KartPhysicsParams {
   // exact check and the design doc's symptom #3 "приклеен на гребне").
   groundSnapDistance: number; // GROUND_SNAP_DISTANCE
 
-  // Ride & Collision v2 — D1: wall-aware ground height. groundProbe.ts's
-  // wallAwareGroundHeight() excludes any of the F/B/R/L probes that read
-  // MORE than this far above the CENTER probe from the ground-height MAX —
-  // those are walls (e.g. a corner probe landing on the TOP of a neighboring
-  // wall_block cube), not ground the kart's own underside is resting on, and
-  // including them was the root cause of the "catapult" bug (symptom #1):
-  // one such probe made groundHeight jump a full block-height in a single
-  // tick, which the vertical rate-detector then read as a huge implied
-  // upward vy and launched the kart. Defaults to 0.3 — the same "unclimbable
-  // step" cutoff kart/kart.ts historically hardcoded (as MAX_STEP) for the
-  // terrain-slide path, before that path moved to D3b's own local-gradient
-  // criterion below — so "too steep to climb" and "too tall to count as
-  // ground under the body" still agree on the same cutoff by default.
-  groundStepExcludeThreshold: number; // GROUND_STEP_EXCLUDE_THRESHOLD
+  // @deprecated Ride & Collision v2 — D1: wall-aware ground height,
+  // superseded by D5 (2026-07-10, see groundProbe.ts wallAwareGroundHeight
+  // doc). D1's original rule excluded any F/B/R/L probe reading more than
+  // this far above the CENTER probe — but comparing against the CENTER probe
+  // (which drifts with the body's own XZ mid-crossing) is exactly what let a
+  // probe reading a surface the kart was STILL PHYSICALLY RESTING ON get
+  // excluded as a "wall" the instant center dipped toward lower terrain
+  // ahead (symptom: kart falls through the deck it's driving across). D5
+  // replaced the comparison target with the body's own reference height
+  // (yRef) and reuses `layerClimbThreshold` as the cutoff instead of this
+  // field — see wallAwareGroundHeight's call site in kart/kart.ts. Kept
+  // (unused by any logic now) only so an old dev_params.json snapshot with
+  // this key still parses/round-trips; not read anywhere, not a live knob.
+  groundStepExcludeThreshold: number; // GROUND_STEP_EXCLUDE_THRESHOLD — deprecated, see doc above
 
   // Ride & Collision v2 — D3b: wall vs. slope gradient. resolveTerrainSlide
   // (physics/terrainWall.ts) used to compare the footprint corner's height
@@ -228,6 +228,29 @@ export interface KartPhysicsParams {
   // носом." See kart/groundProbe.ts clampHeightForAttitude/
   // clampGroundProbesForAttitude for the actual clamp math.
   attitudeCliffDropLimit: number; // ATTITUDE_CLIFF_DROP_LIMIT
+
+  // Cliff-edge nose-dive fix, take 2 (owner playtest report, 2026-07-10 —
+  // "клюёт носом на скорости при съезде с обрыва", see kart/attitude.ts
+  // computeTipOverTarget doc comment for the full model). Human-readable per
+  // .claude/rules/param-tuner-descriptions.md: "Максимальный угол, на
+  // который корпус 'перевешивается' носом/бортом вниз, когда машинка реально
+  // повисла над обрывом (не на скорости пролетела, а стоит/еле ползёт с
+  // частью корпуса за краем)." Deliberately does NOT affect the fast
+  // slope-follow lean (attitudeFollowRate) or the launch/detach decision
+  // (physics/vertical.ts, untouched by this fix) — only this separate, much
+  // slower "see-saw over the edge" lean.
+  attitudeTipOverMaxAngleDeg: number; // ATTITUDE_TIP_OVER_MAX_ANGLE_DEG
+  // Human-readable: "Насколько МЕДЛЕННО корпус перевешивается через кромку
+  // обрыва — специально намного медленнее обычного наклона по рельефу
+  // (attitudeFollowRate), чтобы машинка, которая быстро ПРОЛЕТАЕТ через край
+  // на скорости, вообще не успела клюнуть носом до того как физически
+  // оторвётся от земли; а машинка, которая просто повисла над обрывом и еле
+  // ползёт/стоит, через секунду-две наглядно 'перевесится'." Examples: 0.5 —
+  // тяжёлая, ленивая раскачка, почти незаметна за короткую остановку у края;
+  // 1.0 (дефолт) — заметно перевешивается за 1-2 секунды простоя на краю;
+  // 3+ — почти как обычный наклон, снова ловит клевок на скорости (не
+  // рекомендуется).
+  attitudeTipOverRate: number; // ATTITUDE_TIP_OVER_RATE
 
   // Chase camera heading (src/core/camera.ts, 2026-07-07 — camera detached
   // from physical yaw so drift can be visually deep again without spinning
@@ -513,11 +536,9 @@ export const DEFAULT_KART_PHYSICS_PARAMS: KartPhysicsParams = {
   // within a tick or two at cruise speed — inside the design doc's 0.05-0.10
   // calibration band.
   groundSnapDistance: 0.07,
-  // groundStepExcludeThreshold 0.3: matches the terrain-slide path's own
-  // "too steep to climb" cutoff (kart/kart.ts's old hardcoded MAX_STEP, now
-  // folded into terrainWallGradientThreshold below) by design — a probe the
-  // slide path would already refuse to drive up is exactly the kind of probe
-  // that shouldn't be allowed to lift the body's ground height either.
+  // @deprecated groundStepExcludeThreshold — no longer read anywhere since D5
+  // (see the field's doc comment above); kept only for old dev_params.json
+  // round-tripping. Value left at its old default for anyone rolling back.
   groundStepExcludeThreshold: 0.3,
   // terrainWallGradientThreshold 0.27: rise-over-the-0.15m-base threshold —
   // atan(0.27/0.15) ≈ 61°, i.e. blocks anything steeper than roughly 60-65°.
@@ -538,12 +559,44 @@ export const DEFAULT_KART_PHYSICS_PARAMS: KartPhysicsParams = {
   // pitch diagnosis). 20 keeps the body visibly banked through a ramp at any
   // speed in this vertical slice's speed range.
   attitudeFollowRate: 20,
-  attitudeAirborneRelaxRate: 3,
+  // 3 -> 1.0 (owner playtest report, 2026-07-10, "клюёт носом на скорости" —
+  // see kart/attitude.ts computeTipOverTarget doc and the new
+  // attitudeTipOver* fields below for the full fix). A kart that just
+  // launched off a cliff/ramp at speed should keep roughly whatever pitch it
+  // was carrying at the moment of launch for the WHOLE flight (design brief
+  // S3: "corpus ostaётся GORIZONTAL'NYM... ili sohranyaet naklon sklona i
+  // letit nosom vniz" — either way, no mid-air snap back to level). The old
+  // 3 (time constant ~0.33s) visibly leveled the body out well before a
+  // typical jump landed; 1.0 (time constant 1s) keeps a launch pitch alive
+  // through essentially the whole arc of any jump this vertical slice's
+  // speeds produce, only easing toward level over multiple seconds of
+  // hangtime.
+  attitudeAirborneRelaxRate: 1.0,
   // 0.35 — comfortably clears ordinary heightfield tile-seam noise and real
   // slope probe separation (SLOPE_PROBE_DIST in kart.ts) while capping the
   // multi-meter drop a probe reads the instant it clears a cliff/ramp lip
   // onto a lower layer, which is what produced the reported nose-dive pop.
+  // Also reused as the "how far below the support surface counts as fully
+  // hanging" edge for excludeGroundProbesForAttitude and
+  // computeTipOverTarget below — see those functions' doc comments for why
+  // sharing this one number keeps all three pieces of the cliff-attitude fix
+  // agreeing on where the edge is.
   attitudeCliffDropLimit: 0.35,
+  // 22 (design default — see the field's doc comment above). Enough to read
+  // as a clear nose-down "give up and tip" lean once a kart is genuinely
+  // hanging its center past a ledge, without looking like the kart is trying
+  // to somersault (a real see-saw off a curb settles well short of
+  // vertical).
+  attitudeTipOverMaxAngleDeg: 22,
+  // 1.0 (design default — see the field's doc comment above). An order of
+  // magnitude slower than attitudeFollowRate (20) is the entire point: a
+  // fast crossing (design brief S3) spends only a couple hundred
+  // milliseconds with any probe hanging before physics/vertical.ts's own
+  // detach logic takes the kart airborne, nowhere near enough time for a 1/s
+  // filter to move the body noticeably; a kart genuinely resting with its
+  // footprint hanging (S1/S2) has effectively unlimited time for the same
+  // filter to reach its target.
+  attitudeTipOverRate: 1.0,
 
   // Chase camera detached from physical yaw (2026-07-07) — see camera.ts
   // file header. 4 -> 7 (owner video-diff session 2026-07-08, point 6: "kart

@@ -3,6 +3,10 @@
 // §3.3/§9 Phase 1 gate: "грэйз вдоль стены сохраняет тангенциальную
 // скорость", "сквозь стену не проходит".
 // D3b/D4 regression coverage (design/notes/ride-collision-v2.md, 2026-07-09).
+// D5 regression coverage (2026-07-10, body-relative wall gate — see
+// resolveTerrainSlide/tryEscape's new yRef/climbThreshold params and
+// terrainWall.ts's D5 doc comment): GRAD/STEP now only count as a wall when
+// the "wall" sample itself sits more than climbThreshold above yRef.
 import { describe, expect, it } from "vitest";
 import { footprintHalfExtents, footprintPoints, resolveTerrainSlide, tryEscape, type TerrainSampler } from "./terrainWall";
 import { DEFAULT_AXLE_GEOMETRY } from "./types";
@@ -13,6 +17,9 @@ const { halfLength, halfWidth } = footprintHalfExtents(DEFAULT_AXLE_GEOMETRY);
 // the short WALL_GRADIENT_BASE (0.15m, internal to terrainWall.ts) that
 // counts as a wall (≈61°).
 const WALL_GRADIENT_THRESHOLD = 0.27;
+// Same default as KartPhysicsParams.layerClimbThreshold — the D5 body-
+// relative gate's cutoff for "still within this body's own reach".
+const CLIMB_THRESHOLD = 0.8;
 const FWD = { x: 1, z: 0 };
 const RIGHT = { x: 0, z: -1 };
 
@@ -20,6 +27,20 @@ function samplerFromHf(hf: Heightfield): TerrainSampler {
   return {
     sample: (x, z) => hf.sample(x, z),
     hasColumn: (x, z) => hf.hasColumn(x, z),
+  };
+}
+
+// Mirrors kart.ts's real terrainSampler wiring (sample/hasColumn/solidBlocked/
+// wallBlocked all bound to the SAME yRef this call also gates GRAD/STEP
+// with) — used by the wall_block tests below. wallBlocked (2026-07-10 follow-
+// up) is what actually keeps a wall_block* side genuinely solid regardless of
+// climbThreshold — see heightfield.ts Heightfield.wallBlocked doc.
+function samplerFromHfWithSolid(hf: Heightfield, yRef: number, climbThreshold: number, kartBodyHeight = 1.0): TerrainSampler {
+  return {
+    sample: (x, z) => hf.sampleAt(x, z, yRef, climbThreshold),
+    hasColumn: (x, z) => hf.hasColumn(x, z),
+    solidBlocked: (x, z) => hf.solidBlocked(x, z, yRef, yRef + kartBodyHeight, climbThreshold),
+    wallBlocked: (x, z) => hf.wallBlocked(x, z, yRef),
   };
 }
 
@@ -48,9 +69,10 @@ describe("resolveTerrainSlide — genuine off-map edges", () => {
     // corner would leave the map this substep.
     const dt = 1 / 120;
     const vel = { x: 3, z: 0 };
-    const out = resolveTerrainSlide(sampler, { x: 0, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD);
+    const out = resolveTerrainSlide(sampler, { x: 0, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, 0, CLIMB_THRESHOLD);
     // Inward (+X) component should be gated — position must not have moved
-    // past where it started (or only a negligible amount).
+    // past where it started (or only a negligible amount). Off-map blocking
+    // (hNext===null branch) is independent of the D5 yRef gate.
     expect(out.pos.x).toBeLessThanOrEqual(0.01);
   });
 
@@ -79,7 +101,9 @@ describe("resolveTerrainSlide — genuine off-map edges", () => {
       { x: 1, z: 0 },
       halfLength,
       halfWidth,
-      WALL_GRADIENT_THRESHOLD
+      WALL_GRADIENT_THRESHOLD,
+      0,
+      CLIMB_THRESHOLD
     );
     // With the strip only 1 cell WIDE (x spans roughly -0.5..0.5) and
     // halfWidth=0.45, the footprint corners sit right at the strip's own
@@ -91,7 +115,17 @@ describe("resolveTerrainSlide — genuine off-map edges", () => {
 });
 
 describe("resolveTerrainSlide — wall_block cube sides ARE terrain steps now (2026-07-08 rework)", () => {
-  it("driving into a wall_block's side is blocked: its top sits a full 0.5 level above the ground (near-vertical over the short D3b gradient base)", () => {
+  // FOLLOW-UP FIX (2026-07-10, resolved the earlier D5 regression): D5's
+  // body-relative climb gate correctly stopped GRAD/STEP from false-blocking
+  // ordinary drivable terrain, but it ALSO relaxed a wall_block's half-level
+  // (0.5m) side whenever climbThreshold (default 0.8) exceeded that height —
+  // conflicting with the 2026-07-08 design decision ("wall_block* are
+  // drivable cubes: solid from the side, walkable on top", commit ef6c066).
+  // Fix: wall_block* cells now carry HeightCell.isWall, and
+  // Heightfield.wallBlocked()/TerrainSampler.wallBlocked (never climb-gated)
+  // is OR-ed into cornerBlocked alongside the D5-gated GRAD/STEP/solidBlocked
+  // checks — see heightfield.ts and terrainWall.ts doc comments.
+  it("driving into a wall_block's side is blocked at the production default (climb=0.8 > block height 0.5) via the new always-on wallBlocked check", () => {
     const hf = Heightfield.fromMapJson({
       meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
       cells: [
@@ -103,27 +137,32 @@ describe("resolveTerrainSlide — wall_block cube sides ARE terrain steps now (2
         { asset: "wall_block", x: 1, z: 0, y_level: 0 },
       ],
     });
-    const sampler = samplerFromHf(hf);
+    const yRef = 0;
+    const sampler = samplerFromHfWithSolid(hf, yRef, CLIMB_THRESHOLD);
     const dt = 1 / 120;
-    // Driving from the flat terrain (h=0) toward the block cell (top h=0.5,
-    // cell spans x∈[0.5, 1.5]): position the kart so its leading corner
-    // (pos.x + halfLength = 0.45) sits just BEFORE the boundary and moves
-    // across it this substep — the D3b gradient over a 0.15m base straddling
-    // that boundary reads ~0.5 (a full level step packed into 15cm, way past
-    // WALL_GRADIENT_THRESHOLD), so the inward velocity component must be
-    // killed (the block's old SAT AABB is gone; this path is now THE wall
-    // mechanism for cube sides).
     const vel = { x: 12, z: 0 };
-    const out = resolveTerrainSlide(sampler, { x: -0.15, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD);
+    const out = resolveTerrainSlide(sampler, { x: -0.15, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, yRef, CLIMB_THRESHOLD);
     expect(out.vel.x).toBeLessThanOrEqual(0.01);
   });
 
-  it("anti-tunneling: a corner crossing DEEP past the wall face in one substep (high speed) is still blocked", () => {
-    // Review catch 2026-07-09: at 24 m/s a corner moves 0.2m per substep —
-    // more than half the 0.15m gradient base — so BOTH gradient probes can
-    // land on the wall's plateau (flat, gradient 0). The cur→next rise
-    // backstop must still catch it or fast karts sail straight through
-    // walls.
+  it("a kart already parked ON TOP of a wall_block (yRef == the block's own top) is NOT self-blocked by its own layer (WALL_TOP_TOLERANCE)", () => {
+    const hf = Heightfield.fromMapJson({
+      meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
+      cells: [
+        { asset: "wall_block", x: 0, z: 0, y_level: 0 },
+        { asset: "wall_block", x: 1, z: 0, y_level: 0 },
+        { asset: "wall_block", x: 2, z: 0, y_level: 0 },
+      ],
+    });
+    const yRef = 0.5; // the block strip's own top
+    const sampler = samplerFromHfWithSolid(hf, yRef, CLIMB_THRESHOLD);
+    const dt = 1 / 120;
+    const vel = { x: 3, z: 0 };
+    const out = resolveTerrainSlide(sampler, { x: 0.5, z: 0 }, vel, dt, FWD, RIGHT, 0.3, 0.2, WALL_GRADIENT_THRESHOLD, yRef, CLIMB_THRESHOLD);
+    expect(out.vel.x).toBeCloseTo(3, 6);
+  });
+
+  it("driving up onto a wall_block's top from a foot-height yRef is still blocked (a step this close underneath still isn't within WALL_TOP_TOLERANCE)", () => {
     const hf = Heightfield.fromMapJson({
       meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
       cells: [
@@ -132,11 +171,52 @@ describe("resolveTerrainSlide — wall_block cube sides ARE terrain steps now (2
         { asset: "wall_block", x: 1, z: 0, y_level: 0 },
       ],
     });
-    const sampler = samplerFromHf(hf);
+    // yRef=0 (standing at the block's own FOOT, not its top) — top(0.5) is
+    // 0.5 above yRef, past WALL_TOP_TOLERANCE(0.25), so it still reads as a
+    // wall from below, exactly as intended.
+    const yRef = 0;
+    const sampler = samplerFromHfWithSolid(hf, yRef, CLIMB_THRESHOLD);
+    const dt = 1 / 120;
+    const vel = { x: 6, z: 0 };
+    const out = resolveTerrainSlide(sampler, { x: 0.3, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, yRef, CLIMB_THRESHOLD);
+    expect(out.vel.x).toBeLessThanOrEqual(0.01);
+  });
+
+  it("anti-tunneling: a fast approach into a wall_block's side is still blocked (high speed, production default climb)", () => {
+    const hf = Heightfield.fromMapJson({
+      meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
+      cells: [
+        { asset: "terrain", x: -1, z: 0, y_level: 0 },
+        { asset: "terrain", x: 0, z: 0, y_level: 0 },
+        { asset: "wall_block", x: 1, z: 0, y_level: 0 },
+      ],
+    });
+    const yRef = 0;
+    const sampler = samplerFromHfWithSolid(hf, yRef, CLIMB_THRESHOLD);
     const dt = 1 / 120;
     const vel = { x: 24, z: 0 }; // 0.2m per substep — deep single-step crossing
-    const out = resolveTerrainSlide(sampler, { x: -0.13, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD);
+    const out = resolveTerrainSlide(sampler, { x: -0.13, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, yRef, CLIMB_THRESHOLD);
     expect(out.vel.x).toBeLessThanOrEqual(0.01);
+  });
+
+  it("ground_block (NOT wall_block) is unaffected by the new wallBlocked check — no isWall tag, same D5-gated behavior as before", () => {
+    const hf = Heightfield.fromMapJson({
+      meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
+      cells: [
+        { asset: "terrain", x: -1, z: 0, y_level: 0 },
+        { asset: "terrain", x: 0, z: 0, y_level: 0 },
+        { asset: "ground_block", x: 1, z: 0, y_level: 0 },
+      ],
+    });
+    const yRef = 0;
+    const sampler = samplerFromHfWithSolid(hf, yRef, CLIMB_THRESHOLD);
+    const dt = 1 / 120;
+    const vel = { x: 12, z: 0 };
+    // Same shape as the wall_block test above, but ground_block's 0.5m step
+    // is within CLIMB_THRESHOLD(0.8) and it carries no isWall tag — D5's own
+    // gate (not wallBlocked) governs it, exactly as it did for plain terrain.
+    const out = resolveTerrainSlide(sampler, { x: -0.15, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, yRef, CLIMB_THRESHOLD);
+    expect(out.vel.x).toBeCloseTo(12, 6);
   });
 
   it("driving OFF a block's edge (steep drop AHEAD) is never blocked — cliffs are jumps, not walls", () => {
@@ -157,9 +237,10 @@ describe("resolveTerrainSlide — wall_block cube sides ARE terrain steps now (2
     const dt = 1 / 120;
     // On top of the block strip (h=0.5), driving +X toward the rim at
     // x=1.5 where the ground drops to h=0. Same small footprint as the
-    // strip test, leading corner crossing the rim this substep.
+    // strip test, leading corner crossing the rim this substep. yRef=0.5 —
+    // the body's own height while parked on the block top.
     const vel = { x: 12, z: 0 };
-    const out = resolveTerrainSlide(sampler, { x: 1.25, z: 0 }, vel, dt, FWD, RIGHT, 0.3, 0.2, WALL_GRADIENT_THRESHOLD);
+    const out = resolveTerrainSlide(sampler, { x: 1.25, z: 0 }, vel, dt, FWD, RIGHT, 0.3, 0.2, WALL_GRADIENT_THRESHOLD, 0.5, CLIMB_THRESHOLD);
     expect(out.vel.x).toBeCloseTo(12, 6);
   });
 
@@ -178,13 +259,13 @@ describe("resolveTerrainSlide — wall_block cube sides ARE terrain steps now (2
     // the ramp test below). Moving along the strip: every sample is the same
     // flat 0.5 top — no step, no off-map, velocity untouched.
     const vel = { x: 3, z: 0 };
-    const out = resolveTerrainSlide(sampler, { x: 0.5, z: 0 }, vel, dt, FWD, RIGHT, 0.3, 0.2, WALL_GRADIENT_THRESHOLD);
+    const out = resolveTerrainSlide(sampler, { x: 0.5, z: 0 }, vel, dt, FWD, RIGHT, 0.3, 0.2, WALL_GRADIENT_THRESHOLD, 0.5, CLIMB_THRESHOLD);
     expect(out.vel.x).toBeCloseTo(3, 6);
   });
 });
 
 describe("resolveTerrainSlide — D3a2/D3a3 flush-stacked wall column, sampler mirrors kart.ts's real wiring (symptom A, 2026-07-09)", () => {
-  it("driving from a yard floor into a flush wall_block stack is blocked — the OLD flush-floor bug is gone", () => {
+  it("driving from a yard floor into a flush wall_block stack is blocked — the OLD flush-floor bug is gone (regression: a genuinely tall/out-of-reach wall still blocks under D5)", () => {
     // Reproduces the real bug's shape: kart.ts's terrainSampler.sample is
     // bound to Heightfield.sampleAt (layer-aware), not the plain MAX
     // sample() — see kart.ts step 8a. A 4-cube flush wall_block stack at
@@ -195,9 +276,12 @@ describe("resolveTerrainSlide — D3a2/D3a3 flush-stacked wall column, sampler m
     // — zero gradient, drive straight through. The burial filter (D3a2)
     // removes that buried floor from the candidate set entirely, so
     // sampleAt now reports the column's one live floor (2.0) instead —
-    // producing a real gradient the existing D3b check catches. solidBlocked
-    // (D3a3) is ALSO wired here (matching kart.ts's actual sampler
-    // construction) as a second, independent line of defense.
+    // producing a real gradient the existing D3b check catches. D5's new
+    // yRef gate does NOT relax this case: the stack's real top (2.0) is a
+    // full 0.5m past yRef(1.5)+CLIMB(0.3) — genuinely out of climb reach —
+    // so GRAD/STEP still correctly block it, and solidBlocked (D3a3) is
+    // wired here too (matching kart.ts's actual sampler) as a second,
+    // independent line of defense.
     const hf = Heightfield.fromMapJson({
       meta: { tile_size: 1, level_height: 0.5, origin_offset: [0, 0, 0] },
       cells: [
@@ -212,14 +296,10 @@ describe("resolveTerrainSlide — D3a2/D3a3 flush-stacked wall column, sampler m
     const CLIMB = 0.3; // small enough that 2.0 is unreachable from yRef=1.5
     const yRef = 1.5;
     const kartTop = yRef + 1.0; // matches kart.ts's KART_BODY_HEIGHT
-    const sampler: TerrainSampler = {
-      sample: (x, z) => hf.sampleAt(x, z, yRef, CLIMB),
-      hasColumn: (x, z) => hf.hasColumn(x, z),
-      solidBlocked: (x, z) => hf.solidBlocked(x, z, yRef, kartTop, CLIMB),
-    };
+    const sampler = samplerFromHfWithSolid(hf, yRef, CLIMB, kartTop - yRef);
     const dt = 1 / 120;
     const vel = { x: 12, z: 0 };
-    const out = resolveTerrainSlide(sampler, { x: -0.15, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD);
+    const out = resolveTerrainSlide(sampler, { x: -0.15, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, yRef, CLIMB);
     expect(out.vel.x).toBeLessThanOrEqual(0.01);
   });
 });
@@ -244,7 +324,9 @@ describe("resolveTerrainSlide — does not false-positive block a kart already p
       { x: 1, z: 0 },
       smallHalfLength,
       smallHalfWidth,
-      WALL_GRADIENT_THRESHOLD
+      WALL_GRADIENT_THRESHOLD,
+      0,
+      CLIMB_THRESHOLD
     );
     expect(out.vel.z).toBeCloseTo(3, 6);
   });
@@ -275,7 +357,9 @@ describe("resolveTerrainSlide — D3b: angled slope junction never false-blocks 
       RIGHT,
       halfLength,
       halfWidth,
-      WALL_GRADIENT_THRESHOLD
+      WALL_GRADIENT_THRESHOLD,
+      0,
+      CLIMB_THRESHOLD
     );
     expect(out.vel.x).toBeCloseTo(3, 6);
   });
@@ -296,9 +380,57 @@ describe("resolveTerrainSlide — D3b: angled slope junction never false-blocks 
       RIGHT,
       halfLength,
       halfWidth,
-      WALL_GRADIENT_THRESHOLD
+      WALL_GRADIENT_THRESHOLD,
+      0,
+      CLIMB_THRESHOLD
     );
     expect(Math.hypot(out.vel.x, out.vel.z)).toBeCloseTo(Math.hypot(2, 2), 6);
+  });
+});
+
+describe("resolveTerrainSlide — D5 (body-relative wall gate, 2026-07-10) — symptom A, slope-foot GRAD false block", () => {
+  // Mirrors the exact magnitude tools/diagnose_edge_bugs_sim.ts's scenario A
+  // hit on roads_v1.json's roadTile_289 side seam: a short local rise of
+  // Δ0.423 over the 0.15m gradient base (well past WALL_GRADIENT_THRESHOLD
+  // 0.27) right at a cell boundary — a real, but perfectly climbable, slope
+  // FOOT. hA/hB straddle a hard step at x=0.5, same construction the
+  // existing wall_block tests above use.
+  const sampler: TerrainSampler = {
+    sample: (x, _z) => (x < 0.5 ? 0.55 : 0.973),
+    hasColumn: () => true,
+  };
+  const dt = 1 / 120;
+  const vel = { x: 12, z: 0 };
+
+  it("is NOT a wall when the body is right there (yRef within climb reach of the rise) — the diagnosed false block", () => {
+    // yRef=0.6 mirrors the real playtest trace (kart's own y sitting right
+    // at the low/grass side, ~0.55-0.6) — the "wall" sample (0.973) is only
+    // 0.373 above that, inside CLIMB_THRESHOLD(0.8).
+    const out = resolveTerrainSlide(sampler, { x: -0.15, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, 0.6, CLIMB_THRESHOLD);
+    expect(out.vel.x).toBeCloseTo(12, 6);
+  });
+
+  it("the SAME local rise IS still a wall when the body is far below (out of climb reach)", () => {
+    // yRef=-1.0: the "wall" sample (0.973) is 1.973 above that — genuinely
+    // out of reach, so the gate must still let GRAD/STEP block it (this is
+    // what keeps D5 from silently disabling wall detection everywhere).
+    const out = resolveTerrainSlide(sampler, { x: -0.15, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, -1.0, CLIMB_THRESHOLD);
+    expect(out.vel.x).toBeLessThanOrEqual(0.01);
+  });
+});
+
+describe("resolveTerrainSlide — D5 regression: a genuinely tall wall (Δ2.0, far past any climb reach) still blocks", () => {
+  it("a 2.0m near-vertical rise blocks regardless of how close yRef is set", () => {
+    const sampler: TerrainSampler = {
+      sample: (x, _z) => (x < 0.5 ? 0.0 : 2.0),
+      hasColumn: () => true,
+    };
+    const dt = 1 / 120;
+    const vel = { x: 12, z: 0 };
+    // yRef=0 — right at the low side, the most generous possible reference —
+    // still 2.0 - 0 - CLIMB_THRESHOLD(0.8) = 1.2 clear of climb reach.
+    const out = resolveTerrainSlide(sampler, { x: -0.15, z: 0 }, vel, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, 0, CLIMB_THRESHOLD);
+    expect(out.vel.x).toBeLessThanOrEqual(0.01);
   });
 });
 
@@ -310,7 +442,9 @@ describe("resolveTerrainSlide / tryEscape — D4 anti-deadlock (симптом #
   // remains testable and load-bearing: (a) a genuine dead-end must end as a
   // CLEAN stop — zero residual velocity, no phantom energy re-fed into the
   // next tick, and (b) the escape valve itself picks a validated free
-  // direction and refuses blocked ones.
+  // direction and refuses blocked ones. All walls here are tall (5.0, far
+  // past CLIMB_THRESHOLD from yRef=0) so D5's gate doesn't change any of
+  // these outcomes.
   it("head-on into a pocket's wall is a clean stop: velocity fully drained, not frozen-with-residual", () => {
     // Floor pocket barely longer than the footprint, wall rising ahead.
     const sampler: TerrainSampler = {
@@ -318,7 +452,7 @@ describe("resolveTerrainSlide / tryEscape — D4 anti-deadlock (симптом #
       hasColumn: () => true,
     };
     const dt = 1 / 120;
-    const out = resolveTerrainSlide(sampler, { x: 0, z: 0 }, { x: 12, z: 0 }, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD);
+    const out = resolveTerrainSlide(sampler, { x: 0, z: 0 }, { x: 12, z: 0 }, dt, FWD, RIGHT, halfLength, halfWidth, WALL_GRADIENT_THRESHOLD, 0, CLIMB_THRESHOLD);
     expect(Math.hypot(out.vel.x, out.vel.z)).toBeLessThanOrEqual(0.01);
     expect(out.pos.x).toBeCloseTo(0, 6); // stopped at the start, not teleported
   });
@@ -329,7 +463,7 @@ describe("resolveTerrainSlide / tryEscape — D4 anti-deadlock (симптом #
       sample: (x, _z) => (x > 0.7 ? 5 : 0),
       hasColumn: () => true,
     };
-    const escaped = tryEscape(sampler, 0, 0, FWD, RIGHT, halfLength, halfWidth, 0.05, WALL_GRADIENT_THRESHOLD);
+    const escaped = tryEscape(sampler, 0, 0, FWD, RIGHT, halfLength, halfWidth, 0.05, WALL_GRADIENT_THRESHOLD, 0, CLIMB_THRESHOLD);
     expect(escaped).not.toBeNull();
     expect(escaped!.dir.x).toBeCloseTo(-1, 6); // -fwd
     expect(escaped!.x).toBeCloseTo(-0.05, 6);
@@ -341,7 +475,7 @@ describe("resolveTerrainSlide / tryEscape — D4 anti-deadlock (симптом #
       sample: (x, _z) => (x > 0.7 || x < -0.7 ? 5 : 0),
       hasColumn: () => true,
     };
-    const escaped = tryEscape(sampler, 0, 0, FWD, RIGHT, halfLength, halfWidth, 0.05, WALL_GRADIENT_THRESHOLD);
+    const escaped = tryEscape(sampler, 0, 0, FWD, RIGHT, halfLength, halfWidth, 0.05, WALL_GRADIENT_THRESHOLD, 0, CLIMB_THRESHOLD);
     expect(escaped).not.toBeNull();
     expect(Math.abs(escaped!.dir.z)).toBeCloseTo(1, 6); // one of the laterals
   });
@@ -355,7 +489,7 @@ describe("resolveTerrainSlide / tryEscape — D4 anti-deadlock (симптом #
       sample: (x, z) => (Math.abs(x) > 0.62 || Math.abs(z) > 0.47 ? 5 : 0),
       hasColumn: () => true,
     };
-    const escaped = tryEscape(sampler, 0, 0, FWD, RIGHT, halfLength, halfWidth, 0.15, WALL_GRADIENT_THRESHOLD);
+    const escaped = tryEscape(sampler, 0, 0, FWD, RIGHT, halfLength, halfWidth, 0.15, WALL_GRADIENT_THRESHOLD, 0, CLIMB_THRESHOLD);
     expect(escaped).toBeNull();
   });
 });

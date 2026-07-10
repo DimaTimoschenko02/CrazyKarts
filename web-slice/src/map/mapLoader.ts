@@ -73,6 +73,13 @@ export class GameMap {
     return this.heightfield.solidBlocked(wx, wz, yRef, kartTop, climbThreshold);
   }
 
+  // D5 follow-up (2026-07-10, wall_block regression fix) — see
+  // shared/heightfield.ts Heightfield.wallBlocked doc for the exact rule.
+  // Thin pass-through, same convention as isSolidBlocked above.
+  isWallBlocked(wx: number, wz: number, yRef: number): boolean {
+    return this.heightfield.wallBlocked(wx, wz, yRef);
+  }
+
   // Fallback spawn point for when the authored SPAWN constant (main.ts) lands
   // off this particular map (e.g. a hand-built or server-loaded map that
   // never got a cell at the default coordinates) — the kart would otherwise
@@ -114,7 +121,11 @@ export class GameMap {
     const inst = template.clone();
     inst.position.set(
       def.x * this.tile + this.origin.x,
-      def.y_level * this.levelHeight + this.origin.y,
+      // y_offset (shared/heightfield.ts CellDef doc): fractional-meter snap
+      // shift for decorative tiles whose baked base isn't a multiple of
+      // level_height — keeps the visual mesh flush with heightfield.ts's own
+      // offset surface (see Heightfield.fromMapJson's `offset` handling).
+      def.y_level * this.levelHeight + this.origin.y + (def.y_offset ?? 0),
       def.z * this.tile + this.origin.z
     );
     inst.rotation.y = THREE.MathUtils.degToRad(rot);
