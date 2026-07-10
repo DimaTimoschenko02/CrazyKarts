@@ -64,6 +64,13 @@ export const MIN_OBSTACLE_HEIGHT = 0.35;
 export const DECOR_HEIGHT_EXCEPTIONS = new Set(["bones"]);
 
 // ─── Baked shape table (collisionShapes.json) ────────────────────────────────
+// 2026-07-10 owner review follow-up (Y-gate for projectile sweeps): `topY` is
+// the mesh's own AABB top, in the SAME raw (un-Y-recentered) local space
+// assetLoader.ts places props in — see its "Y is left untouched" doc
+// comment on recenterXZ, and tools/bake-collision-shapes.mjs's topY doc for
+// how it's baked. Optional so a stale/hand-edited shapes table (missing this
+// field) degrades gracefully to the old floor-to-ceiling behavior — see
+// buildPropCollider's worldTopY computation below.
 export interface ObbShapeEntry {
   type: "obb";
   halfX: number; // unscaled local half-extent along the template's own X
@@ -79,11 +86,13 @@ export interface ObbShapeEntry {
   // does, so the baked collider stays aligned with the rendered mesh.
   centerX?: number;
   centerZ?: number;
+  topY?: number;
 }
 export interface HullShapeEntry {
   type: "hull";
   verts: readonly [number, number][]; // unscaled local XZ, CCW, already recentered
   heightY: number; // unscaled local Y extent — used only for the height gate below
+  topY?: number;
 }
 export type ShapeEntry = ObbShapeEntry | HullShapeEntry;
 export type CollisionShapesTable = Readonly<Record<string, ShapeEntry>>;
@@ -109,6 +118,7 @@ function propDiameter(shape: ShapeEntry): number {
 function buildPropCollider(
   asset: string,
   x: number,
+  y: number,
   z: number,
   rotDeg: number,
   scale: number,
@@ -129,6 +139,7 @@ function buildPropCollider(
   }
 
   const rotRad = degToRad(rotDeg);
+  let poly: ConvexPoly;
   if (shape.type === "obb") {
     const cx = (shape.centerX ?? 0) * scale;
     const cz = (shape.centerZ ?? 0) * scale;
@@ -138,10 +149,22 @@ function buildPropCollider(
       { x: cx + shape.halfX * scale, z: cz + shape.halfZ * scale },
       { x: cx - shape.halfX * scale, z: cz + shape.halfZ * scale },
     ];
-    return transformLocalPoly(localVerts, rotRad, x, z);
+    poly = transformLocalPoly(localVerts, rotRad, x, z);
+  } else {
+    const localVerts = shape.verts.map(([vx, vz]) => ({ x: vx * scale, z: vz * scale }));
+    poly = transformLocalPoly(localVerts, rotRad, x, z);
   }
-  const localVerts = shape.verts.map(([vx, vz]) => ({ x: vx * scale, z: vz * scale }));
-  return transformLocalPoly(localVerts, rotRad, x, z);
+
+  // Y-gate for projectile sweeps (2026-07-10 owner review: a dynamite
+  // clearing a building/rock on a high arc must fly over it, not stick to an
+  // invisible floor-to-ceiling column). `shape.topY` is optional (see its
+  // doc comment) — when absent, `worldTopY` stays undefined and every
+  // consumer (server/weapons/projectileSweep.ts) falls back to the old
+  // floor-to-ceiling behavior, matching a not-yet-rebaked shapes table
+  // exactly. Kart-vs-static collision (src/kart/kart.ts) reads only
+  // `poly.verts` and never looks at this field, so it's unaffected either way.
+  if (shape.topY !== undefined) poly.worldTopY = y + shape.topY * scale;
+  return poly;
 }
 
 // Builds every static collider for a map: qualifying props only (see the
@@ -151,13 +174,17 @@ function buildPropCollider(
 // always lines up with where the asset is actually rendered.
 export function buildStaticColliders(map: MapJson, shapes: CollisionShapesTable): ConvexPoly[] {
   const tile = map.meta.tile_size;
-  const [originX, , originZ] = map.meta.origin_offset;
+  const [originX, originY, originZ] = map.meta.origin_offset;
   const out: ConvexPoly[] = [];
 
   for (const prop of map.props ?? []) {
     const worldX = prop.x * tile + originX;
     const worldZ = prop.z * tile + originZ;
-    const collider = buildPropCollider(prop.asset, worldX, worldZ, prop.rot ?? 0, prop.scale ?? 1, shapes);
+    // Same Y placement math as map/mapLoader.ts's placeProp() (`def.y_level *
+    // this.levelHeight + this.origin.y`) — must mirror it exactly so
+    // worldTopY lines up with where the prop is actually rendered.
+    const worldY = prop.y_level * map.meta.level_height + originY;
+    const collider = buildPropCollider(prop.asset, worldX, worldY, worldZ, prop.rot ?? 0, prop.scale ?? 1, shapes);
     if (collider) out.push(collider);
   }
 

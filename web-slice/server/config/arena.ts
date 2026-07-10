@@ -23,9 +23,21 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import type { ConvexPoly } from "../../src/shared/collision2d";
 import { Heightfield, type MapJson } from "../../src/shared/heightfield";
 import { ACTIVE_MAP } from "../../src/shared/activeMap";
+import { buildStaticColliders, type CollisionShapesTable } from "../../src/shared/staticColliders";
+import collisionShapesTable from "../../src/shared/collisionShapes.json";
 import { deriveBoxGrid, deriveSpawnGrid, type GridPoint } from "../spawn/autoSpawn";
+
+// Same baked table src/map/mapLoader.ts already imports client-side
+// (produced by tools/bake-collision-shapes.mjs) — the server needs its own
+// copy so thrown weapons can stick to buildings/props, not just heightfield
+// terrain (2026-07-10 owner bug: dynamite flying through walls/structures —
+// see server/weapons/dynamiteSim.ts sweepDynamiteSegment). Kart-vs-prop
+// collision stays client-only (unrelated to this pass); this is purely a
+// projectile concern.
+const SHAPES_TABLE = collisionShapesTable as unknown as CollisionShapesTable;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MAPS_DIR = path.join(__dirname, "../../public/maps");
@@ -62,6 +74,12 @@ export interface Arena {
   heightfield: Heightfield;
   spawnPoints: readonly WorldPoint[];
   boxPoints: readonly BoxPoint[];
+  // Static XZ prop colliders (buildings/structures + tall natural decor —
+  // src/shared/staticColliders.ts) for this arena's map. Currently only
+  // consumed by server-side projectile sweeps (dynamiteSim.
+  // sweepDynamiteSegment via MatchRoom.ts) — kart-vs-prop collision is
+  // client-only and unrelated.
+  colliders: readonly ConvexPoly[];
   // Ground height at any XZ point. spawnPoints/boxPoints are DERIVED from
   // findFlatSpawnCandidates (autoSpawn.ts), which only ever returns cells
   // clear of the island's edges, so this should always hit a real sample —
@@ -184,6 +202,7 @@ export function loadArena(name?: string): Arena {
     spawnPoints: toWorldPoints(spawnGrid),
     boxPoints,
     groundHeightAt,
+    colliders: buildStaticColliders(mapJson, SHAPES_TABLE),
   };
   cache.set(safeName, { arena, mtimeMs });
   return arena;

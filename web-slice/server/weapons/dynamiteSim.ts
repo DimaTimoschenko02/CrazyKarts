@@ -1,6 +1,12 @@
 // Pure dynamite simulation math — no Colyseus/schema deps, unit-testable in
 // isolation. Same style as rocketSim.ts/mineSim.ts. New gameplay-programmer
 // work (2026-07-10 task brief), no reference implementation to port.
+//
+// Swept terrain/deck/prop collision for a flying dynamite used to live here
+// (sweepDynamiteSegment) — moved to server/weapons/projectileSweep.ts
+// (sweepProjectileSegment) once rocketSim needed the exact same primitive
+// (2026-07-10 follow-up, "НИКАКОЕ оружие не пролетает сквозь объекты"); see
+// server/rooms/MatchRoom.ts tickDynamite for the current caller.
 export interface Vec3 {
   x: number;
   y: number;

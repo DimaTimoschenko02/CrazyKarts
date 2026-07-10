@@ -2,264 +2,316 @@
   "corridor": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "corridor_corner": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "corridor_cornerRound": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "corridor_cornerRoundWindow": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "corridor_cross": {
     "type": "obb",
     "halfX": 0.5000000298023224,
-    "halfZ": 0.5000000298023224
+    "halfZ": 0.5000000298023224,
+    "topY": 1
   },
   "corridor_detailed": {
     "type": "obb",
     "halfX": 0.6000000238418579,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1.1
   },
   "corridor_end": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.250000002980334
+    "halfZ": 0.250000002980334,
+    "topY": 1
   },
   "corridor_open": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "corridor_roof": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 0.2414
   },
   "corridor_split": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "corridor_wall": {
     "type": "obb",
     "halfX": 0.04999999701976776,
     "halfZ": 0.5,
+    "topY": 0.8,
     "centerX": 0.45,
     "centerZ": 0
   },
   "corridor_wallCorner": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 0.8
   },
   "corridor_window": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "corridor_windowClosed": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "hangar_largeA": {
     "type": "obb",
     "halfX": 1,
-    "halfZ": 1.5
+    "halfZ": 1.5,
+    "topY": 1
   },
   "hangar_largeB": {
     "type": "obb",
     "halfX": 1.100000023841858,
-    "halfZ": 1.5
+    "halfZ": 1.5,
+    "topY": 1.1
   },
   "hangar_roundA": {
     "type": "obb",
     "halfX": 1.6356219053268433,
-    "halfZ": 1.4164899587631226
+    "halfZ": 1.4164899587631226,
+    "topY": 1.5
   },
   "hangar_roundB": {
     "type": "obb",
     "halfX": 1.6356219053268433,
-    "halfZ": 1.4164899587631226
+    "halfZ": 1.4164899587631226,
+    "topY": 1.8
   },
   "hangar_roundGlass": {
     "type": "obb",
     "halfX": 1.6356219053268433,
-    "halfZ": 1.4164899587631226
+    "halfZ": 1.4164899587631226,
+    "topY": 1.4
   },
   "hangar_smallA": {
     "type": "obb",
     "halfX": 1,
-    "halfZ": 1
+    "halfZ": 1,
+    "topY": 1
   },
   "hangar_smallB": {
     "type": "obb",
     "halfX": 1,
-    "halfZ": 1
+    "halfZ": 1,
+    "topY": 1
   },
   "structure": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "structure_closed": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "structure_detailed": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "structure_diagonal": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "gate_complex": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.25
+    "halfZ": 0.25,
+    "topY": 1.013
   },
   "gate_simple": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.25
+    "halfZ": 0.25,
+    "topY": 1.08
   },
   "craft_cargoA": {
     "type": "obb",
     "halfX": 0.800000011920929,
-    "halfZ": 1.225000023841858
+    "halfZ": 1.225000023841858,
+    "topY": 0.8
   },
   "craft_cargoB": {
     "type": "obb",
     "halfX": 0.75,
-    "halfZ": 1.25
+    "halfZ": 1.25,
+    "topY": 0.9
   },
   "craft_miner": {
     "type": "obb",
     "halfX": 0.8999999761581421,
-    "halfZ": 1.2999999523162842
+    "halfZ": 1.2999999523162842,
+    "topY": 0.7
   },
   "craft_speederA": {
     "type": "obb",
     "halfX": 1,
-    "halfZ": 1.0499999523162842
+    "halfZ": 1.0499999523162842,
+    "topY": 0.8
   },
   "craft_speederB": {
     "type": "obb",
     "halfX": 1,
-    "halfZ": 1.0128352642059326
+    "halfZ": 1.0128352642059326,
+    "topY": 0.6
   },
   "craft_speederC": {
     "type": "obb",
     "halfX": 1.399999976158142,
-    "halfZ": 0.9628353118896484
+    "halfZ": 0.9628353118896484,
+    "topY": 0.6
   },
   "craft_speederD": {
     "type": "obb",
     "halfX": 1.399999976158142,
-    "halfZ": 1.1128352880477905
+    "halfZ": 1.1128352880477905,
+    "topY": 0.9
   },
   "rocket_baseA": {
     "type": "obb",
     "halfX": 0.8999999761581421,
-    "halfZ": 0.8999999761581421
+    "halfZ": 0.8999999761581421,
+    "topY": 1.6
   },
   "rocket_baseB": {
     "type": "obb",
     "halfX": 0.8999999761581421,
-    "halfZ": 0.8999999761581421
+    "halfZ": 0.8999999761581421,
+    "topY": 1.3
   },
   "rocket_finsA": {
     "type": "obb",
     "halfX": 0.6000000238418579,
-    "halfZ": 0.6000000238418579
+    "halfZ": 0.6000000238418579,
+    "topY": 0.7
   },
   "rocket_finsB": {
     "type": "obb",
     "halfX": 0.6000000238418579,
-    "halfZ": 0.6000000238418579
+    "halfZ": 0.6000000238418579,
+    "topY": 0.7
   },
   "rocket_fuelA": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 0.5
   },
   "rocket_fuelB": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "rocket_sidesA": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1
   },
   "rocket_sidesB": {
     "type": "obb",
     "halfX": 0.6499999761581421,
-    "halfZ": 0.6499999761581421
+    "halfZ": 0.6499999761581421,
+    "topY": 1
   },
   "rocket_topA": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 0.8
   },
   "rocket_topB": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.5
+    "halfZ": 0.5,
+    "topY": 1.1
   },
   "machine_barrel": {
     "type": "obb",
     "halfX": 0.32320506126419746,
-    "halfZ": 0.257735013961792
+    "halfZ": 0.257735013961792,
+    "topY": 0.6
   },
   "machine_barrelLarge": {
     "type": "obb",
     "halfX": 0.3771638572216034,
-    "halfZ": 0.3771638572216034
+    "halfZ": 0.3771638572216034,
+    "topY": 0.6
   },
   "machine_generator": {
     "type": "obb",
     "halfX": 0.3499999940395354,
-    "halfZ": 0.2625000104098839
+    "halfZ": 0.2625000104098839,
+    "topY": 0.4
   },
   "machine_generatorLarge": {
     "type": "obb",
     "halfX": 0.5,
-    "halfZ": 0.6499999761581421
+    "halfZ": 0.6499999761581421,
+    "topY": 0.683
   },
   "satelliteDish_large": {
     "type": "obb",
     "halfX": 0.4243500232696533,
-    "halfZ": 0.3684389591217041
+    "halfZ": 0.3684389591217041,
+    "topY": 0.8142
   },
   "turret_single": {
     "type": "obb",
     "halfX": 0.30000001192092896,
-    "halfZ": 0.36118036029237977
+    "halfZ": 0.36118036029237977,
+    "topY": 0.9
   },
   "turret_double": {
     "type": "obb",
     "halfX": 0.44999998807907104,
-    "halfZ": 0.30000001192092896
+    "halfZ": 0.30000001192092896,
+    "topY": 0.7
   },
   "rover": {
     "type": "obb",
     "halfX": 0.15000000596046448,
-    "halfZ": 0.17499999701976776
+    "halfZ": 0.17499999701976776,
+    "topY": 0.392
   },
   "rock": {
     "type": "hull",
@@ -297,7 +349,8 @@
         0.2705
       ]
     ],
-    "heightY": 0.3
+    "heightY": 0.3,
+    "topY": 0.3
   },
   "rocks_smallA": {
     "type": "hull",
@@ -331,7 +384,8 @@
         0.4349
       ]
     ],
-    "heightY": 0.1051
+    "heightY": 0.1051,
+    "topY": 0.1051
   },
   "rocks_smallB": {
     "type": "hull",
@@ -365,7 +419,8 @@
         0.3494
       ]
     ],
-    "heightY": 0.186
+    "heightY": 0.186,
+    "topY": 0.186
   },
   "rock_crystals": {
     "type": "hull",
@@ -403,7 +458,8 @@
         0.2605
       ]
     ],
-    "heightY": 0.3375
+    "heightY": 0.3375,
+    "topY": 0.3375
   },
   "rock_largeA": {
     "type": "hull",
@@ -441,7 +497,8 @@
         0.2724
       ]
     ],
-    "heightY": 0.5
+    "heightY": 0.5,
+    "topY": 0.5
   },
   "rock_largeB": {
     "type": "hull",
@@ -479,7 +536,8 @@
         0.4095
       ]
     ],
-    "heightY": 0.5
+    "heightY": 0.5,
+    "topY": 0.5
   },
   "rock_crystalsLargeA": {
     "type": "hull",
@@ -517,7 +575,8 @@
         0.2879
       ]
     ],
-    "heightY": 0.541
+    "heightY": 0.541,
+    "topY": 0.541
   },
   "rock_crystalsLargeB": {
     "type": "hull",
@@ -555,7 +614,8 @@
         0.2637
       ]
     ],
-    "heightY": 0.55
+    "heightY": 0.55,
+    "topY": 0.55
   },
   "meteor": {
     "type": "hull",
@@ -585,7 +645,8 @@
         0.375
       ]
     ],
-    "heightY": 0.735
+    "heightY": 0.735,
+    "topY": 0.735
   },
   "meteor_detailed": {
     "type": "hull",
@@ -623,7 +684,8 @@
         0.375
       ]
     ],
-    "heightY": 0.735
+    "heightY": 0.735,
+    "topY": 0.735
   },
   "meteor_half": {
     "type": "hull",
@@ -661,7 +723,8 @@
         0
       ]
     ],
-    "heightY": 0.3675
+    "heightY": 0.3675,
+    "topY": 0.3675
   },
   "crater": {
     "type": "hull",
@@ -691,7 +754,8 @@
         0.2064
       ]
     ],
-    "heightY": 0.1176
+    "heightY": 0.1176,
+    "topY": 0.1176
   },
   "craterLarge": {
     "type": "hull",
@@ -729,7 +793,8 @@
         0.3133
       ]
     ],
-    "heightY": 0.12
+    "heightY": 0.12,
+    "topY": 0.12
   },
   "bones": {
     "type": "hull",
@@ -767,6 +832,7 @@
         0.0693
       ]
     ],
-    "heightY": 0.4422
+    "heightY": 0.4422,
+    "topY": 0.4422
   }
 }

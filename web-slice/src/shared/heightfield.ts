@@ -655,6 +655,38 @@ export class Heightfield {
     return this.cells.has(cx + "," + cz);
   }
 
+  // "Which authored column does this world point fall into" — the SAME
+  // cx/cz rounding hasColumn/columnLayers already use, exposed as a cheap
+  // key comparison. Root cause for the road-tile curb "carabканье" bug
+  // (owner playtest, 2026-07-10 — see physics/terrainWall.ts cornerBlocked's
+  // same-cell gate doc): a Kenney road-tile curb (baked into ONE tile's own
+  // heightGrid, e.g. roadTile_182: a real ~0.4-0.7m rise over the fixed
+  // 0.15m WALL_GRADIENT_BASE probe, well past terrainWallGradientThreshold)
+  // reads as steep as a genuine wall — but it's only 0.3-0.7m tall, under
+  // layerClimbThreshold (0.8 default), so the D5 body-relative climb gate
+  // (isWallHeight) let it through as "just another climbable rise", same as
+  // it correctly does for a genuine ramp foot. The two cases are
+  // geometrically indistinguishable from a LOCAL height probe alone; what
+  // actually differs is AUTHORING SCOPE — a curb is a steep feature baked
+  // entirely inside ONE tile's own mesh, while D5's protected false-positive
+  // (design/notes/ride-collision-v2.md, tools/diagnose_edge_bugs_sim.ts
+  // scenario A) was a bilinear-grid seam artifact straddling the boundary
+  // between TWO DIFFERENT authored cells. cellKeyAt lets terrainWall.ts tell
+  // the two apart: a steep rise whose two probe endpoints land in the SAME
+  // authored column is a genuine feature of THAT tile's own geometry
+  // (curb/barrier) and should wall unconditionally, regardless of
+  // climbThreshold; a steep rise straddling two DIFFERENT columns keeps the
+  // existing D5 climb-gated (potentially-a-ramp-foot) behavior untouched.
+  // Returns null off the authored map (mirrors hasColumn's own "nothing
+  // here" case) so a same-cell comparison against an unauthored point is
+  // always false by construction.
+  cellKeyAt(wx: number, wz: number): string | null {
+    const cx = Math.round((wx - this.originX) / this.tile);
+    const cz = Math.round((wz - this.originZ) / this.tile);
+    const key = cx + "," + cz;
+    return this.cells.has(key) ? key : null;
+  }
+
   // One stacked layer's (height, solidBase) pair AT a specific query point —
   // solidBase is per-cell constant (see heightCellFor), h varies with lx/lz
   // for sloped/grid layers exactly like the old columnHeights() did.
@@ -722,6 +754,22 @@ export class Heightfield {
   private columnHeights(wx: number, wz: number): number[] | null {
     const layers = this.columnLayers(wx, wz);
     return layers === null ? null : layers.map(l => l.h);
+  }
+
+  // Public RAW (unfiltered, every stacked layer, no burial filter — same
+  // list columnHeights()/sample() use) per-layer floor heights of the
+  // column under a world XZ point, or null off the authored footprint. Added
+  // for server/weapons/dynamiteSim.ts's sweepDynamiteSegment (2026-07-10
+  // owner bug: "динамит пролетает сквозь стены/потолки"): a swept substep
+  // needs every layer's height to detect a segment crossing a DECK/roof
+  // stacked ABOVE the projectile's current altitude — sample() only ever
+  // returns the topmost (MAX) layer and sampleAt() deliberately hides higher
+  // decks behind its own-floor/climb logic (both wrong for this "did I pass
+  // through ANY floor plane, in either direction" question). Generic enough
+  // that other swept-projectile callers can reuse it later (see the rocket
+  // follow-up note in that module).
+  allLayerHeights(wx: number, wz: number): number[] | null {
+    return this.columnHeights(wx, wz);
   }
 
   // Ground height at a world XZ point, or null when there is no cell there

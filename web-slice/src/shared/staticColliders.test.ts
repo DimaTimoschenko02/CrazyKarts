@@ -71,6 +71,30 @@ describe("buildStaticColliders — structural props (OBB)", () => {
   });
 });
 
+// 2026-07-10 owner review follow-up: worldTopY (Y-gate for projectile
+// sweeps, server/weapons/projectileSweep.ts) — see collision2d.ts's
+// ConvexPoly.worldTopY doc for why kart-vs-static collision is unaffected.
+describe("buildStaticColliders — worldTopY (Y-gate)", () => {
+  const shapesWithTop: CollisionShapesTable = { corridor: { type: "obb", halfX: 0.5, halfZ: 0.5, topY: 1 } };
+
+  it("worldTopY = prop's y_level*level_height + origin.y + shape.topY*scale", () => {
+    const map: MapJson = {
+      meta: baseMeta([0, 2, 0]), // originY=2
+      props: [{ asset: "corridor", x: 0, z: 0, y_level: 3, scale: 2 }], // y_level*level_height=1.5
+    };
+    const collider = buildStaticColliders(map, shapesWithTop)[0];
+    // 1.5 (y_level*level_height) + 2 (originY) + 1*2 (topY*scale) = 5.5
+    expect(collider.worldTopY).toBeCloseTo(5.5, 10);
+  });
+
+  it("worldTopY stays undefined when the shapes-table entry has no topY (backward compat, stale/hand-built table)", () => {
+    const shapesNoTop: CollisionShapesTable = { corridor: { type: "obb", halfX: 0.5, halfZ: 0.5 } };
+    const map: MapJson = { meta: baseMeta(), props: [{ asset: "corridor", x: 0, z: 0, y_level: 0 }] };
+    const collider = buildStaticColliders(map, shapesNoTop)[0];
+    expect(collider.worldTopY).toBeUndefined();
+  });
+});
+
 describe("buildStaticColliders — natural decor props (hull) — key P2 regression", () => {
   // A rock's hull is a wide, shallow footprint on the +X side (asymmetric —
   // mimics a real rock's irregular silhouette), verified against the OLD

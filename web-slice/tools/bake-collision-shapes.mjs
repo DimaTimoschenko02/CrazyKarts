@@ -288,6 +288,15 @@ function bakeAsset(name, kind) {
       type: "obb",
       halfX: (maxX - minX) / 2,
       halfZ: (maxZ - minZ) / 2,
+      // Top of the mesh's own AABB, in the SAME raw (un-Y-recentered) local
+      // space assetLoader.ts places props in — see its "Y is left untouched"
+      // doc comment. shared/staticColliders.ts turns this into a world-space
+      // Y ceiling (worldTopY) so server/weapons/projectileSweep.ts can let a
+      // projectile flying ABOVE a building/rock pass over it instead of
+      // hitting an invisible floor-to-ceiling column (2026-07-10 owner
+      // review: "динамит, перелетающий камень по высокой дуге, прилипнет в
+      // воздухе над ним").
+      topY: round4(maxY),
     };
     // See PIVOT_RECENTER_ASSETS doc comment above — for these few assets the
     // box's own center sits away from the pack's shared pivot (where
@@ -308,6 +317,7 @@ function bakeAsset(name, kind) {
     type: "hull",
     verts: hull.map(v => [round4(v.x), round4(v.z)]),
     heightY: round4(heightY),
+    topY: round4(maxY), // see the "obb" branch's topY doc comment above
   };
 }
 

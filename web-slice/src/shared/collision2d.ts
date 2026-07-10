@@ -21,6 +21,20 @@ export interface Vec2 {
 // handles every static shape family in collision-v2.md §2.
 export interface ConvexPoly {
   verts: Vec2[];
+  // Optional world-space Y of this shape's own top (set by
+  // shared/staticColliders.ts's buildPropCollider from the baked
+  // collisionShapes.json topY — see that module's doc comment). Purely a
+  // height CEILING for callers that care about vertical extent — 2026-07-10
+  // owner review: server/weapons/projectileSweep.ts uses it to let a
+  // projectile flying ABOVE a building/rock pass over it instead of hitting
+  // an invisible floor-to-ceiling column. Every existing 2D-only consumer
+  // (kart-vs-static resolution in src/kart/kart.ts, this module's own SAT/
+  // point-in-poly/segment primitives) reads only `verts` and ignores this
+  // field entirely, so it's a safe, non-breaking addition. Undefined means
+  // "no known ceiling" — treat as floor-to-ceiling solid (backward-
+  // compatible default for a stale/hand-built ConvexPoly, e.g. makeAabb/
+  // makeObb below never set it).
+  worldTopY?: number;
 }
 
 // Only used for kart-vs-kart (src/physics/kartCollision.ts) — kept as a

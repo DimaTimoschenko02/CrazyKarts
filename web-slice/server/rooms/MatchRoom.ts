@@ -16,7 +16,6 @@ import {
   computeLaunchPitchRad,
   computeMuzzleDirections,
   findProximityHit,
-  isBlockedByTerrain,
   stepRocket,
   tiltDirection3D,
   type PlayerPoint,
@@ -29,6 +28,7 @@ import {
   computeLaunchSpeed,
   dynamitePositionAtT,
 } from "../weapons/dynamiteSim";
+import { sweepProjectileSegment } from "../weapons/projectileSweep";
 
 const ROCKET = WEAPON_TYPES.rocket as ProjectileStats;
 const MINES = WEAPON_TYPES.mines as MineStats;
@@ -521,26 +521,39 @@ export class MatchRoom extends Room<{ state: MatchState }> {
     const remaining: ActiveRocket[] = [];
 
     for (const rocket of this.rockets) {
+      // `rocket.x/y/z` still holds the position from the END of the
+      // PREVIOUS tick (or the muzzle, on the very first tick) — exactly the
+      // segment start sweepProjectileSegment needs. Captured BEFORE we
+      // overwrite it below (same pattern as tickDynamite).
+      const prevPos = { x: rocket.x, y: rocket.y, z: rocket.z };
       rocket.age += dt;
-      const next = stepRocket(
-        { x: rocket.x, y: rocket.y, z: rocket.z },
-        { x: rocket.dx, y: rocket.dy, z: rocket.dz },
-        rocket.speed,
-        dt
-      );
-      rocket.x = next.x;
-      rocket.y = next.y;
-      rocket.z = next.z;
+      const next = stepRocket(prevPos, { x: rocket.dx, y: rocket.dy, z: rocket.dz }, rocket.speed, dt);
 
-      const hitId = findProximityHit(rocket, alive, ROCKET.hitRadius, rocket.ownerId, ROCKET.selfDamage);
-      // Checked against the rocket's CURRENT altitude every tick (not a
-      // frozen launch-time height) — this is what lets a rocket that flew
-      // over a low point still explode when it reaches a hill further along
-      // its (possibly tilted) straight line.
-      const blocked = isBlockedByTerrain(next, this.arena.heightfield);
+      // Swept terrain/deck/prop check first (2026-07-10 owner bug, extended
+      // from dynamite same day: "НИКАКОЕ оружие не пролетает сквозь
+      // объекты" — a rocket at 40m/s covers ~1.33m per 30Hz tick, even
+      // wider than dynamite's ~0.93m, so the old single-end-point
+      // isBlockedByTerrain sample tunneled through thin walls just as
+      // easily). Walks the WHOLE prevPos→next motion in fine substeps — see
+      // projectileSweep.ts's file header for the full breakdown, including
+      // why flying steadily UNDER a bridge deck still explodes nothing
+      // (own-layer floor rule unchanged from before this fix).
+      const swept = sweepProjectileSegment(prevPos, next, this.arena.heightfield, this.arena.colliders);
+
+      // Kart proximity stays a simple radius trigger at the tick's END
+      // position (unchanged from before this fix) — checked against `next`
+      // like before, only when the swept terrain/prop path is clear: a
+      // wall/deck/prop hit partway along the segment wins over a kart the
+      // rocket would only have reached at the very end of the tick.
+      const hitId = swept ? null : findProximityHit(next, alive, ROCKET.hitRadius, rocket.ownerId, ROCKET.selfDamage);
+      const explodePos = swept ? swept.hit : next;
+      rocket.x = explodePos.x;
+      rocket.y = explodePos.y;
+      rocket.z = explodePos.z;
+
       const expired = rocket.age >= rocket.lifetime;
 
-      if (hitId || blocked || expired) {
+      if (hitId || swept || expired) {
         this.explodeRocket(rocket, alive);
         continue; // consumed — do not keep simulating
       }
@@ -606,24 +619,42 @@ export class MatchRoom extends Room<{ state: MatchState }> {
 
     for (const dyn of this.dynamites) {
       if (!dyn.stuck) {
+        // `dyn.x/y/z` still holds the position from the END of the PREVIOUS
+        // tick (or the launch origin, on the very first tick — see
+        // fireDynamite) — exactly the segment start sweepProjectileSegment
+        // needs. Captured BEFORE we overwrite it below.
+        const prevPos = { x: dyn.x, y: dyn.y, z: dyn.z };
         dyn.age += dt;
-        const pos = dynamitePositionAtT(dyn.origin, dyn.vel0, DYNAMITE.gravity, dyn.age);
-        dyn.x = pos.x;
-        dyn.y = pos.y;
-        dyn.z = pos.z;
+        const nextPos = dynamitePositionAtT(dyn.origin, dyn.vel0, DYNAMITE.gravity, dyn.age);
 
-        // Ground first (matches rocketSim.ts's ground-block rule exactly —
-        // "off the map" reads as blocked too), then proximity to a kart —
-        // the first thing it touches wins (task spec: "прилипание к
-        // ПЕРВОМУ во что попал").
+        // Swept terrain/deck/prop check first (2026-07-10 owner bug: "летит
+        // сквозь стены/потолок") — walks the WHOLE prevPos→nextPos motion in
+        // fine substeps instead of point-sampling only nextPos, so a thin
+        // wall/step can no longer be tunneled through between ticks, and a
+        // deck/roof reached from below now stops it too. See
+        // projectileSweep.ts's file header for the full breakdown of what
+        // each of its checks catches (shared with tickRockets below).
+        const swept = sweepProjectileSegment(prevPos, nextPos, this.arena.heightfield, this.arena.colliders);
+
+        // Kart proximity stays a simple radius trigger at the tick's END
+        // position (unchanged from before this fix) — it's already a
+        // generous gate, not a precise geometric test, so it doesn't need
+        // the sweep. Only checked when the swept terrain/prop path is clear:
+        // "sticks to the FIRST thing it touches" (task spec) — a wall/deck
+        // hit partway along the segment wins over a kart the dynamite would
+        // only have reached at the very end of the tick.
         // DYNAMITE.selfDamage (false, owner decision 2026-07-10) doubles as
         // the stick-eligibility flag: a throw that can't hurt its owner must
         // not stick to them either (it would just ride along harmlessly and
         // waste the shot).
-        const grounded = isBlockedByTerrain(pos, this.arena.heightfield);
-        const hitId = grounded ? null : findProximityHit(pos, alive, DYNAMITE.stickRadius, dyn.ownerId, DYNAMITE.selfDamage);
+        const hitId = swept ? null : findProximityHit(nextPos, alive, DYNAMITE.stickRadius, dyn.ownerId, DYNAMITE.selfDamage);
+        const stickPos = swept ? swept.hit : nextPos;
 
-        if (grounded || hitId) {
+        dyn.x = stickPos.x;
+        dyn.y = stickPos.y;
+        dyn.z = stickPos.z;
+
+        if (swept || hitId) {
           dyn.stuck = true;
           dyn.stuckToId = hitId;
           this.broadcast("dynamite:stick", {
