@@ -5,7 +5,7 @@
 // since it does touch camera.position/lookAt.
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import * as THREE from "three";
-import { ChaseCamera, wrapAngle, blendAngle } from "./camera";
+import { ChaseCamera, wrapAngle, blendAngle, occlusionFraction, followOcclusion } from "./camera";
 import { DEFAULT_KART_PHYSICS_PARAMS } from "../physics/types";
 
 // This suite runs under vitest's default node environment (no jsdom — most
@@ -59,6 +59,57 @@ describe("blendAngle", () => {
     // Short-arc midpoint should sit just past +PI (i.e. wrap to just past -PI),
     // not near 0 (which is what a naive non-wrapped lerp would produce).
     expect(Math.abs(Math.abs(wrapAngle(mid - a)) )).toBeLessThan(0.2);
+  });
+});
+
+describe("occlusionFraction", () => {
+  it("returns 1 (no pullback) when there is no hit", () => {
+    expect(occlusionFraction(null, 10, 0.3)).toBe(1);
+  });
+
+  it("returns 1 for a degenerate (near-zero-length) ray regardless of hit", () => {
+    expect(occlusionFraction(0.001, 0, 0.3)).toBe(1);
+  });
+
+  it("clamps to the hit distance minus margin, as a fraction of the full ray", () => {
+    // Full ray 10m, hit at 6m, 0.3m margin -> camera allowed to travel 5.7/10.
+    expect(occlusionFraction(6, 10, 0.3)).toBeCloseTo(0.57, 10);
+  });
+
+  it("clamps to 0 when the hit is closer than the margin (never goes negative)", () => {
+    expect(occlusionFraction(0.1, 10, 0.3)).toBe(0);
+  });
+
+  it("clamps to 1 when the hit sits beyond the full ray length (shouldn't happen, but stays sane)", () => {
+    expect(occlusionFraction(50, 10, 0.3)).toBe(1);
+  });
+});
+
+describe("followOcclusion", () => {
+  it("moves toward a falling target (ducking under cover) at the fast enter rate", () => {
+    const next = followOcclusion(1, 0, /* enterRate */ 16, /* exitRate */ 4, 1 / 60);
+    const expected = 1 + (0 - 1) * (1 - Math.exp(-16 * (1 / 60)));
+    expect(next).toBeCloseTo(expected, 10);
+    expect(next).toBeLessThan(1);
+  });
+
+  it("moves toward a rising target (clearing the occluder) at the slow exit rate", () => {
+    const next = followOcclusion(0, 1, /* enterRate */ 16, /* exitRate */ 4, 1 / 60);
+    const expected = 0 + (1 - 0) * (1 - Math.exp(-4 * (1 / 60)));
+    expect(next).toBeCloseTo(expected, 10);
+    expect(next).toBeGreaterThan(0);
+  });
+
+  it("converges to the target over many frames in either direction", () => {
+    let t = 1;
+    for (let i = 0; i < 120; i++) t = followOcclusion(t, 0.2, 16, 4, 1 / 60);
+    expect(t).toBeCloseTo(0.2, 3);
+    for (let i = 0; i < 120; i++) t = followOcclusion(t, 1, 16, 4, 1 / 60);
+    expect(t).toBeCloseTo(1, 3);
+  });
+
+  it("is a no-op when already at the target", () => {
+    expect(followOcclusion(0.5, 0.5, 16, 4, 1 / 60)).toBeCloseTo(0.5, 10);
   });
 });
 
@@ -127,5 +178,44 @@ describe("ChaseCamera.update", () => {
     // yaw=45deg body direction (which would pull position.x negative).
     expect(camera.position.z).toBeGreaterThan(6);
     expect(Math.abs(camera.position.x)).toBeLessThan(1);
+  });
+
+  it("pulls the camera in front of an overhead deck instead of leaving it stuck on the far side", () => {
+    const cam = new ChaseCamera();
+    const camera = makeCamera();
+    const pos = new THREE.Vector3(0, 0, 0);
+    const yaw = 0; // nose points -Z, camera sits behind at +Z
+    const vel = new THREE.Vector3(0, 0, 0);
+
+    // A wide, thin deck straddling the ray from just-above-the-kart to the
+    // normal chase position (+Z8, +Y5) — like a bridge floor overhead.
+    const deck = new THREE.Mesh(
+      new THREE.BoxGeometry(20, 0.2, 20),
+      new THREE.MeshBasicMaterial()
+    );
+    deck.position.set(0, 2, 4); // between the kart and the default cam height/offset
+    deck.updateMatrixWorld(true);
+    const mapRoot = new THREE.Group();
+    mapRoot.add(deck);
+
+    for (let i = 0; i < 180; i++) {
+      cam.update(camera, pos, yaw, vel, DEFAULT_KART_PHYSICS_PARAMS, 1 / 60, mapRoot);
+    }
+    // Unoccluded settle position would be (0, 5, 8) — well above/behind the
+    // deck. Pulled-in-under-cover, the camera should end up much closer to
+    // the kart (both in height and in Z distance) so the kart is visible.
+    expect(camera.position.y).toBeLessThan(3);
+    expect(camera.position.z).toBeLessThan(5);
+  });
+
+  it("stays at the normal chase position when occluders is omitted/null (default behavior unchanged)", () => {
+    const cam = new ChaseCamera();
+    const camera = makeCamera();
+    const pos = new THREE.Vector3(0, 0, 0);
+    const yaw = 0;
+    const vel = new THREE.Vector3(0, 0, 0);
+    for (let i = 0; i < 180; i++) cam.update(camera, pos, yaw, vel, DEFAULT_KART_PHYSICS_PARAMS, 1 / 60);
+    expect(camera.position.y).toBeCloseTo(5, 1);
+    expect(camera.position.z).toBeCloseTo(8, 1);
   });
 });

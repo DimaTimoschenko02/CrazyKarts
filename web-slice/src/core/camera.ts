@@ -41,12 +41,68 @@ export function blendAngle(a: number, b: number, t: number): number {
   return a + wrapAngle(b - a) * t;
 }
 
+// ── Bridge/overhang occlusion (2026-07-10) ──────────────────────────────
+// Owner report: driving under a raised deck (Kenney Road Tiles bridge/
+// building floor, ~1.1m+) left the chase camera outside/above the
+// overhang, with the kart itself invisible. Fix: cast one ray per frame
+// from a point just above the kart toward the desired chase position: if
+// map geometry blocks that line of sight, pull the camera in along the
+// SAME ray until it's just short of the hit point, instead of leaving it
+// stuck on the far side of the deck. See .claude/rules/smooth-values.md —
+// the raw hit distance is a discrete per-frame sample (a ray can start/stop
+// hitting from one frame to the next as the kart moves), so it's run
+// through an exp-follow filter before it ever touches camera.position,
+// with two rates: fast getting IN under cover (the view shouldn't stay
+// blocked for multiple frames), slower coming back OUT (avoids a visible
+// snap the instant the ray clears).
+
+// Raw occlusion fraction for one ray sample: 1.0 = clear line of sight (or
+// no hit / degenerate ray), down to 0.0 = the hit point sits right at the
+// eye. `margin` pulls the clamp back a little further than the literal hit
+// point so the camera sits IN FRONT of the blocking surface, not clipped
+// into it. Pure function — exported for unit tests.
+export function occlusionFraction(hitDistance: number | null, fullDist: number, margin: number): number {
+  if (hitDistance === null || fullDist < 1e-6) return 1;
+  return THREE.MathUtils.clamp((hitDistance - margin) / fullDist, 0, 1);
+}
+
+// Asymmetric exp-follow: `enterRate` while target is falling (camera
+// ducking in under an occluder), `exitRate` while it's rising back toward
+// 1 (occluder cleared). Same "two rates for two directions" pattern as
+// .claude/rules/smooth-values.md's drift enter/exit example. Exported for
+// unit tests.
+export function followOcclusion(current: number, target: number, enterRate: number, exitRate: number, dt: number): number {
+  const rate = target < current ? enterRate : exitRate;
+  return current + (target - current) * (1 - Math.exp(-rate * dt));
+}
+
+// How far in front of the kart, straight up, the occlusion ray starts —
+// roughly windshield height, so a deck that clears the kart's ROOF but
+// would still clip a chase view starting exactly at wheel-height correctly
+// counts as blocking.
+const OCCLUSION_EYE_HEIGHT = 0.5;
+// Clamp margin (world meters) kept in front of the hit surface — see
+// occlusionFraction doc above.
+const OCCLUSION_MARGIN = 0.3;
+// Fast duck-under-cover rate vs. slow return-to-normal rate — see the
+// asymmetric-filter comment above.
+const OCCLUSION_ENTER_RATE = 16;
+const OCCLUSION_EXIT_RATE = 4;
+
 export class ChaseCamera {
   // null until the first non-top-mode update — lets the camera SNAP to the
   // kart's actual heading on the very first frame instead of easing in from
   // a hardcoded 0 (which would visibly swing the camera at boot/respawn if
   // the kart doesn't happen to start facing -Z).
   private camYaw: number | null = null;
+  // Smoothed occlusion fraction (1 = normal chase distance, 0 = pulled all
+  // the way in to the eye point) — see followOcclusion above. Starts at 1
+  // (unoccluded) so a kart that spawns in the clear never has to "recover"
+  // from a fake initial occlusion.
+  private occlusionT = 1;
+  // Reused across frames — one allocation for the lifetime of the camera
+  // instead of one per frame (this update runs once per rendered frame).
+  private raycaster = new THREE.Raycaster();
 
   update(
     camera: THREE.PerspectiveCamera,
@@ -54,7 +110,13 @@ export class ChaseCamera {
     yaw: number,
     velocity: THREE.Vector3,
     params: KartPhysicsParams,
-    dt: number
+    dt: number,
+    // Static map geometry to occlusion-test against (GameMap.root) — pass
+    // null to skip the check entirely (e.g. before the map has loaded).
+    // Deliberately just the map group, not the whole scene: excludes the
+    // kart's own mesh, remote karts, weapon boxes and VFX, none of which
+    // should ever hide the camera from its own kart.
+    occluders: THREE.Object3D | null = null
   ): void {
     if (window.__camMode === "top") {
       // Diagnostic top-down: high above the kart, north-up — trail arcs and any
@@ -101,7 +163,33 @@ export class ChaseCamera {
     const camTarget = pos.clone()
       .addScaledVector(camFwd, -8)
       .add(new THREE.Vector3(0, 5, 0));
-    camera.position.lerp(camTarget, 1 - Math.exp(-4 * dt));
+
+    // Bridge/overhang occlusion — see the block comment above the class for
+    // the full rationale. eyePoint is a fixed point just above the kart (NOT
+    // camera.position — using the current, already-lagging camera position
+    // as the ray origin would make the check itself lag behind the kart
+    // driving under cover).
+    const eyePoint = pos.clone().add(new THREE.Vector3(0, OCCLUSION_EYE_HEIGHT, 0));
+    let rawT = 1;
+    if (occluders) {
+      const toTarget = camTarget.clone().sub(eyePoint);
+      const fullDist = toTarget.length();
+      if (fullDist > 1e-6) {
+        this.raycaster.set(eyePoint, toTarget.clone().normalize());
+        this.raycaster.far = fullDist;
+        this.raycaster.near = 0;
+        const hits = this.raycaster.intersectObject(occluders, true);
+        const hitDistance = hits.length > 0 ? hits[0].distance : null;
+        rawT = occlusionFraction(hitDistance, fullDist, OCCLUSION_MARGIN);
+      }
+    }
+    this.occlusionT = followOcclusion(this.occlusionT, rawT, OCCLUSION_ENTER_RATE, OCCLUSION_EXIT_RATE, dt);
+
+    // occlusionT === 1 (the overwhelmingly common no-occlusion case) makes
+    // this an identity lerp, i.e. finalTarget === camTarget exactly — the
+    // normal chase feel is untouched byte-for-byte when nothing is in the way.
+    const finalTarget = eyePoint.clone().lerp(camTarget, this.occlusionT);
+    camera.position.lerp(finalTarget, 1 - Math.exp(-4 * dt));
     camera.lookAt(pos.x, pos.y + 1, pos.z);
   }
 }

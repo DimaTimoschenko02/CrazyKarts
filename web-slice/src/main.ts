@@ -251,7 +251,7 @@ function frame(): void {
   // tab-backgrounding stall doesn't feed the exp-follow a huge dt and snap
   // the camera across the map on the next visible frame.
   const frameDt = Math.min((now - lastFrameMs) / 1000, 0.1);
-  chaseCamera.update(camera, kart.position, kart.yaw, kart.velocity, kart.physicsParams, frameDt);
+  chaseCamera.update(camera, kart.position, kart.yaw, kart.velocity, kart.physicsParams, frameDt, map?.root ?? null);
   telemetry.updateHud(hud);
   inputOverlay.update(lastRawInput);
   combat.update(net.client, input, frameDt); // dt: box spin visual only
