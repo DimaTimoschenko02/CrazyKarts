@@ -225,12 +225,20 @@ describe("BicyclePhysics — standstill steering (req 1: no standstill steering 
 });
 
 describe("BicyclePhysics — kinematic/dynamic blend (req 2: nose leads at low speed)", () => {
-  it("at low speed (below kinematicBlendLoSpeed) omega matches the pure kinematic bicycle formula", () => {
+  it("at low speed (below kinematicBlendLoSpeed) omega CONVERGES to the pure kinematic bicycle formula within ~0.5s", () => {
+    // Updated 2026-07-10 ("reverse flick" fix, see bicyclePhysics.ts step G
+    // doc comment and tools/diag_reverse_flick.ts): omega in the kinematic
+    // zone is no longer overwritten outright every tick — it now RELAXES
+    // toward kinematicOmega through an exponential filter (kinematicOmegaRate)
+    // so a fast steer-angle/fwdSpeed-sign flip can't snap the body's yaw rate
+    // instantly. That's the intended behavior change; this test now checks
+    // convergence to the same steady-state formula over a short sustained
+    // hold instead of exact equality after a single step (which would now
+    // correctly fail — the whole point of the fix).
     const p = DEFAULT_KART_PHYSICS_PARAMS;
     const bike = new BicyclePhysics(p, DEFAULT_AXLE_GEOMETRY);
     const fwdSpeedIn = 1.0; // strictly below kinematicBlendLoSpeed=1.5 -> blend=0 exactly
     const velocity = { x: 0, y: 0, z: -fwdSpeedIn };
-    const state = bike.step(freshInput({ velocity, throttle: 1, steerInput: 1 }), DT);
 
     // Reproduce step B (steer angle) exactly as the implementation does.
     const maxAngleRad = (p.maxSteerAngleDeg * Math.PI) / 180;
@@ -239,7 +247,16 @@ describe("BicyclePhysics — kinematic/dynamic blend (req 2: nose leads at low s
     const steerAngle = 1 * maxAngleRad * steerMult;
     const expectedOmega = (fwdSpeedIn / DEFAULT_AXLE_GEOMETRY.wheelbase) * Math.tan(steerAngle);
 
-    expect(state.omega).toBeCloseTo(expectedOmega, 4);
+    // Hold full steer at a constant fwdSpeed for 1s (120 ticks @ 120Hz) —
+    // 10 time constants of kinematicOmegaRate's ~0.1s filter (e^-10 residual
+    // error, comfortably converged well within the "~0.5s" ballpark the
+    // acceptance criteria asked for).
+    let state = bike.step(freshInput({ velocity, throttle: 1, steerInput: 1 }), DT);
+    for (let i = 1; i < 120; i++) {
+      state = bike.step(freshInput({ velocity, throttle: 1, steerInput: 1 }), DT);
+    }
+
+    expect(state.omega).toBeCloseTo(expectedOmega, 3);
     // Nose leads, not a parallel sideways crab: lateral velocity stays tiny.
     expect(Math.abs(state.sideSpeed)).toBeLessThan(0.05);
   });
@@ -555,19 +572,22 @@ function kartLikeTick(sim: KartLikeSim, dt: number, rawSteer: number, rawThrottl
 }
 
 describe("BicyclePhysics + ContinuousDrift — Fix 1 regression: drift entry no longer punches a speed dip", () => {
-  // Bound is still 70% (unchanged) — owner video-diff session 2026-07-08
-  // point 4 wanted the OPPOSITE direction from the original 2026-07-07 fix
-  // (a FASTER/more noticeable speed drop entering a drift, not a smoothed-
-  // away one), so driftPenaltyTau went back down (2.0 -> 1.0) and
-  // corneringDragDriftMult up (4 -> 5.5) — see types.ts driftPenaltyTau's
-  // updated comment for the full re-measurement. With this session's other
-  // changes already in place (softer steerLowSpeedMult/steerHighSpeedMult/
-  // maxSteerAngleDeg reduce the raw cornering-drag transient at entry too),
-  // the dip now measures ~86% of steady mean at tau=1.0 — comfortably above
-  // 70% without needing to loosen the floor at all; a real regression back
-  // toward the pre-2026-07-07 ~67.5% would still be caught. (The brief
-  // allowed loosening this floor to 65% if genuinely needed — not needed
-  // here, so left at 70%.)
+  // Bound loosened 70% -> 65% (2026-07-10, "reverse flick" fix — see
+  // bicyclePhysics.ts step G doc comment and tools/diag_reverse_flick.ts).
+  // The brief for THAT fix explicitly flagged this floor as allowed to loosen
+  // to 65% "if genuinely needed" — it now is: kinematicOmegaRate's filter
+  // means omega no longer snaps instantly to the tighter kinematic turn
+  // radius as fwdSpeed decays through the drift-entry dip (this test's
+  // Phase 2 does cross below kinematicBlendHiSpeed=6 while decelerating), so
+  // the (larger, more slip-driven) dynamic-model omega persists a beat
+  // longer before the kinematic blend fully takes over — a few extra ticks
+  // of higher lateral slip/cornering-drag before the tighter circle "grabs,"
+  // measured here as the dip going from ~86% down to ~68% of steady mean at
+  // default kinematicOmegaRate=10. This is the direct, understood
+  // consequence of trading a snappier-but-jerky kinematic response for a
+  // smoother one (the whole point of the flick fix) — not a speed-model
+  // regression elsewhere. A real regression back toward "yaw torque
+  // basically gone"/near-zero drift would still land far below this floor.
   //
   // Steady-state mean upper bound raised 6.3 -> 7.5: with accelForce cut
   // (20->17, point 3) and maxSteerAngleDeg/driftYawBonus cut (point 1), the
@@ -576,7 +596,7 @@ describe("BicyclePhysics + ContinuousDrift — Fix 1 regression: drift entry no 
   // arc/lower yaw bonus loses less speed to cornering drag per circle) — this
   // bound now just guards "steady mean stays in the same ballpark," not the
   // exact pre-2026-07-08 number.
-  it("fwdSpeed never dips below 70% of the eventual steady-state mean during drift entry", () => {
+  it("fwdSpeed never dips below 65% of the eventual steady-state mean during drift entry", () => {
     const sim = makeKartLikeSim();
     const dt = 1 / 120;
     // Phase 1: accelerate to cruise (3.5s).
@@ -590,7 +610,7 @@ describe("BicyclePhysics + ContinuousDrift — Fix 1 regression: drift entry no 
     const steadyWindow = driftSpeeds.slice(Math.round(8 / dt)); // last 4s of the 12s hold
     const steadyMean = steadyWindow.reduce((a, b) => a + b, 0) / steadyWindow.length;
     const minSpeed = Math.min(...driftSpeeds);
-    expect(minSpeed).toBeGreaterThanOrEqual(steadyMean * 0.7);
+    expect(minSpeed).toBeGreaterThanOrEqual(steadyMean * 0.65);
     // Steady-state mean itself must stay in the same ballpark — this is the
     // "don't wreck the circle" guard, not a pin to an exact legacy number.
     expect(steadyMean).toBeGreaterThan(5.0);
@@ -722,6 +742,116 @@ describe("BicyclePhysics + ContinuousDrift — steady-state drift-circle radius/
     // unreasonably wide (>6.5 m, i.e. barely turning) circle both fail.
     expect(radius).toBeGreaterThan(2.5);
     expect(radius).toBeLessThan(6.5);
+  });
+});
+
+// ─── "Reverse flick" fix regression (2026-07-10, owner-reported: hard
+// forward-cruise -> opposite-steer+reverse causes 3 body rotation-direction
+// changes in 1.3s with jerks up to 1330°/s²). See bicyclePhysics.ts step G/B
+// doc comments and tools/diag_reverse_flick.ts for the full root-cause
+// analysis (kinematicOmega overwriting this.omega outright each tick in the
+// kinematic zone, and reverseGate's old [-1.0,+0.5] window straddling the
+// fwdSpeed=0 crossing). ─────────────────────────────────────────────────────
+describe("BicyclePhysics + ContinuousDrift — reverse-flick fix regression", () => {
+  it("max |Δomega| per tick during a hard forward->reverse flick stays well clear of the pre-fix ~1330°/s² snap", () => {
+    const sim = makeKartLikeSim();
+    const dt = 1 / 120;
+    let prevOmegaDeg: number | null = null;
+    let maxStepDeg = 0;
+    let maxStepT = 0;
+    let t = 0;
+
+    // Phase 1: 2.5s forward cruise, steer left (W+D-equivalent).
+    for (let i = 0; i < Math.round(2.5 / dt); i++) {
+      const st = kartLikeTick(sim, dt, -1, 1);
+      const omegaDeg = (st.omega * 180) / Math.PI;
+      if (prevOmegaDeg !== null) {
+        const d = Math.abs(omegaDeg - prevOmegaDeg);
+        if (d > maxStepDeg) {
+          maxStepDeg = d;
+          maxStepT = t;
+        }
+      }
+      prevOmegaDeg = omegaDeg;
+      t += dt;
+    }
+    // Phase 2: instant opposite steer + reverse throttle (A+S-equivalent), 3s.
+    for (let i = 0; i < Math.round(3.0 / dt); i++) {
+      const st = kartLikeTick(sim, dt, 1, -1);
+      const omegaDeg = (st.omega * 180) / Math.PI;
+      const d = Math.abs(omegaDeg - (prevOmegaDeg as number));
+      if (d > maxStepDeg) {
+        maxStepDeg = d;
+        maxStepT = t;
+      }
+      prevOmegaDeg = omegaDeg;
+      t += dt;
+    }
+
+    // Pre-fix baseline (tools/diag_reverse_flick.ts, before this session's
+    // changes): 11.087°/s per tick (=1330.4°/s² equivalent at 120Hz).
+    // Post-fix measured: ~4.86°/s per tick (~583°/s² eq) — the residual is
+    // NOT from the kinematic-zone overwrite this fix targets; it's the
+    // dynamic tire-torque branch's own (unmodified, out of this fix's scope)
+    // response to the steer angle itself flipping sign in ~0.2-0.3s, which
+    // this fix deliberately does not touch (see bicyclePhysics.ts step G
+    // comment). This bound (900°/s² eq = 7.5°/s/tick) is set to comfortably
+    // catch a regression back toward the old ~1330 level while allowing the
+    // real, physically-driven residual — NOT a claim that this hits the
+    // aspirational ~450°/s² figure from the fix brief (flagged: unreachable
+    // via a kinematic-zone-only fix per the measured breakdown above; would
+    // need dynamic-branch changes, out of this fix's scope).
+    expect(maxStepDeg).toBeLessThan(7.5);
+    expect(maxStepDeg * 120).toBeLessThan(900);
+  });
+
+  it("stationary kart: omega stays 0 regardless of steer input (kinematic formula is 0 at fwdSpeed=0, filter has nothing to relax toward)", () => {
+    const bike = new BicyclePhysics(DEFAULT_KART_PHYSICS_PARAMS, DEFAULT_AXLE_GEOMETRY);
+    const velocity = { x: 0, y: 0, z: 0 };
+    for (const steer of [-1, -0.5, 0.3, 1]) {
+      bike.reset();
+      for (let i = 0; i < 120; i++) {
+        const state = bike.step(freshInput({ velocity, throttle: 0, steerInput: steer }), DT);
+        expect(state.omega).toBeCloseTo(0, 9);
+      }
+    }
+  });
+
+  it("at/above kinematicBlendHiSpeed (kinematicBlend=1) a single step's omega is byte-identical to the pre-fix formula — the kinematic filter never participates at high speed", () => {
+    const p = DEFAULT_KART_PHYSICS_PARAMS;
+    const bike = new BicyclePhysics(p, DEFAULT_AXLE_GEOMETRY);
+    const fwdSpeedIn = p.kinematicBlendHiSpeed + 2; // comfortably in the fully-dynamic zone
+    const velocity = { x: 0, y: 0, z: -fwdSpeedIn };
+    const input = freshInput({ velocity, throttle: 1, steerInput: 1 });
+    const state = bike.step(input, DT);
+
+    // Reproduce the OLD (pre-fix) formula independently: at kinematicBlend=1
+    // the lerp(omegaKinFiltered, omegaDynamic, 1) collapses to omegaDynamic
+    // regardless of what omegaKinFiltered is — bit-for-bit identical to the
+    // old `lerp(kinematicOmega, omegaDynamic, 1) === omegaDynamic` behavior.
+    // This test asserts that collapse actually holds (not e.g. a floating-
+    // point NaN/branch difference) by independently recomputing omegaDynamic
+    // from the same tire-force formulas (steps C-F) and comparing.
+    const maxAngleRad = (p.maxSteerAngleDeg * Math.PI) / 180;
+    const spdRatio = Math.min(Math.max(fwdSpeedIn / p.maxSpeed, 0), 1);
+    const steerMult = p.steerLowSpeedMult + (p.steerHighSpeedMult - p.steerLowSpeedMult) * spdRatio;
+    const reverseGate = 1; // fwdSpeed > 0, comfortably above the reverseGate window either old or new
+    const reverseSteerMult = p.reverseSteerGain * (1 - reverseGate) + 1 * reverseGate;
+    const steerAngle = 1 * maxAngleRad * steerMult * reverseSteerMult;
+    const halfWb = DEFAULT_AXLE_GEOMETRY.wheelbase * 0.5;
+    const vLatFront = 0 - 0 * halfWb; // sideSpeed=0, omega=0 initially (fresh bike)
+    const vLatRear = 0 + 0 * halfWb;
+    const vWheelLatFront = vLatFront * Math.cos(steerAngle) + fwdSpeedIn * Math.sin(steerAngle);
+    const sat = Math.max(p.tireSaturationSpeed, 0.1);
+    const rearGripEff = p.rearGripStiffness * Math.max(1, 0);
+    const fFront = -p.frontGripStiffness * Math.tanh(vWheelLatFront / sat) * sat;
+    const fRearTotal = 2 * (-rearGripEff * Math.tanh(vLatRear / sat) * sat);
+    const torque = (fRearTotal - fFront) * halfWb;
+    const moi = p.mass * halfWb * halfWb * Math.max(p.inertiaScale, 0.01);
+    const omegaAccel = torque / Math.max(moi, 0.001);
+    const omegaDynamicExpected = (0 + omegaAccel * DT) * Math.exp(-p.omegaDamping * DT);
+
+    expect(state.omega).toBeCloseTo(omegaDynamicExpected, 9);
   });
 });
 

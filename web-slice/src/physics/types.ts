@@ -82,6 +82,19 @@ export interface KartPhysicsParams {
   kinematicBlendHiSpeed: number; // KINEMATIC_BLEND_HI_SPEED — at/over this, pure dynamic tire model
   kinematicLateralMute: number; // KINEMATIC_LATERAL_MUTE — residual tire-force sideways push at full-kinematic speed
 
+  // Yaw-inertia filter rate for the kinematic low-speed zone (owner-reported
+  // "reverse flick" bug, 2026-07-10 — see bicyclePhysics.ts step G doc
+  // comment for the full mechanism). Human-readable per
+  // .claude/rules/param-tuner-descriptions.md: "Насколько быстро корпус
+  // 'догоняет' направление, в которое смотрят колёса на малой скорости
+  // (парковка, реверс, у самого нуля скорости). Выше — руль у нуля скорости
+  // отзывается почти мгновенно, как раньше. Ниже — корпус ощущается тяжелее
+  // и приходит к нужному вращению плавнее, особенно заметно если резко
+  // бросить руль в другую сторону или дать по тормозам с реверсом." При
+  // kinematicBlend=1 (машинка едет быстрее kinematicBlendHiSpeed) этот
+  // фильтр вообще не участвует — там всё как раньше, без изменений.
+  kinematicOmegaRate: number; // KINEMATIC_OMEGA_RATE
+
   // Drift signal shaping (bicycle_physics.gd J/K steps)
   driftMinSpeed: number; // DRIFT_MIN_SPEED
   slipSmoothing: number; // SLIP_SMOOTHING
@@ -420,6 +433,13 @@ export const DEFAULT_KART_PHYSICS_PARAMS: KartPhysicsParams = {
   kinematicBlendLoSpeed: 1.5,
   kinematicBlendHiSpeed: 6,
   kinematicLateralMute: 0.1,
+  // 10.0 (2026-07-10 "reverse flick" fix, see field doc comment above and
+  // tools/diag_reverse_flick.ts). Time constant ~0.1s — fast enough that
+  // ordinary low-speed steering (parking, drift entry/exit at low fwdSpeed)
+  // reads as immediate as before, but long enough to smooth away the
+  // instant sign-flip kinematicOmega makes when both steerAngle and
+  // fwdSpeed flip sign together in a hard reversal.
+  kinematicOmegaRate: 10.0,
 
   driftMinSpeed: 2.5,
   slipSmoothing: 5,

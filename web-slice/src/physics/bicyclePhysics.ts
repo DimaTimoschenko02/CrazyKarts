@@ -110,11 +110,26 @@ export class BicyclePhysics {
     // Reverse maneuverability fix (see types.ts reverseSteerGain doc comment
     // and tools/diagnose_reverse.ts FACT 2): continuously scale up the
     // effective steer angle as fwdSpeed goes negative. `reverseGate` is 1
-    // (no change) at/above +0.5 m/s and 0 (full reverseSteerGain applied) at
-    // /below -1.0 m/s — a narrow window straddling standstill so a normal
-    // forward cruise is completely unaffected, and there's no discrete
-    // forward/reverse branch (smooth-values rule).
-    const reverseGate = smoothstep(-1.0, 0.5, fwdSpeed);
+    // (no change) at/above -0.3 m/s and 0 (full reverseSteerGain applied) at
+    // /below -1.5 m/s.
+    //
+    // Window moved 2026-07-10 (owner-reported "reverse flick" bug, see
+    // tools/diag_reverse_flick.ts): the old [-1.0, +0.5] window straddled
+    // fwdSpeed=0 on BOTH sides, so reverseSteerGain (2.5x at old defaults)
+    // started blowing up steerAngle while the kart was still coasting
+    // FORWARD (fwdSpeed<+0.5) — a normal forward cruise with the wheel held
+    // was never touched, but a hard reversal (forward cruise -> opposite
+    // steer + reverse throttle) rode straight through that window exactly
+    // while fwdSpeed was crossing zero, tripling steerAngle in ~0.18s right
+    // where tan(steerAngle) is most sensitive and the kinematic omega term
+    // (step G) is also flipping sign — the two effects compounded into the
+    // reported yaw judder. The new [-1.5, -0.3] window only starts engaging
+    // once the kart is ALREADY moving backward (fwdSpeed<-0.3), so it no
+    // longer overlaps the zero-crossing transient at all; full gain is
+    // reached at -1.5 m/s (was -1.0), a modest, deliberate widening so the
+    // ramp-up is no faster than before. Reused below for cdReverseMult
+    // (reverseCorneringDragFloor) — same shifted window, still one knob.
+    const reverseGate = smoothstep(-1.5, -0.3, fwdSpeed);
     const reverseSteerMult = lerp(p.reverseSteerGain, 1, reverseGate);
     const steerAngle = inp.steerInput * maxAngleRad * steerMult * reverseSteerMult;
 
@@ -169,9 +184,30 @@ export class BicyclePhysics {
     // at/over kinematicBlendHiSpeed. No standalone "standstill steering aid"
     // is needed anymore — at fwdSpeed=0 the kinematic formula itself is 0,
     // so a stationary kart never yaws from steering input alone.
+    // Yaw inertia in the kinematic zone (owner-reported "reverse flick" bug,
+    // 2026-07-10 — see tools/diag_reverse_flick.ts). Before this fix, when
+    // kinematicBlend < 1 this.omega was overwritten wholesale by
+    // kinematicOmega every tick, which has NO memory of the body's own
+    // rotation — it's a pure function of fwdSpeed and steerAngle. On a fast
+    // steer flip AND a fwdSpeed sign flip happening together (hard reversal),
+    // kinematicOmega itself flips sign near-instantly, and because it was
+    // written straight into this.omega (not filtered), the visible body
+    // yaw-rate flipped just as fast — a discrete-feeling jerk, exactly the
+    // "smooth-values" rule case #3 (binary state flip driving continuous
+    // physics), just via a continuously-recomputed target rather than an
+    // if/else. Fix: treat kinematicOmega as a TARGET the existing omega
+    // relaxes toward (exponential filter, framerate-independent per
+    // .claude/rules/smooth-values.md #2/#3) instead of a value that
+    // overwrites it outright. kinematicOmegaRate is the filter's rate
+    // constant — this.omega itself is the only persistent state needed, no
+    // new field. At kinematicBlend=1 (fwdSpeed >= kinematicBlendHiSpeed) this
+    // filtered value is fully discarded by the blend lerp below anyway, so
+    // high-speed/dynamic-model behavior is untouched bit-for-bit.
     const kinematicOmega = (fwdSpeed / this.wheelbase) * Math.tan(steerAngle);
+    const kinAlpha = 1 - Math.exp(-p.kinematicOmegaRate * delta);
+    const omegaKinFiltered = lerp(this.omega, kinematicOmega, kinAlpha);
     const kinematicBlend = smoothstep(p.kinematicBlendLoSpeed, p.kinematicBlendHiSpeed, Math.abs(fwdSpeed));
-    this.omega = lerp(kinematicOmega, omegaDynamic, kinematicBlend);
+    this.omega = lerp(omegaKinFiltered, omegaDynamic, kinematicBlend);
 
     // H. Apply lateral tire forces to body velocity — muted in the kinematic
     // zone (see step G): a car turning purely by kinematic nose-tracking
