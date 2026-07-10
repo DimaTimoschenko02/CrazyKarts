@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { snapOffsetFromSurface, worldPointToCell } from "./snapCell";
+import { snapOffsetFromSurface, worldPointToCell, snapLevelCapY, resolveSnapPlacement } from "./snapCell";
 import { Heightfield, tileBottomY, type MapJson } from "../shared/heightfield";
 
 describe("worldPointToCell", () => {
@@ -102,5 +102,110 @@ describe("snapOffsetFromSurface — snap-to-surface fractional y_offset", () => 
     expect(tileBottomY("terrain")).toBeNull();
     const offset = snapOffsetFromSurface({ floorHeight: 0.5, yLevel: 0, levelHeight: 0.5, bottomY: null });
     expect(offset).toBeCloseTo(0.5, 6);
+  });
+});
+
+describe("snapLevelCapY — highest surface the snap picker may target (regression #1, Q/E dead in snap mode)", () => {
+  const LEVEL_HEIGHT = 1.1; // roads preset
+
+  it("caps at the top of the active level's band (plus epsilon)", () => {
+    expect(snapLevelCapY(0, LEVEL_HEIGHT)).toBeCloseTo(1.11, 6);
+    expect(snapLevelCapY(2, LEVEL_HEIGHT)).toBeCloseTo(3.3 + 0.01, 6);
+  });
+
+  it("rejects a bridge deck above the active level but accepts the floor beneath it", () => {
+    // Deck top at 2.2 (level 2 boundary), floor top at 0.55, user on y_level 0.
+    const cap = snapLevelCapY(0, LEVEL_HEIGHT);
+    expect(2.2 <= cap).toBe(false); // deck hit filtered out
+    expect(0.55 <= cap).toBe(true); // floor hit accepted
+  });
+
+  it("accepts a surface sitting exactly on the level boundary (epsilon)", () => {
+    // A full-height block top lands exactly at (yLevel+1)*levelHeight —
+    // float-exact boundary must still be targetable at that level.
+    expect(1.1 <= snapLevelCapY(0, LEVEL_HEIGHT)).toBe(true);
+  });
+});
+
+describe("resolveSnapPlacement — layer bump so snap never overwrites its support (regression #2)", () => {
+  const LEVEL_HEIGHT = 1.1; // roads preset (tile_size 3 irrelevant here)
+
+  it("tree glued onto grass: support at y_level 0 stays, tree lands on y_level 1 with y_offset -0.55", () => {
+    // Grass at (x,z,0), walkable top 0.55m; tree's mesh bottom is its pivot (0).
+    const occupied = new Set([0]);
+    const placed = resolveSnapPlacement({
+      yLevel: 0,
+      levelHeight: LEVEL_HEIGHT,
+      floorHeight: 0.55,
+      bottomY: 0,
+      isLevelOccupied: lvl => occupied.has(lvl),
+    });
+    expect(placed.yLevel).toBe(1);
+    expect(placed.yOffset).toBeCloseTo(-0.55, 6);
+    // World bottom is unchanged by the bump: still exactly the grass top.
+    expect(placed.yLevel * LEVEL_HEIGHT + 0 + placed.yOffset).toBeCloseTo(0.55, 6);
+  });
+
+  it("keeps the requested level when it is free (no support cell in the way)", () => {
+    const placed = resolveSnapPlacement({
+      yLevel: 0,
+      levelHeight: LEVEL_HEIGHT,
+      floorHeight: 0.55,
+      bottomY: 0,
+      isLevelOccupied: () => false,
+    });
+    expect(placed.yLevel).toBe(0);
+    expect(placed.yOffset).toBeCloseTo(0.55, 6);
+  });
+
+  it("skips PAST several occupied layers to the first free one, world height still unchanged", () => {
+    const occupied = new Set([0, 1, 2]);
+    const placed = resolveSnapPlacement({
+      yLevel: 0,
+      levelHeight: LEVEL_HEIGHT,
+      floorHeight: 2.75, // top of a 2.5-level stack
+      bottomY: 0,
+      isLevelOccupied: lvl => occupied.has(lvl),
+    });
+    expect(placed.yLevel).toBe(3);
+    expect(placed.yOffset).toBeCloseTo(2.75 - 3 * LEVEL_HEIGHT, 6);
+    expect(placed.yLevel * LEVEL_HEIGHT + placed.yOffset).toBeCloseTo(2.75, 6);
+  });
+
+  it("accounts for a non-zero baked bottom (bottomY) in the recomputed offset", () => {
+    const placed = resolveSnapPlacement({
+      yLevel: 0,
+      levelHeight: LEVEL_HEIGHT,
+      floorHeight: 0.55,
+      bottomY: 0.2,
+      isLevelOccupied: lvl => lvl === 0,
+    });
+    // worldBottom = yLevel*LH + bottomY + yOffset must equal floorHeight.
+    expect(placed.yLevel).toBe(1);
+    expect(placed.yLevel * LEVEL_HEIGHT + 0.2 + placed.yOffset).toBeCloseTo(0.55, 6);
+  });
+
+  it("null bottomY (space-kit pivot-bottom asset) behaves as bottomY 0", () => {
+    const placed = resolveSnapPlacement({
+      yLevel: 0,
+      levelHeight: 0.5,
+      floorHeight: 0.5,
+      bottomY: null,
+      isLevelOccupied: lvl => lvl === 0,
+    });
+    expect(placed.yLevel).toBe(1);
+    expect(placed.yOffset).toBeCloseTo(0, 6);
+  });
+
+  it("terminates via maxLevels against a pathological always-occupied column", () => {
+    const placed = resolveSnapPlacement({
+      yLevel: 0,
+      levelHeight: 1.1,
+      floorHeight: 0.55,
+      bottomY: 0,
+      isLevelOccupied: () => true,
+      maxLevels: 8,
+    });
+    expect(placed.yLevel).toBe(8);
   });
 });

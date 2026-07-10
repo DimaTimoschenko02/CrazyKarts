@@ -17,7 +17,7 @@ import type { MapJson } from "../map/mapLoader";
 import { TWO_CELL_ASSETS, longAxis, Heightfield, tileBottomY } from "../shared/heightfield";
 import { shouldDeletePropFirst, topCellYLevelAt } from "./deletePriority";
 import { cellsAlongLine } from "./paintLine";
-import { worldPointToCell, snapOffsetFromSurface } from "./snapCell";
+import { worldPointToCell, snapOffsetFromSurface, snapLevelCapY, resolveSnapPlacement } from "./snapCell";
 import { filterBrowserAssets, type BrowserAssetInfo, type BrowserFilterState } from "./assetBrowserFilter";
 // Palette data (categories/items/isProp) is shared with the game's preload
 // list (src/main.ts) — see shared/mapAssets.ts header comment for why.
@@ -249,7 +249,24 @@ function boxMarkerKey(x: number, z: number, yLevel: number): string {
 // height exactly to delete a mistake). Returns null if the column is empty.
 function cellKeyToDelete(x: number, z: number, activeY: number): string | null {
   const exact = cellKey(x, z, activeY);
-  if (cells.has(exact)) return exact;
+  if (cells.has(exact)) {
+    // Snap-attached records above the active layer come off FIRST (owner
+    // regression 2026-07-10 #2 follow-up): a tree glued onto grass lives one
+    // layer up with a y_offset (see buildPlacementRecord), so a delete aimed
+    // at the grass cell must peel the visible attachment on top, not yank the
+    // support out from under it. Only records carrying y_offset qualify —
+    // plain stacked layers (wall blocks etc.) keep the surgical
+    // "active-level first" behavior unchanged.
+    let attachKey: string | null = null;
+    let attachY = -Infinity;
+    for (const [key, rec] of cells) {
+      if (rec.x === x && rec.z === z && rec.y_level > activeY && rec.y_offset !== undefined && rec.y_level > attachY) {
+        attachY = rec.y_level;
+        attachKey = key;
+      }
+    }
+    return attachKey ?? exact;
+  }
   let topKey: string | null = null;
   let topY = -Infinity;
   for (const [key, rec] of cells) {
@@ -1008,14 +1025,30 @@ function getSnapHeightfield(): Heightfield {
 // sank roadTile_019 trees ~1m under the grass they were aimed at.
 function computeSnapOffset(asset: string, x: number, z: number, yLvl: number): number | null {
   if (!snapToSurface) return 0;
-  const worldX = (x - HALF) * TILE_SIZE;
-  const worldZ = (z - HALF) * TILE_SIZE;
   return snapOffsetFromSurface({
-    floorHeight: getSnapHeightfield().sample(worldX, worldZ),
+    floorHeight: computeSnapFloorHeight(x, z, yLvl),
     yLevel: yLvl,
     levelHeight: LEVEL_HEIGHT,
     bottomY: tileBottomY(asset),
   });
+}
+
+// The already-placed surface height (world meters) snap attaches to at cell
+// (x, z) while the user's active level is yLvl — the HIGHEST authored floor
+// at/below the level's band cap (snapLevelCapY), or null when the column has
+// no surface within reach. Uses the layer-aware sampleAt (not the plain
+// MAX-of-layers sample) for the same reason raycastSnapCell filters its ray
+// hits (owner regression 2026-07-10 #1): with the cursor under a bridge and
+// y_level 0 the snap target must be the floor BENEATH the deck, not the deck
+// itself. sampleAt falls back to the column's lowest floor when everything is
+// above the cap — that fallback is above the cap by construction, so the
+// post-check turns it into "nothing to snap to" (null) instead.
+function computeSnapFloorHeight(x: number, z: number, yLvl: number): number | null {
+  const worldX = (x - HALF) * TILE_SIZE;
+  const worldZ = (z - HALF) * TILE_SIZE;
+  const capY = snapLevelCapY(yLvl, LEVEL_HEIGHT);
+  const floor = getSnapHeightfield().sampleAt(worldX, worldZ, capY, 0);
+  return floor !== null && floor <= capY ? floor : null;
 }
 
 // Position + rotation + scale for a placed prop object — mirrors
@@ -1424,9 +1457,20 @@ function raycastSnapCell(): { x: number; z: number } | null {
   raycaster.setFromCamera(ndc, camera);
   const candidates: THREE.Object3D[] = [...cellObjs.values(), ...propObjs];
   const hits = raycaster.intersectObjects(candidates, true);
-  if (hits.length === 0) return null;
-  const point = hits[0].point;
-  return worldPointToCell(point.x, point.z, TILE_SIZE, HALF, GRID_SIZE);
+  // Owner regression 2026-07-10 #1: taking hits[0] unconditionally always
+  // targeted the HIGHEST surface along the ray (bridge deck, wall top),
+  // making Q/E level selection dead in snap mode. Hits come back sorted by
+  // distance, so take the first one at/below the active level's band cap —
+  // aiming under a bridge with y_level 0 skips the deck and picks the floor
+  // beneath; Q/E up to the deck's level targets the deck again. See
+  // snapLevelCapY's doc in snapCell.ts.
+  const capY = snapLevelCapY(yLevel, LEVEL_HEIGHT);
+  for (const hit of hits) {
+    if (hit.point.y <= capY) {
+      return worldPointToCell(hit.point.x, hit.point.z, TILE_SIZE, HALF, GRID_SIZE);
+    }
+  }
+  return null;
 }
 
 function updatePreciseStatusBar(): void {
@@ -2061,22 +2105,55 @@ function finishEraseStroke(): void {
   scheduleAutosave();
 }
 
+// The CellRecord a placement at (x, z) actually writes — including where in
+// the column it lives. Without snap this is just the active y_level. With
+// snap on and a surface in reach, the y_level may get BUMPED to the first
+// free layer so the record never overwrites the cell it's being glued onto
+// (owner regression 2026-07-10 #2 — "приклеил дерево к траве, трава
+// пропала"), with y_offset recomputed so the world height is unchanged; see
+// resolveSnapPlacement's doc in snapCell.ts. When snap is on but finds no
+// surface (null), the record stays at the plain y_level with no y_offset key
+// — same "snap: n/a" semantics the status bar shows.
+function buildPlacementRecord(asset: string, x: number, z: number, rot: number): CellRecord {
+  const rec: CellRecord = { asset, x, z, y_level: yLevel, rot };
+  if (mirrorState) rec.mirror = true;
+  if (!snapToSurface) return rec;
+  const floorHeight = computeSnapFloorHeight(x, z, yLevel);
+  if (floorHeight === null) return rec;
+  const placed = resolveSnapPlacement({
+    yLevel,
+    levelHeight: LEVEL_HEIGHT,
+    floorHeight,
+    bottomY: tileBottomY(asset),
+    isLevelOccupied: lvl => cells.has(cellKey(x, z, lvl)),
+  });
+  rec.y_level = placed.yLevel;
+  if (placed.yOffset !== 0) rec.y_offset = placed.yOffset;
+  return rec;
+}
+
 function paintCellAt(stroke: PaintStroke, x: number, z: number): void {
   if (!activeAsset) return;
-  const key = cellKey(x, z, yLevel);
+  const rot = ROT_CYCLE[rotIndex];
+  const rec = buildPlacementRecord(activeAsset, x, z, rot);
+  // Key by the level the record actually lands on (may be snap-bumped above
+  // the active level — see buildPlacementRecord), so the undo entry and the
+  // dedup set both address the layer that really changed.
+  const key = cellKey(rec.x, rec.z, rec.y_level);
   if (stroke.painted.has(key)) return;
   stroke.painted.add(key);
-  const rot = ROT_CYCLE[rotIndex];
   const before = cells.get(key) ?? null;
   // Re-placing an identical tile is a visual no-op — skip it so the stroke's
   // undo batch doesn't fill up with entries that restore what's already there.
-  if (before && before.asset === activeAsset && before.rot === rot && !!before.mirror === mirrorState) return;
-  const rec: CellRecord = { asset: activeAsset, x, z, y_level: yLevel, rot };
-  if (mirrorState) rec.mirror = true;
-  // null (snap found no surface) and 0 both mean "no fractional shift" —
-  // the record stays at its plain y_level height, no y_offset key written.
-  const offset = computeSnapOffset(activeAsset, x, z, yLevel);
-  if (offset !== null && offset !== 0) rec.y_offset = offset;
+  if (
+    before &&
+    before.asset === rec.asset &&
+    before.rot === rec.rot &&
+    !!before.mirror === !!rec.mirror &&
+    (before.y_offset ?? 0) === (rec.y_offset ?? 0)
+  ) {
+    return;
+  }
   placeCell(rec);
   stroke.batch.push({ kind: "cell", key, before, after: rec });
 }
@@ -2184,14 +2261,11 @@ renderer.domElement.addEventListener("pointerdown", e => {
       scheduleAutosave();
     } else if (TWO_CELL_ASSETS.has(activeAsset)) {
       // 2-cell pieces stay click-to-place: dragging them would stamp
-      // overlapping copies one cell apart.
-      const key = cellKey(lastCellX, lastCellZ, yLevel);
+      // overlapping copies one cell apart. Same snap-aware level/offset
+      // resolution as paintCellAt (buildPlacementRecord).
+      const rec = buildPlacementRecord(activeAsset, lastCellX, lastCellZ, rot);
+      const key = cellKey(rec.x, rec.z, rec.y_level);
       const before = cells.get(key) ?? null;
-      const rec: CellRecord = { asset: activeAsset, x: lastCellX, z: lastCellZ, y_level: yLevel, rot };
-      if (mirrorState) rec.mirror = true;
-      // Same null/0 handling as paintCellAt — no surface means no shift.
-      const offset = computeSnapOffset(activeAsset, lastCellX, lastCellZ, yLevel);
-      if (offset !== null && offset !== 0) rec.y_offset = offset;
       placeCell(rec);
       pushUndo({ kind: "cell", key, before, after: rec });
       scheduleAutosave();

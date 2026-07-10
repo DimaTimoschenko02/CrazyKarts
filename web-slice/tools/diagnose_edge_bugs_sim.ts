@@ -99,8 +99,14 @@ function simulate(name: string, start: { x: number; z: number; yaw: number; spee
     );
     const groundHeightNow = wallAwareGroundHeight(probes, yRef, P.layerClimbThreshold);
     const detachRef = probes.center ?? groundHeightNow;
+    // Mirror kart.ts step 8b-vertical exactly — leadingProbeHeight by sign of
+    // travel direction (this diagnostic previously omitted it, which meant it
+    // was silently exercising the OLD groundHeight-AND-detachRef gate, not
+    // the D2-followup gate kart.ts actually runs in production).
+    const fwdSigned = k.vx * fwd.x + k.vz * fwd.z;
+    const leadingProbeHeightNow = fwdSigned >= 0 ? probes.hF : probes.hB;
     const vPrev = k.vertical;
-    k.vertical = stepVertical(vPrev, { groundHeight: groundHeightNow, detachRefHeight: detachRef, dt: DT }, {
+    k.vertical = stepVertical(vPrev, { groundHeight: groundHeightNow, detachRefHeight: detachRef, leadingProbeHeight: leadingProbeHeightNow, dt: DT }, {
       gravity: P.verticalGravity,
       groundFollowRate: P.verticalGroundFollowRate,
       airborneDropThreshold: P.verticalAirborneDropThreshold,
@@ -202,4 +208,18 @@ if (scenario === "B4") {
   for (let z = 13.0; z >= 8.9; z -= 0.25) console.log("  z=" + z.toFixed(2), "h=", hf.sample(34.5, z)?.toFixed(3), "sampleAt(yRef=2.75)=", hf.sampleAt(34.5, z, 2.75, 0.8)?.toFixed(3));
   simulate("B4: drive deck strip north across elevated canal, 7 m/s", { x: 34.5, z: 16.5, yaw: 0, speed: 7 }, 250, { logEvery: 15 });
   simulate("B5: creep to canal edge, 1.2 m/s", { x: 34.5, z: 13.5, yaw: 0, speed: 1.2 }, 500, { logEvery: 40 });
+}
+
+// ── Regression repro (2026-07-10 playtest): "падает сквозь текстуру и
+// застревает" on a SLOW approach to a real road-tile slope. roadTile_018
+// slope found via tools/scan_slope_tmp.ts: continuous descent along +Z at
+// x=40.5, from h≈1.79 at z=14.5 down to h=0.55 at z=18.0 (grade ≈0.35,
+// matches the catalog's rise=1.1/tile_size=3). yaw=180° (fwd=(0,+1)) drives
+// straight down the slope. Slow speeds per owner report (0.5-1.5 m/s).
+if (scenario === "all" || scenario === "C") {
+  console.log("slope profile along z at x=40.5 (top->bottom):");
+  for (let z = 13.0; z <= 19.0; z += 0.5) console.log("  z=" + z.toFixed(1), "h=", hf.sample(40.5, z)?.toFixed(3));
+  simulate("C1: slow descent down real slope, 0.6 m/s", { x: 40.5, z: 12.5, yaw: Math.PI, speed: 0.6 }, 900, { logEvery: 30 });
+  simulate("C2: slow descent down real slope, 1.2 m/s", { x: 40.5, z: 12.5, yaw: Math.PI, speed: 1.2 }, 600, { logEvery: 20 });
+  simulate("C3: crawl descent, 0.3 m/s", { x: 40.5, z: 12.5, yaw: Math.PI, speed: 0.3 }, 1800, { logEvery: 60 });
 }

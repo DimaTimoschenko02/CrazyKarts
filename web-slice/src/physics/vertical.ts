@@ -107,6 +107,19 @@ export interface VerticalState {
   // meaningful to callers; null only before the first tick / first ground
   // sample.
   groundHeightPrev: number | null;
+  // D2 slope-bias fix (2026-07-10, "падает сквозь текстуру на медленном
+  // съезде с рампы" regression — see stepVertical's D2 gate doc below for the
+  // full derivation). A SEPARATE exp-follow tracker of the CONTINUOUS
+  // detachRef/leadingRef signal (the body's own center probe), evolved with
+  // the exact same follow-lag SHAPE as `y` but anchored to detachRef instead
+  // of `groundHeight` (the wall-aware MAX of every F/B/R/L probe, which `y`
+  // itself follows). Optional — every pre-existing VerticalState literal
+  // (tests constructing `{ y, vy, airborne, groundHeightPrev }` by hand)
+  // falls back to `state.y` wherever this is read (see stepVertical), so
+  // omitting it reproduces the OLD "compare against y" behavior exactly —
+  // only a caller/test that legitimately diverges groundHeight from
+  // detachRef needs this field to behave correctly.
+  detachFollowY?: number;
 }
 
 export interface VerticalInput {
@@ -164,7 +177,7 @@ export interface VerticalInput {
 }
 
 export function createVerticalState(y: number): VerticalState {
-  return { y, vy: 0, airborne: false, groundHeightPrev: null };
+  return { y, vy: 0, airborne: false, groundHeightPrev: null, detachFollowY: y };
 }
 
 export function stepVertical(state: VerticalState, inp: VerticalInput, p: VerticalParams): VerticalState {
@@ -175,7 +188,7 @@ export function stepVertical(state: VerticalState, inp: VerticalInput, p: Vertic
       // No ground info under the kart — fail safe into freefall (carrying
       // whatever vertical rate we had) rather than staying glued to a stale
       // height forever. Shouldn't happen in practice (see VerticalInput doc).
-      return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: state.groundHeightPrev };
+      return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: state.groundHeightPrev, detachFollowY: state.detachFollowY ?? state.y };
     }
 
     // D3: the launch/detach checks below read the CONTINUOUS center probe
@@ -184,6 +197,14 @@ export function stepVertical(state: VerticalState, inp: VerticalInput, p: Vertic
     // caller has no center reading (defensive; kart.ts's own call site
     // already applies the same fallback at the source).
     const detachRef = inp.detachRefHeight ?? inp.groundHeight;
+
+    // D2 slope-bias fix (2026-07-10, owner playtest: "падает сквозь текстуру
+    // на медленном съезде, потом застревает"). `followAlpha`/`detachFollowY`
+    // moved up here (used to live right before candidateY, below) because the
+    // D2 positional gate now needs them too — see that gate's own doc for why.
+    const followAlpha = 1 - Math.exp(-p.groundFollowRate * dt);
+    const detachFollowYIn = state.detachFollowY ?? state.y;
+    const detachFollowY = detachFollowYIn + (detachRef - detachFollowYIn) * followAlpha;
 
     // Raw, unsmoothed rate-of-rise of the sampled ground this tick. null
     // previous sample (first tick ever) means "unknown" — treat as matching
@@ -198,7 +219,7 @@ export function stepVertical(state: VerticalState, inp: VerticalInput, p: Vertic
       // ground sample); vy carries the last ground-following rate, which is
       // exactly the trampoline effect for a kart still climbing when the
       // ramp ends, or a near-level launch when walking off a flat cliff.
-      return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: detachRef };
+      return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: detachRef, detachFollowY };
     }
 
     // D2 positional detachment — see header comment above. Only fires when
@@ -233,11 +254,45 @@ export function stepVertical(state: VerticalState, inp: VerticalInput, p: Vertic
     // A genuine crest/cliff/straddle drops both.
     const usesLeadingGate = inp.leadingProbeHeight !== undefined;
     const leadingRef = usesLeadingGate ? (inp.leadingProbeHeight ?? detachRef) : inp.groundHeight;
-    if (detachRef < state.y - p.groundSnapDistance && leadingRef < state.y - p.groundSnapDistance) {
-      return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: detachRef };
+    // ANCHOR FIX (2026-07-10, root cause of the falls-through-slope
+    // regression): this gate used to compare detachRef/leadingRef against
+    // `state.y` directly — but `state.y` follows `groundHeight`, the
+    // wall-aware MAX of every F/B/R/L probe (I3's "mount the highest contact
+    // point" model). On an perfectly ordinary, perfectly solid CONTINUOUS
+    // slope (not a crest, not a cliff — e.g. any roadTile_* descent), the
+    // UPHILL probe (rear while descending) reads structurally HIGHER than
+    // the center/leading (downhill) probes by roughly
+    // halfWheelbase*slopeGrade — a STATIC, non-diverging offset with nothing
+    // to do with the body actually leaving the ground (measured ~0.3m on
+    // roads_v1's 20° slope tiles vs. the OLD 0.07m groundSnapDistance — the
+    // gate fired on literally every tick once state.y settled near that
+    // rear-biased height, producing a continuous detach/land/detach "pogo"
+    // that reads exactly like clipping through the floor and getting stuck,
+    // repeating for the entire length of any slope tile at ANY speed).
+    // `detachFollowY` (computed above) is a SEPARATE exp-follow tracker with
+    // the identical follow-lag SHAPE as `y`, but anchored to `detachRef`
+    // (the center probe) instead of `groundHeight` — on a straight slope
+    // detachRef IS the physically correct "where's the ground at my own
+    // center" answer (a rigid chassis tilted to match a uniform grade has
+    // its belly-center exactly on the slope, not propped up by whichever
+    // wheel happens to be uphill), so detachFollowY tracks it with only the
+    // SAME small follow-lag the original convex-crest test already exercises
+    // (~0.08-0.2m, well under any real "hovering over air" gap) — no static
+    // slope bias baked in. A genuine crest/cliff still detaches: on a real
+    // ridge the gap between detachRef and its own recent trend keeps GROWING
+    // (matching the existing "moderate crest eventually detaches" test,
+    // which is byte-for-byte unaffected by this change — see below), unlike
+    // a straight slope's bounded, constant gap.
+    // Byte-identical for every pre-existing caller/test that never diverges
+    // groundHeight from detachRef (the overwhelming majority of
+    // vertical.test.ts): when groundHeight===detachRef every tick,
+    // detachFollowY and state.y chase the IDENTICAL target sequence with the
+    // IDENTICAL alpha from the IDENTICAL start value — they're mathematically
+    // the same trajectory, so this anchor swap is a pure no-op there.
+    if (detachRef < detachFollowY - p.groundSnapDistance && leadingRef < detachFollowY - p.groundSnapDistance) {
+      return { y: state.y, vy: state.vy, airborne: true, groundHeightPrev: detachRef, detachFollowY };
     }
 
-    const followAlpha = 1 - Math.exp(-p.groundFollowRate * dt);
     const candidateY = state.y + (inp.groundHeight - state.y) * followAlpha;
     const impliedVy = (candidateY - state.y) / Math.max(dt, 1e-6);
     // D3 second half: `vy` here is pure bookkeeping (launch detector input +
@@ -257,7 +312,7 @@ export function stepVertical(state: VerticalState, inp: VerticalInput, p: Vertic
     // groundRateNow above stays an apples-to-apples rate over the SAME
     // continuous signal — mixing the two would reintroduce a one-tick
     // discontinuity right at a grounded/launch-check boundary.
-    return { y: candidateY, vy: vyStored, airborne: false, groundHeightPrev: detachRef };
+    return { y: candidateY, vy: vyStored, airborne: false, groundHeightPrev: detachRef, detachFollowY };
   }
 
   // Airborne: ballistic, no ground-follow, no re-derivation from input.
@@ -301,7 +356,49 @@ export function stepVertical(state: VerticalState, inp: VerticalInput, p: Vertic
     : inp.groundHeight;
 
   if (landingRef !== null && vy <= 0 && y <= landingRef + p.landingMargin) {
-    return { y: landingRef, vy: 0, airborne: false, groundHeightPrev }; // no bounce
+    // D2 slope-bias fix (2026-07-10): reseed detachFollowY to the freshly-
+    // landed height on touchdown, same "no bounce, no inherited lag" reset
+    // vy already gets — an in-flight detachFollowY value (frozen since the
+    // launch, see the airborne no-op return below) would otherwise carry a
+    // stale lag into the very first grounded tick after landing and could
+    // misfire the D2 gate immediately.
+    return { y: landingRef, vy: 0, airborne: false, groundHeightPrev, detachFollowY: landingRef }; // no bounce
   }
-  return { y, vy, airborne: true, groundHeightPrev };
+  // Airborne, still falling/rising: detachFollowY is frozen (no ground-follow
+  // while airborne, same convention as `y` itself) — carried over unchanged.
+  return { y, vy, airborne: true, groundHeightPrev, detachFollowY: state.detachFollowY ?? state.y };
+}
+
+// Post-step safety invariant (owner requirement, 2026-07-10, same playtest
+// report as the D2 anchor fix above): "the kart must never end up INSIDE the
+// terrain, period" — a defense-in-depth backstop, not the primary landing
+// mechanism (physics/vertical.ts's own grounded-follow/landing branches above
+// own normal ground contact). This exists for whatever edge case still slips
+// a body below its own current floor in a single tick — e.g. a fast fall
+// covering more than `landingMargin` in one substep and skipping straight
+// past the landing check's window, or a future bug in the detach logic this
+// pass didn't anticipate.
+//
+// `groundHeight` here MUST be the caller's own current-tick, yRef-aware floor
+// sample (kart.ts step 8b's `groundHeightNow`, from
+// map.sampleHeightAt(x, z, yRef, layerClimbThreshold) — the SAME multi-layer,
+// "which floor is this body actually near" selection the grounded branch
+// above already uses) — NOT a plain topmost-layer sample. This is what keeps
+// the guard from wrongly yanking a kart flying UNDER a bridge deck up onto
+// the deck's top: sampleAt's own layer selection already resolved "this body
+// is near the LOWER floor, not the bridge", so `groundHeight` here already
+// reads the lower floor, and the guard only ever corrects a body that's
+// slipped below THAT (correct) floor — a body cruising above it (including a
+// kart still climbing away from a trampoline launch, or comfortably clearing
+// the gap under a bridge) is never touched, since the guard is one-directional
+// (only pushes UP, only when already below).
+const GROUND_PENETRATION_EPS = 0.02; // meters — tighter than landingMargin(0.04)/groundSnapDistance(0.07): this is a "should never happen" backstop, not a normal-operation tolerance, so it should catch real penetration without ever fighting the ordinary landing snap for the same tick.
+
+export function clampAboveGround(state: VerticalState, groundHeight: number | null): VerticalState {
+  if (groundHeight === null) return state; // no floor info here — nothing to clamp against (matches every other "off the map" fallback in this module)
+  if (state.y >= groundHeight - GROUND_PENETRATION_EPS) return state; // already at/above the floor — no-op, byte-identical passthrough
+  // Snapped up, velocity killed (no bounce, same "clean landing" contract as
+  // the ordinary landing branch), and re-grounded — a kart found inside the
+  // terrain is, by definition, standing on it now.
+  return { y: groundHeight, vy: 0, airborne: false, groundHeightPrev: groundHeight, detachFollowY: groundHeight };
 }

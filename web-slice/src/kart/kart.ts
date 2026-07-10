@@ -19,7 +19,7 @@ import type { GameMap } from "../map/mapLoader";
 import { buildKartPhysicsParams, type KartStats } from "./stats";
 import type { RawInput } from "../core/input";
 import { KART_COLLISION_RADIUS, resolveKartPush, type KartObstacle } from "../physics/kartCollision";
-import { createVerticalState, stepVertical, type VerticalState } from "../physics/vertical";
+import { createVerticalState, stepVertical, clampAboveGround, type VerticalState } from "../physics/vertical";
 import { footprintHalfExtents, footprintPoints, resolveTerrainSlide } from "../physics/terrainWall";
 import { resolveKartVsStatic } from "../physics/staticSlide";
 import { STATIC_COLLISION_SKIN } from "../shared/staticColliders";
@@ -629,6 +629,17 @@ export class Kart {
       landingMargin: this.params.verticalLandingMargin,
       groundSnapDistance: this.params.groundSnapDistance,
     });
+    // Post-step safety invariant (owner playtest report, 2026-07-10: "падает
+    // сквозь текстуру и застревает") — see physics/vertical.ts
+    // clampAboveGround doc for the full contract. Defense-in-depth backstop
+    // behind the D2 anchor fix above (same session): the kart body must never
+    // end up below its own current-layer floor, regardless of edge case.
+    // `groundHeightNow` is this SAME tick's yRef-aware floor sample (already
+    // computed above for the grounded-follow target) — reusing it is what
+    // keeps this guard bridge/multi-layer-safe (see that doc's "flying under
+    // a bridge deck" case) and jump/trampoline-safe (one-directional: only
+    // pushes the body UP, only when it's already below the floor).
+    this.vertical = clampAboveGround(this.vertical, groundHeightNow);
     this.state.pos.y = this.vertical.y;
 
     // 8d. Body attitude (pitch/roll) — TWO separately-filtered, additive

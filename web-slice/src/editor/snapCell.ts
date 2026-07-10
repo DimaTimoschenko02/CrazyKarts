@@ -34,6 +34,52 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
 }
 
+// Highest surface Y (world meters) the snap picker is allowed to target while
+// the user's active level is yLevel — the top of that level's own band, plus a
+// small epsilon so a surface sitting EXACTLY on the band boundary (e.g. a
+// full-height block's top) still counts.
+//
+// Owner regression 2026-07-10 #1: raycastSnapCell used to take the FIRST mesh
+// hit along the camera ray unconditionally, i.e. always the highest surface —
+// a bridge deck, a wall top — making Q/E level selection dead in snap mode
+// ("can't place under a bridge anymore"). Both the mesh-ray hit filter and the
+// heightfield floor sampling now reject surfaces above this cap, so aiming
+// under a deck with y_level 0 skips the deck and lands on the floor below;
+// raising Q/E to the deck's level makes the deck targetable again.
+export function snapLevelCapY(yLevel: number, levelHeight: number, eps = 0.01): number {
+  return (yLevel + 1) * levelHeight + eps;
+}
+
+// Where a snap placement actually gets WRITTEN into the cells map.
+//
+// Owner regression 2026-07-10 #2: cells are keyed by (x, z, y_level), and a
+// snapped record used to keep the user's active y_level verbatim — so gluing a
+// tree onto grass at the same active level produced the SAME key as the grass
+// and silently replaced it ("дерево стоит, а блок под ним пропал"). Instead,
+// bump y_level up to the first free layer at/above the requested one and fold
+// the difference back into y_offset, so the final WORLD height is unchanged:
+// worldBottom stays exactly floorHeight regardless of which layer the record
+// lives on. Grass keeps (x,z,0); the tree lands on (x,z,1) with a negative
+// y_offset that visually plants its bottom on the grass top.
+//
+// maxLevels is a hard iteration cap (a real column can't be taller than the
+// map allows; this only guards against a pathological isLevelOccupied).
+export function resolveSnapPlacement(params: {
+  readonly yLevel: number;
+  readonly levelHeight: number;
+  readonly floorHeight: number;
+  readonly bottomY: number | null; // null = asset has no baked bottom → pivot is the bottom
+  readonly isLevelOccupied: (level: number) => boolean;
+  readonly maxLevels?: number;
+}): { yLevel: number; yOffset: number } {
+  const { yLevel, levelHeight, floorHeight, bottomY, isLevelOccupied } = params;
+  const maxLevels = params.maxLevels ?? 256;
+  let level = yLevel;
+  while (isLevelOccupied(level) && level < yLevel + maxLevels) level++;
+  const yOffset = floorHeight - (level * levelHeight + (bottomY ?? 0));
+  return { yLevel: level, yOffset };
+}
+
 // The fractional y_offset (meters) that puts a tile's own lowest mesh point
 // (bottomY, local meters above its pivot — see tileBottomY in
 // shared/heightfield.ts) flush on an already-placed surface at floorHeight.

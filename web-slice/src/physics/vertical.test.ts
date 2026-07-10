@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createVerticalState, stepVertical, type VerticalParams, type VerticalState } from "./vertical";
+import { createVerticalState, stepVertical, clampAboveGround, type VerticalParams, type VerticalState } from "./vertical";
 
 const P: VerticalParams = {
   gravity: 20,
@@ -281,6 +281,131 @@ describe("stepVertical — params drive the thresholds", () => {
       s2 = stepVertical(s2, { groundHeight: -100, detachRefHeight: -100, dt: DT }, highG);
     }
     expect(Math.abs(s2.vy)).toBeGreaterThan(Math.abs(s1.vy));
+  });
+});
+
+describe("stepVertical — D2 anchor fix (2026-07-10 regression, 'падает сквозь текстуру на медленном съезде')", () => {
+  // Reproduces the roads_v1.json slope bug numerically: on a real slope,
+  // groundHeight (wall-aware MAX including the UPHILL/rear probe) sits a
+  // roughly CONSTANT ~halfWheelbase*grade above detachRef/leadingProbeHeight
+  // (the downhill center/front probes) — a static geometric fact, not a
+  // "kart left the ground" signal. tools/diagnose_edge_bugs_sim.ts scenario
+  // "C" measured ~0.3m on roads_v1's real 20° slope tiles (grade≈0.367,
+  // halfWheelbase≈0.9 -> 0.9*0.367≈0.33m) — GAP below models that directly.
+  const GAP = 0.3; // meters, constant slope-induced bias (groundHeight - detachRef/leading)
+  const RATE = 0.15; // m/s descent rate of the center probe (slow crawl, matches the owner's reported 0.5-1.5 m/s kart speed on this grade)
+
+  it("does not detach on a continuous slope where groundHeight sits a constant gap above detachRef/leadingProbeHeight (was: pogo/bounce every ~0.3s)", () => {
+    // Prime on FLAT ground first (h constant) so state.y/detachFollowY both
+    // reach their real steady state the way actual driving would (arriving
+    // at the top of the slope after cruising on flat ground) — starting the
+    // state artificially pre-set to the settled slope value (skipping the
+    // approach) would seed detachFollowY inconsistently with detachRef's very
+    // first reading and produce a spurious one-tick transient unrelated to
+    // the bug this test targets.
+    let s = createVerticalState(GAP);
+    let h = 0; // center-probe height
+    for (let i = 0; i < 60; i++) {
+      const leading = h - GAP * 0.5;
+      s = stepVertical(s, { groundHeight: h + GAP, detachRefHeight: h, leadingProbeHeight: leading, dt: DT }, P);
+    }
+    expect(s.airborne).toBe(false); // sanity: settled on flat ground first
+    let everAirborne = false;
+    for (let i = 0; i < 600; i++) {
+      h -= RATE * DT;
+      const leading = h - GAP * 0.5; // front probe: further downhill still, roughly another half-gap below center
+      s = stepVertical(s, { groundHeight: h + GAP, detachRefHeight: h, leadingProbeHeight: leading, dt: DT }, P);
+      if (s.airborne) everAirborne = true;
+    }
+    expect(everAirborne).toBe(false);
+  });
+
+  it("still detaches once the gap genuinely GROWS past a real crest (not just the constant slope bias)", () => {
+    // Same constant-gap slope for a while (settles), then the ground falls
+    // away for real (gap grows without bound, like driving off the end of
+    // the slope into open air) — must still detach.
+    let s = createVerticalState(GAP);
+    let h = 0;
+    for (let i = 0; i < 200; i++) {
+      h -= RATE * DT;
+      const leading = h - GAP * 0.5;
+      s = stepVertical(s, { groundHeight: h + GAP, detachRefHeight: h, leadingProbeHeight: leading, dt: DT }, P);
+    }
+    expect(s.airborne).toBe(false); // sanity: still glued through the ordinary slope portion
+    let everAirborne = false;
+    for (let i = 0; i < 60; i++) {
+      h -= 3; // cliff: center probe crashes far below every tick from here
+      const leading = h - GAP * 0.5;
+      s = stepVertical(s, { groundHeight: h + GAP, detachRefHeight: h, leadingProbeHeight: leading, dt: DT }, P);
+      if (s.airborne) { everAirborne = true; break; }
+    }
+    expect(everAirborne).toBe(true);
+  });
+
+  it("the convex-ridge crest test (D2's original motivating case) is unaffected — byte-identical trajectory", () => {
+    // groundHeight===detachRef every tick (no leadingProbeHeight wired) here,
+    // same as the pre-existing "moderate crest eventually detaches" test —
+    // detachFollowY and state.y chase the identical target sequence with the
+    // identical alpha from the identical start, so this anchor swap cannot
+    // change the outcome for any caller that never diverges the two signals.
+    const params: VerticalParams = { ...P, groundSnapDistance: 0.07 };
+    let s = createVerticalState(0);
+    let h = 0;
+    for (let i = 0; i < 90; i++) {
+      h += 1.7 * DT;
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, params);
+    }
+    let everAirborne = false;
+    for (let i = 0; i < 90; i++) {
+      h -= 1.7 * DT;
+      s = stepVertical(s, { groundHeight: h, detachRefHeight: h, dt: DT }, params);
+      if (s.airborne) { everAirborne = true; break; }
+    }
+    expect(everAirborne).toBe(true); // same assertion as the pre-existing test — proves no regression
+  });
+});
+
+describe("clampAboveGround — post-step 'never inside terrain' safety invariant", () => {
+  it("snaps a body found below its own current floor up onto it, killing vy and re-grounding", () => {
+    const s: VerticalState = { y: 0.5, vy: -8, airborne: true, groundHeightPrev: null };
+    const out = clampAboveGround(s, 1.0); // floor is well above the body — genuine penetration
+    expect(out.y).toBe(1.0);
+    expect(out.vy).toBe(0);
+    expect(out.airborne).toBe(false);
+  });
+
+  it("does not touch a body already at/above the floor (grounded, ordinary driving)", () => {
+    const s: VerticalState = { y: 1.0, vy: 0, airborne: false, groundHeightPrev: 1.0 };
+    const out = clampAboveGround(s, 1.0);
+    expect(out).toEqual(s);
+  });
+
+  it("does not touch a body climbing away from a trampoline launch (well above the floor, still ascending)", () => {
+    const s: VerticalState = { y: 3.5, vy: 9, airborne: true, groundHeightPrev: null };
+    const out = clampAboveGround(s, 1.0);
+    expect(out).toEqual(s);
+  });
+
+  it("does not touch a body flying UNDER a bridge deck — groundHeight here is already the LOWER floor (caller's yRef-aware sampleAt), not the deck", () => {
+    // Caller (kart.ts) passes groundHeightNow = map.sampleHeightAt(x, z, yRef,
+    // climbThreshold) — for a body cruising under a bridge, that already
+    // resolves to the canal/lower floor, not the deck above. A body well
+    // above that lower floor (mid-air under the bridge) must be untouched.
+    const s: VerticalState = { y: 2.0, vy: -2, airborne: true, groundHeightPrev: null };
+    const out = clampAboveGround(s, 0.5); // lower floor, well below the body
+    expect(out).toEqual(s);
+  });
+
+  it("only fires past a small epsilon — does not fight ordinary landing-margin snapping for the same tick", () => {
+    const s: VerticalState = { y: 1.0, vy: 0, airborne: false, groundHeightPrev: 1.0 };
+    const out = clampAboveGround(s, 1.01); // 1cm below the floor — under GROUND_PENETRATION_EPS(0.02)
+    expect(out).toEqual(s); // no-op, not a spurious re-snap on ordinary heightfield noise
+  });
+
+  it("no-op when there is no floor sample at all (off-map)", () => {
+    const s: VerticalState = { y: -50, vy: -5, airborne: true, groundHeightPrev: null };
+    const out = clampAboveGround(s, null);
+    expect(out).toEqual(s);
   });
 });
 
