@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.claude/skills/project-hooks/node/runner.mjs\" PostToolUse --codex",
+            "commandWindows": "node .claude/skills/project-hooks/node/runner.mjs PostToolUse --codex",
+            "timeout": 120,
+            "statusMessage": "Project hooks (PostToolUse)",
+            "additionalContextLimit": 60000
+          }
+        ]
+      }
+    ]
+  }
+}
